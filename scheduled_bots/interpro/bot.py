@@ -22,10 +22,12 @@ if __name__ == "__main__":
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--run-one', help='run one doc', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
+    parser.add_argument('--taxon', help='limit protein -> interpro to taxon', type=str)
     parser.add_argument('--interpro-version', type=str)
     parser.add_argument('--interpro-date', type=str)
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
+    taxon = args.taxon
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
 
     version_date = date_parse(args.interpro_date)
@@ -43,8 +45,10 @@ if __name__ == "__main__":
     release_wdid = release.get_or_create(login)
     print("release_wdid: {}".format(release_wdid))
 
+    print("running item bot")
     ItemsBot.main(login, release_wdid, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
-    ProteinBot.main(login, release_wdid, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
+    print("protein ipr bot")
+    ProteinBot.main(login, release_wdid, taxon=taxon, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
 
     for file_path in glob.glob(os.path.join(log_dir, "*.log")):
         # bot_log_parser.process_log(file_path)

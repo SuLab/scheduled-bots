@@ -20,7 +20,7 @@ INTERPRO = "P2926"
 UNIPROT = "P352"
 
 
-def create_uniprot_relationships(login, release_wdid, collection, taxon=None):
+def create_uniprot_relationships(login, release_wdid, collection, taxon=None, write=True):
     # only do uniprot proteins that are already in wikidata
     if taxon:
         uniprot2wd = wdi_helpers.id_mapper(UNIPROT, (("P703", taxon),))
@@ -60,7 +60,8 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None):
 
         if wd_item.create_new_item:
             raise ValueError("something bad happened")
-        wdi_helpers.try_write(wd_item, uniprot_id, INTERPRO, login, edit_summary="add/update family and/or domains")
+        wdi_helpers.try_write(wd_item, uniprot_id, INTERPRO, login, write=write,
+                              edit_summary="add/update family and/or domains")
 
     cursor.close()
 
@@ -85,6 +86,6 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
         wdi_core.WDItemEngine.logger.handles = []
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__))
 
-    create_uniprot_relationships(login, release_wdid, collection, taxon=taxon)
+    create_uniprot_relationships(login, release_wdid, collection, taxon=taxon, write=write)
 
     return os.path.join(log_dir, log_name)
