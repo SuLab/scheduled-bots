@@ -99,7 +99,7 @@ class IPRTerm:
                                         references=[self.reference])]
 
         wd_item = wdi_core.WDItemEngine(item_name=self.name, domain='interpro', data=statements,
-                                        append_value=["P279"],
+                                        append_value=["P279","P31"],
                                         fast_run=fast_run, fast_run_base_filter=IPRTerm.fast_run_base_filter)
         wd_item.set_label(self.name, lang='en')
         for lang, description in self.lang_descr.items():
