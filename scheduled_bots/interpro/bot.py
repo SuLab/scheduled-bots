@@ -39,8 +39,13 @@ if __name__ == "__main__":
     parser.add_argument('--taxon', help='limit protein -> interpro to taxon', type=str)
     parser.add_argument('--interpro-version', type=str)
     parser.add_argument('--interpro-date', type=str)
+    parser.add_argument('--protein', help='run protein ipr bot', action='store_true')
+    parser.add_argument('--items', help='run item ipr bot', action='store_true')
 
     args = parser.parse_args()
+    if not (args.protein or args.items):
+        args.protein = args.items = True
+
     log_dir = args.log_dir if args.log_dir else "./logs"
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
 
@@ -59,21 +64,22 @@ if __name__ == "__main__":
     release_wdid = release.get_or_create(login)
     print("release_wdid: {}".format(release_wdid))
 
-    print("running item bot")
-    ItemsBot.main(login, release_wdid, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
+    if args.items:
+        print("running item bot")
+        ItemsBot.main(login, release_wdid, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
 
-    print("protein ipr bot")
-
-    if args.taxon:
-        # only do this one taxon
-        taxon = args.taxon
-        print("running protein ipr bot on taxon: {}".format(taxon))
-        ProteinBot.main(login, release_wdid, taxon=taxon, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
-    else:
-        # can't do all at once... too big. Run each taxon individually
-        taxa = get_all_taxa()
-        for taxon in taxa:
+    if args.protein:
+        print("protein ipr bot")
+        if args.taxon:
+            # only do this one taxon
+            taxon = args.taxon
             print("running protein ipr bot on taxon: {}".format(taxon))
             ProteinBot.main(login, release_wdid, taxon=taxon, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
+        else:
+            # can't do all at once... too big. Run each taxon individually
+            taxa = get_all_taxa()
+            for taxon in taxa:
+                print("running protein ipr bot on taxon: {}".format(taxon))
+                ProteinBot.main(login, release_wdid, taxon=taxon, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
 
     print("DONE")
