@@ -17,6 +17,20 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
+
+def get_all_taxa():
+    # get all taxa with a uniprot protein
+    # http://tinyurl.com/hkdwzq9
+    query = """SELECT ?t
+    {	?a	wdt:P352	?p	; wdt:P703	?t}
+    GROUP BY ?t
+    """
+    result = wdi_core.WDItemEngine.execute_sparql_query(query=query)
+    taxa = set([x['t']['value'].replace("http://www.wikidata.org/entity/","")  for x in result['results']['bindings']])
+    return taxa
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run interpro wikidata import bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
@@ -25,9 +39,9 @@ if __name__ == "__main__":
     parser.add_argument('--taxon', help='limit protein -> interpro to taxon', type=str)
     parser.add_argument('--interpro-version', type=str)
     parser.add_argument('--interpro-date', type=str)
+
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
-    taxon = args.taxon
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
 
     version_date = date_parse(args.interpro_date)
@@ -47,9 +61,19 @@ if __name__ == "__main__":
 
     print("running item bot")
     ItemsBot.main(login, release_wdid, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
-    print("protein ipr bot")
-    ProteinBot.main(login, release_wdid, taxon=taxon, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
 
-    for file_path in glob.glob(os.path.join(log_dir, "*.log")):
-        # bot_log_parser.process_log(file_path)
-        pass
+    print("protein ipr bot")
+
+    if args.taxon:
+        # only do this one taxon
+        taxon = args.taxon
+        print("running protein ipr bot on taxon: {}".format(taxon))
+        ProteinBot.main(login, release_wdid, taxon=taxon, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
+    else:
+        # can't do all at once... too big. Run each taxon individually
+        taxa = get_all_taxa()
+        for taxon in taxa:
+            print("running protein ipr bot on taxon: {}".format(taxon))
+            ProteinBot.main(login, release_wdid, taxon=taxon, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
+
+    print("DONE")
