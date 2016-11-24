@@ -37,8 +37,8 @@ if __name__ == "__main__":
     parser.add_argument('--run-one', help='run one doc', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
     parser.add_argument('--taxon', help='limit protein -> interpro to taxon', type=str)
-    parser.add_argument('--interpro-version', type=str)
-    parser.add_argument('--interpro-date', type=str)
+    parser.add_argument('--interpro-version', help="example: '60.0'", type=str)
+    parser.add_argument('--interpro-date', help="format example: '03-NOV-16'", type=str)
     parser.add_argument('--protein', help='run protein ipr bot', action='store_true')
     parser.add_argument('--items', help='run item ipr bot', action='store_true')
 
@@ -51,9 +51,6 @@ if __name__ == "__main__":
 
     version_date = date_parse(args.interpro_date)
     version_num = args.interpro_version
-
-    #version_date = date_parse("03-NOV-16")
-    #version_num = "60.0"
 
     release = wdi_helpers.Release(title="InterPro Release {}".format(version_num),
                                   description="Release {} of the InterPro database & software".format(version_num),

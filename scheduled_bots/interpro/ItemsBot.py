@@ -39,7 +39,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
     # create/update all interpro items
     terms = []
     cursor = interpro_coll.find(no_cursor_timeout=True)
-    for doc in tqdm(cursor, total=cursor.count()):
+    for doc in tqdm(cursor, total=cursor.count(), mininterval=1.0):
         doc['release_wdid'] = release_wdid
         term = IPRTerm(**doc)
         term.create_item(login, write=write)
@@ -50,7 +50,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
 
     # create/update interpro item relationships
     IPRTerm.refresh_ipr_wd()
-    for term in tqdm(terms):
+    for term in tqdm(terms, mininterval=1.0):
         term.create_relationships(login, write=write)
 
     return os.path.join(log_dir, log_name)

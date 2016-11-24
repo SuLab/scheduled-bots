@@ -30,7 +30,7 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
         fast_run_base_filter = {UNIPROT: ""}
 
     cursor = collection.find({'_id': {'$in': list(uniprot2wd.keys())}}, no_cursor_timeout=True)
-    for doc in tqdm(cursor, total=cursor.count()):
+    for doc in tqdm(cursor, total=cursor.count(), mininterval=1.0):
         uniprot_id = doc['_id']
         statements = []
         # uniprot ID. needed for PBB_core to find uniprot item
