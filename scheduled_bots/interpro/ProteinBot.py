@@ -1,12 +1,11 @@
 import json
 import os
 from datetime import datetime
+from json import JSONDecodeError
 
-from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
-from dateutil.parser import parse as date_parse
 from pymongo import MongoClient
 from tqdm import tqdm
-
+from wikidataintegrator import wdi_core, wdi_helpers
 
 from .IPRTerm import IPRTerm
 
@@ -54,12 +53,16 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
             print("wdid_not_found " + uniprot_id + " " + uniprot2wd[uniprot_id])
             wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(uniprot_id, UNIPROT, None, "wdid_not_found"))
 
-        wd_item = wdi_core.WDItemEngine(wd_item_id=uniprot2wd[uniprot_id], domain="proteins", data=statements,
-                                        fast_run=True, fast_run_base_filter=fast_run_base_filter,
-                                        append_value=["P279", "P527", "P361"])
+        try:
+            wd_item = wdi_core.WDItemEngine(wd_item_id=uniprot2wd[uniprot_id], domain="proteins", data=statements,
+                                            fast_run=True, fast_run_base_filter=fast_run_base_filter,
+                                            append_value=["P279", "P527", "P361"])
+        except JSONDecodeError as e:
+            wdi_core.WDItemEngine.log("ERROR",
+                                      wdi_helpers.format_msg(uniprot_id, UNIPROT, uniprot2wd[uniprot_id], str(e),
+                                                             msg_type=type(e)))
+            continue
 
-        if wd_item.create_new_item:
-            raise ValueError("something bad happened")
         wdi_helpers.try_write(wd_item, uniprot_id, INTERPRO, login, write=write,
                               edit_summary="add/update family and/or domains")
 

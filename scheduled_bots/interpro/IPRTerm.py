@@ -1,8 +1,11 @@
+from json import JSONDecodeError
+
 from wikidataintegrator import wdi_core, wdi_helpers
 from wikidataintegrator.wdi_helpers import format_msg
 
 INTERPRO = "P2926"
 INSTANCE_OF = "P31"
+
 
 class IPRTerm:
     """
@@ -98,9 +101,15 @@ class IPRTerm:
                       wdi_core.WDItemID(value=self.type_wdid, prop_nr=INSTANCE_OF,
                                         references=[self.reference])]
 
-        wd_item = wdi_core.WDItemEngine(item_name=self.name, domain='interpro', data=statements,
-                                        append_value=["P279","P31"],
-                                        fast_run=fast_run, fast_run_base_filter=IPRTerm.fast_run_base_filter)
+        try:
+            wd_item = wdi_core.WDItemEngine(item_name=self.name, domain='interpro', data=statements,
+                                            append_value=["P279", "P31"],
+                                            fast_run=fast_run, fast_run_base_filter=IPRTerm.fast_run_base_filter)
+        except JSONDecodeError as e:
+            wdi_core.WDItemEngine.log("ERROR",
+                                      wdi_helpers.format_msg(self.id, INTERPRO, None, str(e), msg_type=type(e)))
+            return None
+
         wd_item.set_label(self.name, lang='en')
         for lang, description in self.lang_descr.items():
             wd_item.set_description(description, lang=lang)
@@ -136,4 +145,5 @@ class IPRTerm:
                                         append_value=['P279', 'P527', 'P361'],
                                         fast_run=True, fast_run_base_filter=IPRTerm.fast_run_base_filter)
 
-        wdi_helpers.try_write(wd_item, self.id, INTERPRO, login, edit_summary="create/update subclass/has part/part of", write=write)
+        wdi_helpers.try_write(wd_item, self.id, INTERPRO, login, edit_summary="create/update subclass/has part/part of",
+                              write=write)
