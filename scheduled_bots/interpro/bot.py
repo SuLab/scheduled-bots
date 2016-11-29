@@ -29,8 +29,7 @@ def get_all_taxa():
     taxa = set([x['t']['value'].replace("http://www.wikidata.org/entity/","")  for x in result['results']['bindings']])
     return taxa
 
-
-
+# todo open ItemsBot mongouri params
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run interpro wikidata import bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)

@@ -87,7 +87,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
     log_name = '{}-{}.log'.format(__metadata__['name'], __metadata__['run_id'])
     if wdi_core.WDItemEngine.logger is not None:
         wdi_core.WDItemEngine.logger.handles = []
-    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__))
+    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__), logger_name='ipr{}'.format(taxon))
 
     create_uniprot_relationships(login, release_wdid, collection, taxon=taxon, write=write)
 
