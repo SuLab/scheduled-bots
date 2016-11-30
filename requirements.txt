@@ -1,3 +1,4 @@
+pandas
 lxml==3.6.4
 pymongo==3.3.0
 python-dateutil==2.5.3
