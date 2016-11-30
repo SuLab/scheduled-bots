@@ -58,7 +58,7 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
             wd_item = wdi_core.WDItemEngine(wd_item_id=uniprot2wd[uniprot_id], domain="proteins", data=statements,
                                             fast_run=True, fast_run_base_filter=fast_run_base_filter,
                                             append_value=["P279", "P527", "P361"])
-        except (JSONDecodeError, requests.ConnectionError) as e:
+        except Exception as e:
             wdi_core.WDItemEngine.log("ERROR",
                                       wdi_helpers.format_msg(uniprot_id, UNIPROT, uniprot2wd[uniprot_id], str(e),
                                                              msg_type=type(e)))
