@@ -1,7 +1,5 @@
-#########
 # Helper functions
 #########
-from wikidataintegrator import wdi_core
 
 #########
 # Mappings for GO
@@ -44,16 +42,16 @@ go_evidence_codes = {
 ###############
 # wd item representing a source database
 sources_wdids = {'UniProt': 'Q905695',
-           'Uniprot': 'Q905695',
-           'UniProtKB': 'Q905695',
-           'ncbi_gene': 'Q20641742',  # these two are the same?  --v
-           'Entrez': 'Q20641742',
-           'ncbi_taxonomy': 'Q13711410',
-           'swiss_prot': 'Q2629752',
-           'trembl': 'Q22935315',
-           'Ensembl': 'Q1344256',
-           'refseq': 'Q7307074'
-}
+                 'Uniprot': 'Q905695',
+                 'UniProtKB': 'Q905695',
+                 'ncbi_gene': 'Q20641742',  # these two are the same?  --v
+                 'Entrez': 'Q20641742',
+                 'ncbi_taxonomy': 'Q13711410',
+                 'swiss_prot': 'Q2629752',
+                 'trembl': 'Q22935315',
+                 'Ensembl': 'Q1344256',
+                 'refseq': 'Q7307074'
+                 }
 
 # property ID
 prop_ids = {'uniprot': 'P352',
@@ -68,18 +66,18 @@ prop_ids = {'uniprot': 'P352',
 
 # http://www.geneontology.org/doc/GO.xrf_abbs
 curators_wdids = {'AgBase': 'Q4690901',
-            'BHF-UCL': 'Q4970039',
-            # 'CACAO': None,
-            'EnsemblPlants': 'Q27927711',
-            'FlyBase': 'Q3074571',
-            'GOC': 'Q23809253',
-            'GO_Central': 'Q27927716',
-            'HGNC': 'Q1646383',
-            'IntAct': 'Q27901835',
-            'InterPro': 'Q3047275',
-            'MGI': 'Q1951035',
-            # 'ParkinsonsUK-UCL':
-            'Reactome': 'Q2134522',
-            'SGD': 'Q3460832',
-            'UniProt': 'Q905695',
-            'WormBase': 'Q3570042'}
+                  'BHF-UCL': 'Q4970039',
+                  'CACAO': 'Q27929332',
+                  'EnsemblPlants': 'Q27927711',
+                  'FlyBase': 'Q3074571',
+                  'GOC': 'Q23809253',
+                  'GO_Central': 'Q27927716',
+                  'HGNC': 'Q1646383',
+                  'IntAct': 'Q27901835',
+                  'InterPro': 'Q3047275',
+                  'MGI': 'Q1951035',
+                  'ParkinsonsUK-UCL': 'Q27929334',
+                  'Reactome': 'Q2134522',
+                  'SGD': 'Q3460832',
+                  'UniProt': 'Q905695',
+                  'WormBase': 'Q3570042'}

@@ -8,17 +8,16 @@ https://www.wikidata.org/wiki/Q27553062
 import argparse
 import json
 import os
-from itertools import chain
-
 from datetime import datetime
+from itertools import chain
+from typing import List, Dict, Sequence, Container, Set
+
 import pandas as pd
 import pymongo
-from pandas.parser import k
 from pymongo import MongoClient
+from scheduled_bots.geneprotein import go_props, go_evidence_codes, curators_wdids, sources_wdids
 from tqdm import tqdm
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
-
-from scheduled_bots.geneprotein import go_props, go_evidence_codes, curators_wdids, sources_wdids
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -39,7 +38,8 @@ ENTREZ = "P351"
 UNIPROT = "P352"
 
 
-def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, retrieved: datetime, go_map: dict, pmid_map: dict, login: wdi_login.WDLogin):
+def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, retrieved: datetime, go_map: dict,
+                       pmid_map: dict, login: wdi_login.WDLogin):
     """
     add go terms to a protein item.
     Follows the schema described here:
@@ -75,7 +75,10 @@ def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, r
             # stated in pmids
             pmids = set([x[5:] for x in list(chain(*list(ss_df))) if x.startswith("PMID:")])
             for pmid in pmids:
-                reference.append(wdi_core.WDItemID(pmid_map[pmid], 'P248', is_reference=True))
+                if pmid in pmid_map:
+                    reference.append(wdi_core.WDItemID(pmid_map[pmid], 'P248', is_reference=True))
+                else:
+                    raise ValueError("article item for pmid {} not found. skipping item".format(pmid))
 
             # stated in dbs
             dbs = set(ss_df.index.get_level_values("DB"))
@@ -88,9 +91,7 @@ def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, r
                 if curator in curators_wdids:
                     reference.append(wdi_core.WDItemID(curators_wdids[curator], 'P1640', is_reference=True))
                 else:
-                    wdi_core.WDItemEngine.logger.warning(
-                        wdi_helpers.format_msg(uniprot_id, UNIPROT, item_wdid, "curator not found: {}".format(curator)))
-                    print("curator not found: {}".format(curator))
+                    raise ValueError("curator not found: {}".format(curator))
 
             # reference URL
             ref_url = "http://www.ebi.ac.uk/QuickGO/GAnnotation?protein={}".format(uniprot_id)
@@ -101,12 +102,35 @@ def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, r
 
             statement.references.append(reference)
 
+        # not required, but for asthetics...
+        statement.references = statement.references[::-1]
         statements.append(statement)
 
     return statements
 
 
-def main(coll: pymongo.collection.Collection, taxon: str, retrieved: datetime, log_dir: str = "./logs", write: bool = True) -> None:
+def create_articles(pmids: Set[str], login: object, write: bool = True) -> Dict[str, str]:
+    """
+    Given a list of pmids, make article items for each
+    :param pmids: list of pmids
+    :param login: wdi_core login instance
+    :param write: actually perform write
+    :return: map pmid -> wdid
+    """
+    pmid_map = dict()
+    for pmid in pmids:
+        p = wdi_helpers.PubmedStub(pmid)
+        if write:
+            pmid_wdid = p.get_or_create(login)
+            print(pmid_wdid)
+            pmid_map[pmid] = pmid_wdid
+        else:
+            pmid_map[pmid] = 'Q1'
+    return pmid_map
+
+
+def main(coll: pymongo.collection.Collection, taxon: str, retrieved: datetime, log_dir: str = "./logs",
+         write: bool = True) -> None:
     """
     Main function for annotating GO terms on proteins
     
@@ -137,45 +161,38 @@ def main(coll: pymongo.collection.Collection, taxon: str, retrieved: datetime, l
 
     # get all pmids and make items for them
     pmids = set([x[5:] for x in df['Reference'] if x.startswith("PMID:")])
-    #pmid_map = wdi_helpers.id_mapper("P698")
-    pmid_map = dict()
+    pmid_map = wdi_helpers.id_mapper("P698")
+    print("Total number of pmids: {}".format(len(pmids)))
     pmids_todo = pmids - set(pmid_map.keys())
     print("Creating {} pmid items".format(len(pmids_todo)))
-
-    for pmid in pmids_todo:
-        p = wdi_helpers.PubmedStub(pmid)
-        #pmid_map[pmid] = "Q1"
-        #continue
-        if write:
-            pmid_wdid = p.get_or_create(login)
-            pmid_map[pmid] = pmid_wdid
-        else:
-            pmid_map[pmid] = "Q1"
+    new_pmids = create_articles(pmids_todo, login, write)
+    pmid_map.update(new_pmids)
     print("Done creating pmid items")
 
     # groupby ID, GOID & evidence, the make references a list
     go_annotations = df.groupby(['ID', 'GO ID', 'Evidence', 'Source', 'DB', 'Aspect'])['Reference'].apply(list)
 
     # iterate through all proteins & write
-    failed_items=[]
+    failed_items = []
     for uniprot_id, item_wdid in tqdm(prot_wdid_mapping.items()):
         if uniprot_id not in go_annotations:
             continue
-        if item_wdid != "Q27551834":
-            pass
         this_go = go_annotations[uniprot_id]
-        statements = make_go_statements(item_wdid, uniprot_id, this_go, retrieved, go_map, pmid_map, login)
-
         try:
+            statements = make_go_statements(item_wdid, uniprot_id, this_go, retrieved, go_map, pmid_map, login)
             wditem = wdi_core.WDItemEngine(wd_item_id=item_wdid, domain='protein', data=statements, fast_run=True,
                                            fast_run_base_filter={UNIPROT: "", "P703": organism_wdid})
+                                           #good_refs=[{'P248': None}], keep_good_ref_statements=True)
             wdi_helpers.try_write(wditem, record_id=uniprot_id, record_prop=UNIPROT, edit_summary="update GO terms",
                                   login=login, write=write)
         except Exception as e:
             print(e)
             failed_items.append(uniprot_id)
-    print("{} items failed: {}".format(len(failed_items), failed_items))
+            wdi_core.WDItemEngine.log("ERROR",
+                                      wdi_helpers.format_msg(uniprot_id, UNIPROT, item_wdid, str(e),
+                                                             msg_type=type(e)))
 
+    print("{} items failed: {}".format(len(failed_items), failed_items))
 
 
 # taxon = "559292"  # yeast Q27510868
@@ -199,6 +216,7 @@ if __name__ == "__main__":
     log_name = '{}-{}.log'.format(__metadata__['name'], datetime.now().strftime('%Y%m%d_%H:%M'))
     if wdi_core.WDItemEngine.logger is not None:
         wdi_core.WDItemEngine.logger.handles = []
-    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__), logger_name='go{}'.format(taxon))
+    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
+                                        logger_name='go{}'.format(taxon))
 
     main(coll, taxon, retrieved, log_dir=log_dir, write=not args.dummy)
