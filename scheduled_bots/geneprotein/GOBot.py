@@ -4,6 +4,8 @@ https://www.wikidata.org/wiki/Q22291171
 example yeast protein:
 https://www.wikidata.org/wiki/Q27553062
 
+Data source: Quickgo mongo
+
 """
 import argparse
 import json
@@ -90,6 +92,8 @@ def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, r
             for curator in curators:
                 if curator in curators_wdids:
                     reference.append(wdi_core.WDItemID(curators_wdids[curator], 'P1640', is_reference=True))
+                    # TODO: # curator-specific reference URLs
+                    # If curator is SGD, add external ID to ref
                 else:
                     raise ValueError("curator not found: {}".format(curator))
 
@@ -194,8 +198,6 @@ def main(coll: pymongo.collection.Collection, taxon: str, retrieved: datetime, l
 
     print("{} items failed: {}".format(len(failed_items), failed_items))
 
-
-# taxon = "559292"  # yeast Q27510868
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata GO bot')
