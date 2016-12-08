@@ -119,9 +119,13 @@ def create_item(record, organism_info, chr_num_wdid, retrieved, login):
     else:
         item_description = '{} gene found in {}'.format(organism_info['type'], organism_info['name'])
 
-    wd_item_gene = wdi_core.WDItemEngine(item_name=item_name, domain='genes', data=statements,
-                                         append_value=[PROPS['subclass of']],
-                                         fast_run=True,
+    entrez_ref = HelperBot.make_ref_source(record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
+                                 external_ids['Entrez Gene ID'], login=login)
+    entrez_statement = wdi_core.WDString(external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref])
+
+    wd_item_gene = wdi_core.WDItemEngine(item_name=item_name, domain='genes', data=[entrez_statement],
+                                         append_value=[PROPS['subclass of']], search_only=True,
+                                         fast_run=False,
                                          fast_run_base_filter={PROPS['Entrez Gene ID']: '',
                                                                PROPS['found in taxon']: organism_info['wdid']})
     wd_item_gene.set_label(item_name)
@@ -130,6 +134,8 @@ def create_item(record, organism_info, chr_num_wdid, retrieved, login):
     if 'NCBI Locus tag' in external_ids:
         aliases.append(external_ids['NCBI Locus tag'])
     wd_item_gene.set_aliases(aliases)
+
+    wd_item_gene.update(data=statements, append_value=[PROPS['subclass of']])
     wdi_helpers.try_write(wd_item_gene, external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], login)
 
 
@@ -323,7 +329,8 @@ def do_gp_human(record, chr_num_wdid, external_ids, login=None):
     else:
         s.append(wdi_core.WDItemID(chrom_wdid, PROPS['chromosome'],
                                    references=[genomic_pos_ref], qualifiers=[assembly]))
-        s.append(wdi_core.WDItemID(chrom_wdid_hg19, PROPS['chromosome'],
+        if do_hg19:
+            s.append(wdi_core.WDItemID(chrom_wdid_hg19, PROPS['chromosome'],
                                    references=[genomic_pos_ref_hg19], qualifiers=[assembly_hg19]))
 
     return s
