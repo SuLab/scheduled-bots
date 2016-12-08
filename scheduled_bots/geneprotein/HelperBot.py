@@ -13,17 +13,6 @@ source_items = {'uniprot': 'Q905695',
                 'ensembl': 'Q1344256',
                 'refseq': 'Q7307074'}
 
-prop_ids = {'uniprot': 'P352',
-            'ncbi_gene': 'P351',
-            'entrez_gene': 'P351',
-            'ncbi_taxonomy': 'P685',
-            'ncbi_locus_tag': 'P2393',
-            'ensembl_gene': 'P594',
-            'ensembl_protein': 'P705',
-            'refseq_protein': 'P637'
-            }
-
-
 def check_record(record):
     # only one genomic position
     assert 'genomic_pos' in record and isinstance(record['genomic_pos'], dict)
@@ -139,10 +128,9 @@ def make_ref_source(source_doc, id_prop, identifier, login=None):
     source = source_doc['id']
     if source not in source_items:
         raise ValueError("Unknown source for reference creation: {}".format(source))
-    if id_prop not in prop_ids:
-        raise ValueError("Unknown id_prop for reference creation: {}".format(id_prop))
+    assert id_prop.startswith("P")
 
-    link_to_id = wdi_core.WDString(value=str(identifier), prop_nr=prop_ids[id_prop], is_reference=True)
+    link_to_id = wdi_core.WDString(value=str(identifier), prop_nr=id_prop, is_reference=True)
 
     if "release" in source_doc:
         source_doc['release'] = str(source_doc['release'])
@@ -166,7 +154,7 @@ def make_ref_source(source_doc, id_prop, identifier, login=None):
 def make_reference(source, id_prop, identifier, retrieved):
     reference = [
         wdi_core.WDItemID(value=source_items[source], prop_nr='P248', is_reference=True),  # stated in
-        wdi_core.WDString(value=str(identifier), prop_nr=prop_ids[id_prop], is_reference=True),  # Link to ID
+        wdi_core.WDString(value=str(identifier), prop_nr=id_prop, is_reference=True),  # Link to ID
         wdi_core.WDTime(retrieved.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', is_reference=True)]
     return reference
 

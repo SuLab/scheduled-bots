@@ -79,11 +79,10 @@ __metadata__ = {'name': 'GeneBot',
                 'properties': list(PROPS.values())
                 }
 
-# If the source is "entrez", the reference identifier to be used is "entrez_gene"
-# These are defined in HelperBot
-source_ref_id = {'ensembl': 'ensembl_gene',
-                 'entrez': 'entrez_gene',
-                 'uniprot': 'uniprot'}
+# If the source is "entrez", the reference identifier to be used is "Ensembl Gene ID" (P594)
+source_ref_id = {'ensembl': "Ensembl Gene ID",
+                 'entrez': 'Entrez Gene ID',
+                 'uniprot': None}
 
 
 def create_item(record, organism_info, chr_num_wdid, retrieved, login):
@@ -104,14 +103,21 @@ def create_item(record, organism_info, chr_num_wdid, retrieved, login):
     """
 
     external_ids = get_external_ids(record)
-    statements = gene_item_statements(record, external_ids, organism_info['wdid'], chr_num_wdid)
+    statements = gene_item_statements(record, external_ids, organism_info['wdid'], chr_num_wdid, login=login)
 
     ############
     # names and labels
     ############
 
-    item_name = record['name']['@value']
-    item_description = '{} gene found in {}'.format(organism_info['type'], organism_info['name'])
+    if 'symbol' in record:
+        item_name = record['symbol']['@value']
+    else:
+        item_name = record['name']['@value']
+
+    if record['taxid']['@value'] == 9606:
+        item_description = 'gene of the species Homo sapiens'
+    else:
+        item_description = '{} gene found in {}'.format(organism_info['type'], organism_info['name'])
 
     wd_item_gene = wdi_core.WDItemEngine(item_name=item_name, domain='genes', data=statements,
                                          append_value=[PROPS['subclass of']],
@@ -121,10 +127,10 @@ def create_item(record, organism_info, chr_num_wdid, retrieved, login):
     wd_item_gene.set_label(item_name)
     wd_item_gene.set_description(item_description, lang='en')
     aliases = [record['symbol']['@value']]
-    if 'locus_tag' in external_ids:
-        aliases.append(external_ids['locus_tag'])
+    if 'NCBI Locus tag' in external_ids:
+        aliases.append(external_ids['NCBI Locus tag'])
     wd_item_gene.set_aliases(aliases)
-    wdi_helpers.try_write(wd_item_gene, external_ids['entrez_gene'], PROPS['Entrez Gene ID'], login)
+    wdi_helpers.try_write(wd_item_gene, external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], login)
 
 
 def get_external_ids(record):
@@ -136,69 +142,90 @@ def get_external_ids(record):
 
     ensembl_gene = record['ensembl']['@value']['gene']
 
-    external_ids = {'entrez_gene': entrez_gene, 'ensembl_gene': ensembl_gene}
+    external_ids = {'Entrez Gene ID': entrez_gene, 'Ensembl Gene ID': ensembl_gene}
 
     ############
     # optional external IDs
     ############
     if 'locus_tag' in record:
         # ncbi locus tag
-        external_ids['locus_tag'] = record['locus_tag']['@value']
+        external_ids['NCBI Locus tag'] = record['locus_tag']['@value']
 
     if 'SGD' in record:
-        external_ids['sgd'] = record['SGD']['@value']
+        external_ids['Saccharomyces Genome Database ID'] = record['SGD']['@value']
 
     if 'HGNC' in record:
-        external_ids['hgnc_id'] = record['HGNC']['@value']
+        external_ids['HGNC ID'] = record['HGNC']['@value']
 
     if 'symbol' in record and 'HGNC' in record:
         # "and 'HGNC' in record" is required because there is something wrong with mygene
         # see: https://github.com/stuppie/scheduled-bots/issues/2
-        external_ids['hgnc_symbol'] = record['symbol']['@value']
+        external_ids['HGNC Gene Symbol'] = record['symbol']['@value']
 
     if 'MGI' in record:
-        external_ids['mgi_id'] = record['MGI']['@value']
+        external_ids['Mouse Genome Informatics ID'] = record['MGI']['@value']
 
     ############
     # optional external IDs (can have more than one)
     ############
     if 'transcript' in record['ensembl']['@value']:
         # Ensembl Transcript ID
-        external_ids['ensembl_transcript'] = record['ensembl']['@value']['transcript']
-        if not isinstance(external_ids['ensembl_transcript'], list):
-            external_ids['ensembl_transcript'] = [external_ids['ensembl_transcript']]
+        external_ids['Ensembl Transcript ID'] = record['ensembl']['@value']['transcript']
+        if not isinstance(external_ids['Ensembl Transcript ID'], list):
+            external_ids['Ensembl Transcript ID'] = [external_ids['Ensembl Transcript ID']]
 
     if 'rna' in record['refseq']['@value']:
         # RefSeq RNA ID
-        external_ids['refseq_transcript'] = record['refseq']['@value']['rna']
-        if not isinstance(external_ids['refseq_transcript'], list):
-            external_ids['refseq_transcript'] = [external_ids['refseq_transcript']]
+        external_ids['RefSeq RNA ID'] = record['refseq']['@value']['rna']
+        if not isinstance(external_ids['RefSeq RNA ID'], list):
+            external_ids['RefSeq RNA ID'] = [external_ids['RefSeq RNA ID']]
 
     return external_ids
 
 
-def gene_item_statements(record, external_ids, organism_wdid, chr_num_wdid):
+def gene_item_statements(record, external_ids, organism_wdid, chr_num_wdid, login=None):
     """
     construct list of referenced statements to pass to PBB_Core Item engine
+    login is required to make reference items
     """
     s = []
 
     ############
     # ID statements
     ############
-    entrez_ref = make_ref_source(record['entrezgene']['@source'], 'entrez_gene', external_ids['entrez_gene'])
-    ensembl_ref = make_ref_source(record['ensembl']['@source'], 'ensembl_gene', external_ids['ensembl_gene'])
+    ensembl_ref = make_ref_source(record['ensembl']['@source'], PROPS['Ensembl Gene ID'], external_ids['Ensembl Gene ID'], login=login)
+    entrez_ref = make_ref_source(record['entrezgene']['@source'], PROPS['Entrez Gene ID'], external_ids['Entrez Gene ID'], login=login)
 
-    s.append(wdi_core.WDString(external_ids['ensembl_gene'], PROPS['Ensembl Gene ID'], references=[ensembl_ref]))
-    s.append(wdi_core.WDString(external_ids['entrez_gene'], PROPS['Entrez Gene ID'], references=[entrez_ref]))
-    s.append(wdi_core.WDString(external_ids['mgi_id'], PROPS['Mouse Genome Informatics ID'], references=[entrez_ref]))
-    s.append(wdi_core.WDString(external_ids['hgnc_symbol'], PROPS['HGNC Gene Symbol'], references=[entrez_ref]))
-    s.append(wdi_core.WDString(external_ids['hgnc_id'], PROPS['HGNC ID'], references=[entrez_ref]))
-    s.append(wdi_core.WDString(external_ids['sgd'], PROPS['Saccharomyces Genome Database ID'], references=[entrez_ref]))
-    s.append(wdi_core.WDString(external_ids['locus_tag'], PROPS['NCBI Locus tag'], references=[entrez_ref]))
-    s.append(
-        wdi_core.WDString(external_ids['ensembl_transcript'], PROPS['Ensembl Transcript ID'], references=[ensembl_ref]))
-    s.append(wdi_core.WDString(external_ids['refseq_transcript'], PROPS['RefSeq RNA ID'], references=[entrez_ref]))
+    s.append(wdi_core.WDString(external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref]))
+    s.append(wdi_core.WDString(external_ids['Ensembl Gene ID'], PROPS['Ensembl Gene ID'], references=[ensembl_ref]))
+
+    for key in ['NCBI Locus tag', 'HGNC ID', 'HGNC Gene Symbol']:
+        if key in external_ids:
+            s.append(wdi_core.WDString(external_ids[key], PROPS[key], references=[entrez_ref]))
+
+    key = 'Mouse Genome Informatics ID'
+    if key in external_ids:
+        source_doc = record['MGI']['@source']
+        s.append(wdi_core.WDString(external_ids[key], PROPS[key],
+                                   references=[make_ref_source(source_doc, PROPS[key], external_ids[key])]))
+
+    key = 'Saccharomyces Genome Database ID'
+    if key in external_ids:
+        source_doc = record['SGD']['@source']
+        s.append(wdi_core.WDString(external_ids[key], PROPS[key],
+                                   references=[make_ref_source(source_doc, PROPS[key], external_ids[key])]))
+
+    key = 'Ensembl Transcript ID'
+    if key in external_ids:
+        for id in external_ids:
+            s.append(wdi_core.WDString(id, PROPS[key], references=[ensembl_ref]))
+
+    key = 'RefSeq RNA ID'
+    if key in external_ids:
+        for id in external_ids:
+            s.append(wdi_core.WDString(id, PROPS[key], references=[entrez_ref]))
+
+
 
     ############
     # Gene statements
@@ -221,19 +248,20 @@ def gene_item_statements(record, external_ids, organism_wdid, chr_num_wdid):
     # example: http://mygene.info/v3/gene/2952?fields=genomic_pos,genomic_pos_hg19
 
     if human:
-        gp_statements = do_gp_human(record, chr_num_wdid, external_ids)
+        gp_statements = do_gp_human(record, chr_num_wdid, external_ids, login=login)
     else:
-        gp_statements = do_gp_non_human(record, chr_num_wdid, external_ids)
+        gp_statements = do_gp_non_human(record, chr_num_wdid, external_ids, login=login)
     s.extend(gp_statements)
 
     return s
 
 
-def do_gp_human(record, chr_num_wdid, external_ids):
+def do_gp_human(record, chr_num_wdid, external_ids, login=None):
     genomic_pos_value = record['genomic_pos']['@value']
     genomic_pos_source = record['genomic_pos']['@source']
-    genomic_pos_id_prop = source_ref_id[genomic_pos_source['_id']]
-    genomic_pos_ref = make_ref_source(genomic_pos_source, genomic_pos_id_prop, external_ids[genomic_pos_id_prop])
+    genomic_pos_id_prop = source_ref_id[genomic_pos_source['id']]
+    genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop],
+                                      external_ids[genomic_pos_id_prop], login=login)
     assembly = wdi_core.WDItemID("Q20966585", PROPS['chromosome'], is_qualifier=True)
 
     # create qualifier for start/stop
@@ -247,8 +275,8 @@ def do_gp_human(record, chr_num_wdid, external_ids):
         genomic_pos_value_hg19 = record['genomic_pos_hg19']['@value']
         genomic_pos_source_hg19 = record['genomic_pos_hg19']['@source']
         genomic_pos_id_prop_hg19 = source_ref_id[genomic_pos_source_hg19['_id']]
-        genomic_pos_ref_hg19 = make_ref_source(genomic_pos_source_hg19, genomic_pos_id_prop_hg19,
-                                               external_ids[genomic_pos_id_prop_hg19])
+        genomic_pos_ref_hg19 = make_ref_source(genomic_pos_source_hg19, PROPS[genomic_pos_id_prop_hg19],
+                                               external_ids[genomic_pos_id_prop_hg19], login=login)
         assembly_hg19 = wdi_core.WDItemID("Q21067546", PROPS['chromosome'], is_qualifier=True)
         chrom_wdid_hg19 = chr_num_wdid[genomic_pos_value_hg19['chr']]
         qualifiers_hg19 = [wdi_core.WDItemID(chrom_wdid_hg19, PROPS['chromosome'], is_qualifier=True), assembly_hg19]
@@ -301,11 +329,12 @@ def do_gp_human(record, chr_num_wdid, external_ids):
     return s
 
 
-def do_gp_non_human(record, chr_num_wdid, external_ids):
+def do_gp_non_human(record, chr_num_wdid, external_ids, login=None):
     genomic_pos_value = record['genomic_pos']['@value']
     genomic_pos_source = record['genomic_pos']['@source']
     genomic_pos_id_prop = source_ref_id[genomic_pos_source['_id']]
-    genomic_pos_ref = make_ref_source(genomic_pos_source, genomic_pos_id_prop, external_ids[genomic_pos_id_prop])
+    genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop],
+                                      external_ids[genomic_pos_id_prop], login=login)
 
     # create qualifier for start/stop/orientation
     chrom_wdid = chr_num_wdid[genomic_pos_value['chr']]
