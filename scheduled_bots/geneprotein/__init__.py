@@ -1,5 +1,15 @@
+#########
 # Helper functions
 #########
+
+type_of_gene_map = {'ncRNA': 'Q427087',
+                    'snRNA': 'Q284578',
+                    'snoRNA': 'Q284416',
+                    'rRNA': 'Q215980',
+                    'tRNA': 'Q201448',
+                    'pseudo': 'Q277338',
+                    'protein-coding': 'Q20747295'}
+
 
 #########
 # Mappings for GO
@@ -61,7 +71,9 @@ prop_ids = {'uniprot': 'P352',
             'ncbi_locus_tag': 'P2393',
             'ensembl_gene': 'P594',
             'ensembl_protein': 'P705',
-            'refseq_protein': 'P637'
+            'refseq_protein': 'P637',
+            'sgd_id': None,
+            'mgi_id': 'P671'
             }
 
 # http://www.geneontology.org/doc/GO.xrf_abbs
@@ -81,3 +93,29 @@ curators_wdids = {'AgBase': 'Q4690901',
                   'SGD': 'Q3460832',
                   'UniProt': 'Q905695',
                   'WormBase': 'Q3570042'}
+
+# These are for reference URLs for GO annotations and are not necessarily the same
+# as the formatter URL for the property for the IDs
+curator_ref_urls = {'SGD': {'url': 'http://www.yeastgenome.org/locus/$1/overview#go', 'id': 'sgd_id'},
+                    'MGI': {'url': 'http://www.informatics.jax.org/go/marker/$1', 'id': 'mgi_id'}
+                    }
+
+
+
+#########
+# Organism Info
+#########
+organisms_info = {
+    559292: {
+        "type": "fungal",
+        "name": "Saccharomyces cerevisiae S288c",
+        "wdid": "Q27510868",
+        'taxid': 559292
+    },
+    9606: {
+        "type": "mammalian",
+        "name": "Homo sapiens",
+        "wdid": "Q15978631",
+        'taxid': 9606
+    }
+}
