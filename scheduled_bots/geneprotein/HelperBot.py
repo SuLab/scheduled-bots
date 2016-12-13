@@ -1,3 +1,5 @@
+import sys
+import traceback
 from datetime import datetime
 
 import requests
@@ -13,37 +15,75 @@ source_items = {'uniprot': 'Q905695',
                 'ensembl': 'Q1344256',
                 'refseq': 'Q7307074'}
 
-def check_record(record):
-    # only one genomic position
-    assert 'genomic_pos' in record and isinstance(record['genomic_pos'], dict)
-    if 'genomic_pos_hg19' in record:
-        assert isinstance(record['genomic_pos_hg19'], dict)
 
-    # required keys and sub keys
+def validate_docs(docs, external_id_prop):
+    for doc in docs:
+        try:
+            doc = validate_doc(doc)
+        except AssertionError as e:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            wdi_core.WDItemEngine.log("ERROR",
+                                      wdi_helpers.format_msg(doc['_id'], external_id_prop, None, str(e), type(e)))
+            continue
+        yield doc
+
+
+def validate_doc(doc):
+    """
+    Check fields in mygene doc. and neccessary transformations
+    :param doc:
+    :return:
+    """
+    # make sure only one genomic position and its a dict
+    assert 'genomic_pos' in doc and isinstance(doc['genomic_pos'], dict)
+    if 'genomic_pos_hg19' in doc:
+        assert isinstance(doc['genomic_pos_hg19'], dict)
+
+    # existence required keys and sub keys
     required = {'entrezgene': None,
                 'ensembl': {'gene', 'transcript', 'protein'},
                 'refseq': {'rna', 'protein'},  # not using refseq['genomic']
                 'type_of_gene': None,
                 'name': None,
-                'genomic_pos': {'start', 'end', 'chr', 'strand'}
+                'genomic_pos': {'start', 'end', 'chr', 'strand'},
                 }
-    for key,value in required.items():
-        assert key in record, "{} not in record".format(key)
+    for key, value in required.items():
+        assert key in doc, "{} not in record".format(key)
         if hasattr(value, "__iter__"):
             for sub_key in required[key]:
-                assert sub_key in record[key], "{} not in {}".format(sub_key, key)
+                assert sub_key in doc[key], "{} not in {}".format(sub_key, key)
 
-    # make sure certain fields are lists
-    if not isinstance(record['ensembl']['transcript'], list):
-        record['ensembl']['transcript'] = [record['ensembl']['transcript']]
-    if not isinstance(record['ensembl']['protein'], list):
-        record['ensembl']['protein'] = [record['ensembl']['protein']]
-    if not isinstance(record['refseq']['rna'], list):
-        record['refseq']['rna'] = [record['refseq']['rna']]
-    if not isinstance(record['refseq']['protein'], list):
-        record['refseq']['protein'] = [record['refseq']['protein']]
+    # make sure these fields are lists
+    if not isinstance(doc['ensembl']['transcript'], list):
+        doc['ensembl']['transcript'] = [doc['ensembl']['transcript']]
+    if not isinstance(doc['ensembl']['protein'], list):
+        doc['ensembl']['protein'] = [doc['ensembl']['protein']]
+    if not isinstance(doc['refseq']['rna'], list):
+        doc['refseq']['rna'] = [doc['refseq']['rna']]
+    if not isinstance(doc['refseq']['protein'], list):
+        doc['refseq']['protein'] = [doc['refseq']['protein']]
 
-    return record
+    # make sure these fields are not lists
+    assert isinstance(doc['ensembl']['gene'], str)
+    assert isinstance(doc['entrezgene'], (int, str))
+    assert isinstance(doc['type_of_gene'], str)
+    assert isinstance(doc['name'], str)
+    assert isinstance(doc['uniprot']["Swiss-Prot"], str)
+    # assert isinstance(record['refseq']['genomic'], str)  # this isn't used
+
+    # check types of optional and required fields
+    fields = {'SGD': str, 'HGNC': str, 'MIM': str, 'MGI': str, 'locus_tag': str, 'symbol': str, 'taxid': int,
+              'entrezgene': int, 'type_of_gene': str, 'name': str}
+    for field, field_type in fields.items():
+        if field in doc:
+            assert isinstance(doc[field], field_type), field
+
+    # check optional dict fields
+    if 'uniprot' in doc:
+        assert "Swiss-Prot" in doc['uniprot'] and isinstance(doc['uniprot']["Swiss-Prot"], str)
+
+    return doc
 
 
 def get_mygene_src_version():
@@ -79,6 +119,7 @@ def tag_mygene_docs(docs):
                   'ensembl': 'ensembl',
                   'entrezgene': 'entrez',
                   'genomic_pos': None,
+                  'genomic_pos_hg19': None,
                   'locus_tag': 'entrez',
                   'name': 'entrez',
                   'symbol': 'entrez',
@@ -99,8 +140,10 @@ def tag_mygene_docs(docs):
     for doc in docs:
         if doc['taxid'] in ensembl_taxids:
             key_source['genomic_pos'] = 'ensembl'
+            key_source['genomic_pos_hg19'] = 'ensembl'
         else:
             key_source['genomic_pos'] = 'entrez'
+            key_source['genomic_pos_hg19'] = 'entrez'
 
         tagged_doc = {k: {'@value': v, '@source': source_dict[key_source[k]]} for k, v in doc.items() if
                       k in key_source}
@@ -157,4 +200,3 @@ def make_reference(source, id_prop, identifier, retrieved):
         wdi_core.WDString(value=str(identifier), prop_nr=id_prop, is_reference=True),  # Link to ID
         wdi_core.WDTime(retrieved.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', is_reference=True)]
     return reference
-

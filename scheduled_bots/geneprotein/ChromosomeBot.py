@@ -26,7 +26,7 @@ class ChromosomeBot:
                  'release_type', 'genome_rep', 'seq_rel_date', 'asm_name', 'submitter', 'gbrs_paired_asm',
                  'paired_asm_comp', 'ftp_path', 'excluded_from_refseq']
         self.ass_sum = pd.read_csv("ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt", sep="\t",
-                                   comment="#", names=names)
+                                   comment="#", names=names, low_memory=False)
 
     def get_assembly_report(self, taxid):
         if self.ass_sum is None:

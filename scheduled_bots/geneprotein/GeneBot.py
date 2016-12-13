@@ -43,9 +43,10 @@ from pymongo import MongoClient
 from scheduled_bots.geneprotein import HelperBot
 from scheduled_bots.geneprotein import type_of_gene_map, organisms_info
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
+from tqdm import tqdm
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 
-from .HelperBot import make_ref_source
+from HelperBot import make_ref_source
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -63,10 +64,11 @@ PROPS = {'found in taxon': 'P703',
          'NCBI Locus tag': 'P2393',
          'Ensembl Gene ID': 'P594',
          'Ensembl Transcript ID': 'P704',
+         'genomic assembly': 'P659',
          'genomic start': 'P644',
          'genomic end': 'P645',
          'chromosome': 'P1057',
-         'Saccharomyces Genome Database ID': None,
+         'Saccharomyces Genome Database ID': 'P3406',
          'Mouse Genome Informatics ID': 'P671',
          'HGNC ID': 'P354',
          'HGNC Gene Symbol': 'P353',
@@ -85,7 +87,7 @@ source_ref_id = {'ensembl': "Ensembl Gene ID",
                  'uniprot': None}
 
 
-def create_item(record, organism_info, chr_num_wdid, retrieved, login):
+def create_item(record, organism_info, chr_num_wdid, retrieved, login, write=True):
     """
     generate pbb_core item object
 
@@ -120,7 +122,7 @@ def create_item(record, organism_info, chr_num_wdid, retrieved, login):
         item_description = '{} gene found in {}'.format(organism_info['type'], organism_info['name'])
 
     entrez_ref = HelperBot.make_ref_source(record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
-                                 external_ids['Entrez Gene ID'], login=login)
+                                           external_ids['Entrez Gene ID'], login=login)
     entrez_statement = wdi_core.WDString(external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref])
 
     wd_item_gene = wdi_core.WDItemEngine(item_name=item_name, domain='genes', data=[entrez_statement],
@@ -128,6 +130,7 @@ def create_item(record, organism_info, chr_num_wdid, retrieved, login):
                                          fast_run=False,
                                          fast_run_base_filter={PROPS['Entrez Gene ID']: '',
                                                                PROPS['found in taxon']: organism_info['wdid']})
+    wd_item_gene.update(data=statements, append_value=[PROPS['subclass of']])
     wd_item_gene.set_label(item_name)
     wd_item_gene.set_description(item_description, lang='en')
     aliases = [record['symbol']['@value']]
@@ -135,8 +138,7 @@ def create_item(record, organism_info, chr_num_wdid, retrieved, login):
         aliases.append(external_ids['NCBI Locus tag'])
     wd_item_gene.set_aliases(aliases)
 
-    wd_item_gene.update(data=statements, append_value=[PROPS['subclass of']])
-    wdi_helpers.try_write(wd_item_gene, external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], login)
+    wdi_helpers.try_write(wd_item_gene, external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], login, write=write)
 
 
 def get_external_ids(record):
@@ -223,12 +225,12 @@ def gene_item_statements(record, external_ids, organism_wdid, chr_num_wdid, logi
 
     key = 'Ensembl Transcript ID'
     if key in external_ids:
-        for id in external_ids:
+        for id in external_ids[key]:
             s.append(wdi_core.WDString(id, PROPS[key], references=[ensembl_ref]))
 
     key = 'RefSeq RNA ID'
     if key in external_ids:
-        for id in external_ids:
+        for id in external_ids[key]:
             s.append(wdi_core.WDString(id, PROPS[key], references=[entrez_ref]))
 
 
@@ -268,7 +270,7 @@ def do_gp_human(record, chr_num_wdid, external_ids, login=None):
     genomic_pos_id_prop = source_ref_id[genomic_pos_source['id']]
     genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop],
                                       external_ids[genomic_pos_id_prop], login=login)
-    assembly = wdi_core.WDItemID("Q20966585", PROPS['chromosome'], is_qualifier=True)
+    assembly = wdi_core.WDItemID("Q20966585", PROPS['genomic assembly'], is_qualifier=True)
 
     # create qualifier for start/stop
     chrom_wdid = chr_num_wdid[genomic_pos_value['chr']]
@@ -280,10 +282,10 @@ def do_gp_human(record, chr_num_wdid, external_ids, login=None):
         do_hg19 = True
         genomic_pos_value_hg19 = record['genomic_pos_hg19']['@value']
         genomic_pos_source_hg19 = record['genomic_pos_hg19']['@source']
-        genomic_pos_id_prop_hg19 = source_ref_id[genomic_pos_source_hg19['_id']]
+        genomic_pos_id_prop_hg19 = source_ref_id[genomic_pos_source_hg19['id']]
         genomic_pos_ref_hg19 = make_ref_source(genomic_pos_source_hg19, PROPS[genomic_pos_id_prop_hg19],
                                                external_ids[genomic_pos_id_prop_hg19], login=login)
-        assembly_hg19 = wdi_core.WDItemID("Q21067546", PROPS['chromosome'], is_qualifier=True)
+        assembly_hg19 = wdi_core.WDItemID("Q21067546", PROPS['genomic assembly'], is_qualifier=True)
         chrom_wdid_hg19 = chr_num_wdid[genomic_pos_value_hg19['chr']]
         qualifiers_hg19 = [wdi_core.WDItemID(chrom_wdid_hg19, PROPS['chromosome'], is_qualifier=True), assembly_hg19]
         strand_orientation_hg19 = 'Q22809680' if genomic_pos_value_hg19['strand'] == 1 else 'Q22809711'
@@ -339,7 +341,7 @@ def do_gp_human(record, chr_num_wdid, external_ids, login=None):
 def do_gp_non_human(record, chr_num_wdid, external_ids, login=None):
     genomic_pos_value = record['genomic_pos']['@value']
     genomic_pos_source = record['genomic_pos']['@source']
-    genomic_pos_id_prop = source_ref_id[genomic_pos_source['_id']]
+    genomic_pos_id_prop = source_ref_id[genomic_pos_source['id']]
     genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop],
                                       external_ids[genomic_pos_id_prop], login=login)
 
@@ -362,8 +364,8 @@ def do_gp_non_human(record, chr_num_wdid, external_ids, login=None):
     return s
 
 
-def main(coll: pymongo.collection.Collection, taxid: str, retrieved: datetime, log_dir: str = "./logs",
-         write: bool = True) -> None:
+def main(coll: pymongo.collection.Collection, taxid: str, retrieved: datetime,
+         log_dir: str = "./logs", write: bool = True) -> None:
     """
     Main function for creating/updating genes
 
@@ -374,15 +376,18 @@ def main(coll: pymongo.collection.Collection, taxid: str, retrieved: datetime, l
     :param write: actually perform write
     :return:
     """
+
+    # make sure the organism is found in wikidata
+    taxid = int(taxid)
+    organism_wdid = wdi_helpers.prop2qid("P685", taxid)
+    if not organism_wdid:
+        raise ValueError("organism {} not found".format(taxid))
+
+    # login
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
     if wdi_core.WDItemEngine.logger is not None:
         wdi_core.WDItemEngine.logger.handles = []
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__))
-
-    # make sure the organism is found in wikidata
-    organism_wdid = wdi_helpers.prop2qid("P685", taxid)
-    if not organism_wdid:
-        raise ValueError("organism {} not found".format(taxid))
 
     # make sure all chromosome items are found in wikidata
     if taxid not in organisms_info:
@@ -392,22 +397,22 @@ def main(coll: pymongo.collection.Collection, taxid: str, retrieved: datetime, l
     chr_num_wdid = cb.get_or_create(organism_info)
 
     # only do certain records
-    docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein_coding'})
-    docs = map(HelperBot.check_record, docs)
+    docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding'})
+    docs = HelperBot.validate_docs(docs, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs)
 
-    for record in records:
-        create_item(record, organism_info, chr_num_wdid, retrieved, login)
+    for record in tqdm(records, mininterval=2):
+        create_item(record, organism_info, chr_num_wdid, retrieved, login, write=write)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata GO bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help="only run using this taxon", type=str)
+    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id)", type=str)
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
-    parser.add_argument('--mongo-coll', type=str, default="quickgo")
+    parser.add_argument('--mongo-coll', type=str, default="mygene")
     parser.add_argument('--retrieved', help="date go annotations were retrieved (YYYYMMDD)", type=str)
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"

@@ -1,10 +1,10 @@
-from .HelperBot import make_ref_source, check_record
+from .HelperBot import make_ref_source, validate_doc
 
 
 def test_check_record():
     record = {'entrezgene': 123, 'genomic_pos': {}, 'type_of_gene':1, 'name':'g', 'ensembl': 2}
     try:
-        check_record(record)
+        validate_doc(record)
     except AssertionError:
         pass
 
