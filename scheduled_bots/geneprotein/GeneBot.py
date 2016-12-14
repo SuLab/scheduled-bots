@@ -36,6 +36,8 @@ For microbes, the data from mygene is fine....
 import argparse
 import json
 import os
+import sys
+import traceback
 from datetime import datetime
 
 import pymongo
@@ -43,10 +45,9 @@ from pymongo import MongoClient
 from scheduled_bots.geneprotein import HelperBot
 from scheduled_bots.geneprotein import type_of_gene_map, organisms_info
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
+from scheduled_bots.geneprotein.HelperBot import make_ref_source
 from tqdm import tqdm
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
-
-from HelperBot import make_ref_source
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -87,7 +88,7 @@ source_ref_id = {'ensembl': "Ensembl Gene ID",
                  'uniprot': None}
 
 
-def create_item(record, organism_info, chr_num_wdid, retrieved, login, write=True):
+def create_item(record, organism_info, chr_num_wdid, login, write=True):
     """
     generate pbb_core item object
 
@@ -99,7 +100,6 @@ def create_item(record, organism_info, chr_num_wdid, retrieved, login, write=Tru
         'taxid': 559292
     }
     :param chr_num_wdid: mapping of chr number (str) to wdid
-    :param retrieved:
     :param login:
 
     """
@@ -121,24 +121,32 @@ def create_item(record, organism_info, chr_num_wdid, retrieved, login, write=Tru
     else:
         item_description = '{} gene found in {}'.format(organism_info['type'], organism_info['name'])
 
-    entrez_ref = HelperBot.make_ref_source(record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
-                                           external_ids['Entrez Gene ID'], login=login)
-    entrez_statement = wdi_core.WDString(external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref])
+    entrez_ref = make_ref_source(record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
+                                 external_ids['Entrez Gene ID'], login=login)
+    entrez_statement = wdi_core.WDString(external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
+                                         references=[entrez_ref])
 
-    wd_item_gene = wdi_core.WDItemEngine(item_name=item_name, domain='genes', data=[entrez_statement],
-                                         append_value=[PROPS['subclass of']], search_only=True,
-                                         fast_run=False,
-                                         fast_run_base_filter={PROPS['Entrez Gene ID']: '',
-                                                               PROPS['found in taxon']: organism_info['wdid']})
-    wd_item_gene.update(data=statements, append_value=[PROPS['subclass of']])
-    wd_item_gene.set_label(item_name)
-    wd_item_gene.set_description(item_description, lang='en')
     aliases = [record['symbol']['@value']]
     if 'NCBI Locus tag' in external_ids:
         aliases.append(external_ids['NCBI Locus tag'])
-    wd_item_gene.set_aliases(aliases)
 
-    wdi_helpers.try_write(wd_item_gene, external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], login, write=write)
+    try:
+        wd_item_gene = wdi_core.WDItemEngine(item_name=item_name, domain='genes', data=[entrez_statement],
+                                             append_value=[PROPS['subclass of']], search_only=True,
+                                             fast_run=False,
+                                             fast_run_base_filter={PROPS['Entrez Gene ID']: '',
+                                                                   PROPS['found in taxon']: organism_info['wdid']})
+        wd_item_gene.update(data=statements, append_value=[PROPS['subclass of']])
+        wd_item_gene.set_label(item_name)
+        wd_item_gene.set_description(item_description, lang='en')
+        wd_item_gene.set_aliases(aliases)
+        wdi_helpers.try_write(wd_item_gene, external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], login, write=write)
+    except Exception as e:
+        exc_info = sys.exc_info()
+        traceback.print_exception(*exc_info)
+        msg = wdi_helpers.format_msg(external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], None,
+                                     str(e), msg_type=type(e))
+        wdi_core.WDItemEngine.log("ERROR", msg)
 
 
 def get_external_ids(record):
@@ -201,8 +209,10 @@ def gene_item_statements(record, external_ids, organism_wdid, chr_num_wdid, logi
     ############
     # ID statements
     ############
-    ensembl_ref = make_ref_source(record['ensembl']['@source'], PROPS['Ensembl Gene ID'], external_ids['Ensembl Gene ID'], login=login)
-    entrez_ref = make_ref_source(record['entrezgene']['@source'], PROPS['Entrez Gene ID'], external_ids['Entrez Gene ID'], login=login)
+    ensembl_ref = make_ref_source(record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
+                                  external_ids['Ensembl Gene ID'], login=login)
+    entrez_ref = make_ref_source(record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
+                                 external_ids['Entrez Gene ID'], login=login)
 
     s.append(wdi_core.WDString(external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref]))
     s.append(wdi_core.WDString(external_ids['Ensembl Gene ID'], PROPS['Ensembl Gene ID'], references=[ensembl_ref]))
@@ -232,8 +242,6 @@ def gene_item_statements(record, external_ids, organism_wdid, chr_num_wdid, logi
     if key in external_ids:
         for id in external_ids[key]:
             s.append(wdi_core.WDString(id, PROPS[key], references=[entrez_ref]))
-
-
 
     ############
     # Gene statements
@@ -333,7 +341,7 @@ def do_gp_human(record, chr_num_wdid, external_ids, login=None):
                                    references=[genomic_pos_ref], qualifiers=[assembly]))
         if do_hg19:
             s.append(wdi_core.WDItemID(chrom_wdid_hg19, PROPS['chromosome'],
-                                   references=[genomic_pos_ref_hg19], qualifiers=[assembly_hg19]))
+                                       references=[genomic_pos_ref_hg19], qualifiers=[assembly_hg19]))
 
     return s
 
@@ -364,14 +372,12 @@ def do_gp_non_human(record, chr_num_wdid, external_ids, login=None):
     return s
 
 
-def main(coll: pymongo.collection.Collection, taxid: str, retrieved: datetime,
-         log_dir: str = "./logs", write: bool = True) -> None:
+def main(coll: pymongo.collection.Collection, taxid: str, log_dir: str = "./logs", write: bool = True) -> None:
     """
     Main function for creating/updating genes
 
     :param coll: mongo collection containing gene data from mygene
     :param taxid: taxon to use (ncbi tax id)
-    :param retrieved:
     :param log_dir: dir to store logs
     :param write: actually perform write
     :return:
@@ -402,7 +408,7 @@ def main(coll: pymongo.collection.Collection, taxid: str, retrieved: datetime,
     records = HelperBot.tag_mygene_docs(docs)
 
     for record in tqdm(records, mininterval=2):
-        create_item(record, organism_info, chr_num_wdid, retrieved, login, write=write)
+        create_item(record, organism_info, chr_num_wdid, login, write=write)
 
 
 if __name__ == "__main__":
@@ -413,13 +419,11 @@ if __name__ == "__main__":
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
     parser.add_argument('--mongo-coll', type=str, default="mygene")
-    parser.add_argument('--retrieved', help="date go annotations were retrieved (YYYYMMDD)", type=str)
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     taxon = args.taxon
     coll = MongoClient(args.mongo_uri)[args.mongo_db][args.mongo_coll]
-    retrieved = datetime.strptime(args.retrieved, "%Y%m%d") if args.retrieved else datetime.now()
 
     log_name = '{}-{}.log'.format(__metadata__['name'], datetime.now().strftime('%Y%m%d_%H:%M'))
     if wdi_core.WDItemEngine.logger is not None:
@@ -427,4 +431,4 @@ if __name__ == "__main__":
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='go{}'.format(taxon))
 
-    main(coll, taxon, retrieved, log_dir=log_dir, write=not args.dummy)
+    main(coll, taxon, log_dir=log_dir, write=not args.dummy)
