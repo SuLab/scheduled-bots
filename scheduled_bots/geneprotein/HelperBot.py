@@ -36,9 +36,9 @@ def validate_doc(doc):
     :return:
     """
     # make sure only one genomic position and its a dict
-    assert 'genomic_pos' in doc and isinstance(doc['genomic_pos'], dict)
+    assert 'genomic_pos' in doc and isinstance(doc['genomic_pos'], dict), 'genomic_pos'
     if 'genomic_pos_hg19' in doc:
-        assert isinstance(doc['genomic_pos_hg19'], dict)
+        assert isinstance(doc['genomic_pos_hg19'], dict), 'genomic_pos_hg19'
 
     # existence required keys and sub keys
     required = {'entrezgene': None,
@@ -65,23 +65,21 @@ def validate_doc(doc):
         doc['refseq']['protein'] = [doc['refseq']['protein']]
 
     # make sure these fields are not lists
-    assert isinstance(doc['ensembl']['gene'], str)
-    assert isinstance(doc['entrezgene'], (int, str))
-    assert isinstance(doc['type_of_gene'], str)
-    assert isinstance(doc['name'], str)
-    assert isinstance(doc['uniprot']["Swiss-Prot"], str)
+    assert isinstance(doc['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
+    assert isinstance(doc['entrezgene'], (int, str)), "incorrect type: doc['entrezgene']"
+    assert isinstance(doc['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
     # assert isinstance(record['refseq']['genomic'], str)  # this isn't used
 
     # check types of optional and required fields
     fields = {'SGD': str, 'HGNC': str, 'MIM': str, 'MGI': str, 'locus_tag': str, 'symbol': str, 'taxid': int,
-              'entrezgene': int, 'type_of_gene': str, 'name': str}
+              'type_of_gene': str, 'name': str}
     for field, field_type in fields.items():
         if field in doc:
-            assert isinstance(doc[field], field_type), field
+            assert isinstance(doc[field], field_type), "incorrect type: {}".format(field)
 
     # check optional dict fields
     if 'uniprot' in doc:
-        assert "Swiss-Prot" in doc['uniprot'] and isinstance(doc['uniprot']["Swiss-Prot"], str)
+        assert "Swiss-Prot" in doc['uniprot'] and isinstance(doc['uniprot']['Swiss-Prot'], str), "doc['uniprot']['Swiss-Prot']"
 
     return doc
 
