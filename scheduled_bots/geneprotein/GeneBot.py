@@ -121,22 +121,16 @@ def create_item(record, organism_info, chr_num_wdid, login, write=True):
     else:
         item_description = '{} gene found in {}'.format(organism_info['type'], organism_info['name'])
 
-    entrez_ref = make_ref_source(record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
-                                 external_ids['Entrez Gene ID'], login=login)
-    entrez_statement = wdi_core.WDString(external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
-                                         references=[entrez_ref])
-
     aliases = [record['symbol']['@value']]
     if 'NCBI Locus tag' in external_ids:
         aliases.append(external_ids['NCBI Locus tag'])
 
     try:
-        wd_item_gene = wdi_core.WDItemEngine(item_name=item_name, domain='genes', data=[entrez_statement],
-                                             append_value=[PROPS['subclass of']], search_only=True,
-                                             fast_run=False,
+        wd_item_gene = wdi_core.WDItemEngine(item_name=item_name, domain='genes', data=statements,
+                                             append_value=[PROPS['subclass of']],
+                                             fast_run=True,
                                              fast_run_base_filter={PROPS['Entrez Gene ID']: '',
                                                                    PROPS['found in taxon']: organism_info['wdid']})
-        wd_item_gene.update(data=statements, append_value=[PROPS['subclass of']])
         wd_item_gene.set_label(item_name)
         wd_item_gene.set_description(item_description, lang='en')
         wd_item_gene.set_aliases(aliases)
@@ -404,10 +398,11 @@ def main(coll: pymongo.collection.Collection, taxid: str, log_dir: str = "./logs
 
     # only do certain records
     docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding'})
+    total = docs.count()
     docs = HelperBot.validate_docs(docs, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs)
 
-    for record in tqdm(records, mininterval=2):
+    for record in tqdm(records, mininterval=2, total=total):
         create_item(record, organism_info, chr_num_wdid, login, write=write)
 
 
