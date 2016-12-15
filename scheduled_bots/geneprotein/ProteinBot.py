@@ -108,7 +108,7 @@ def create_item(record, organism_info, gene_wdid, login, write=True):
     try:
         wd_item_gene = wdi_core.WDItemEngine(item_name=item_name, domain='proteins', data=statements,
                                              append_value=[PROPS['subclass of']],
-                                             fast_run=False,
+                                             fast_run=True,
                                              fast_run_base_filter={PROPS['UniProt ID']: '',
                                                                    PROPS['found in taxon']: organism_info['wdid']})
         wd_item_gene.set_label(item_name)
