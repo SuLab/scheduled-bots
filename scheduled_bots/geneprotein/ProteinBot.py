@@ -92,12 +92,9 @@ def create_item(record, organism_info, gene_wdid, login, write=True):
     ############
 
     item_name = record['name']['@value']
-    if item_name == "hypothetical protein":
-        if 'locus_tag' in record:
-            item_name += " " + record['locus_tag']['@value']
-        elif 'symbol' in record:
-            item_name += " " + record['symbol']['@value']
-
+    if 'locus_tag' in record:
+        item_name += " " + record['locus_tag']['@value']
+    
     if record['taxid']['@value'] == 9606:
         item_description = 'protein of the species Homo sapiens'
     else:
