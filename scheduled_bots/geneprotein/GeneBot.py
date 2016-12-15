@@ -17,21 +17,10 @@ example microbial gene:
 https://www.wikidata.org/wiki/Q23097138
 https://mygene.info/v3/gene/7150837
 
-
----------
-TODO: mygene doesn't contain any way of mapping the genomic positions to a chromosome/refseq identifier.
-They are present on ncbi ftps site
-
-Need to get the path the latest ref genome here:
-ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt
-
-then use that path to get an assembly report for an organism:
-ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.35_GRCh38.p9/GCF_000001405.35_GRCh38.p9_assembly_report.txt
-
-For microbes, the data from mygene is fine....
----------
-
 """
+#TODO: Gene on two chromosomes
+#https://www.wikidata.org/wiki/Q20787772
+
 
 import argparse
 import json

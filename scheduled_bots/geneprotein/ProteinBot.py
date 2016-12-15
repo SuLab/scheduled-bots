@@ -251,13 +251,10 @@ def main(coll: pymongo.collection.Collection, taxid: str, retrieved: datetime,
     docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding'})
     docs = HelperBot.validate_docs(docs, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs)
-    c=0
+
     for record in tqdm(records, mininterval=2):
         gene_wdid = gene_wdid_mapping[str(record['entrezgene']['@value'])]
         create_item(record, organism_info, gene_wdid, login, write=write)
-        c+=1
-        if c==10:
-            break
 
 
 if __name__ == "__main__":
