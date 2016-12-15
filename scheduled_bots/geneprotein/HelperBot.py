@@ -47,6 +47,7 @@ def validate_doc(doc):
                 'type_of_gene': None,
                 'name': None,
                 'genomic_pos': {'start', 'end', 'chr', 'strand'},
+                'uniprot': {'Swiss-Prot'}
                 }
     for key, value in required.items():
         assert key in doc, "{} not in record".format(key)
