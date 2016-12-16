@@ -94,7 +94,7 @@ def create_item(record, organism_info, gene_wdid, login, write=True):
     item_name = record['name']['@value']
     if 'locus_tag' in record:
         item_name += " " + record['locus_tag']['@value']
-    
+
     if record['taxid']['@value'] == 9606:
         item_description = 'protein of the species Homo sapiens'
     else:
@@ -186,14 +186,14 @@ def protein_item_statements(record, external_ids, organism_wdid, gene_wdid, logi
     key = 'Ensembl Protein ID'
     if key in external_ids:
         for id in external_ids[key]:
-            ensembl_ref = make_ref_source(record['ensembl']['@source'], PROPS['Ensembl Protein ID'],
-                                          id, login=login)
-            s.append(wdi_core.WDString(id, PROPS[key], references=[ensembl_ref]))
+            ref = make_ref_source(record['ensembl']['@source'], PROPS[key], id, login=login)
+            s.append(wdi_core.WDString(id, PROPS[key], references=[ref]))
 
     key = 'RefSeq Protein ID'
     if key in external_ids:
         for id in external_ids[key]:
-            s.append(wdi_core.WDString(id, PROPS[key], references=[entrez_ref]))
+            ref = make_ref_source(record['refseq']['@source'], PROPS[key], id, login=login)
+            s.append(wdi_core.WDString(id, PROPS[key], references=[ref]))
 
     ############
     # Protein statements

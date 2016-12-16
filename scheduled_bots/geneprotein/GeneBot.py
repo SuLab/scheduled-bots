@@ -212,19 +212,19 @@ def gene_item_statements(record, external_ids, organism_wdid, chr_num_wdid, logi
 
     key = 'Saccharomyces Genome Database ID'
     if key in external_ids:
-        source_doc = record['SGD']['@source']
-        s.append(wdi_core.WDString(external_ids[key], PROPS[key],
-                                   references=[make_ref_source(source_doc, PROPS[key], external_ids[key])]))
+        s.append(wdi_core.WDString(external_ids[key], PROPS[key], references=[entrez_ref]))
 
     key = 'Ensembl Transcript ID'
     if key in external_ids:
         for id in external_ids[key]:
-            s.append(wdi_core.WDString(id, PROPS[key], references=[ensembl_ref]))
+            ref = make_ref_source(record['ensembl']['@source'], PROPS[key], id, login=login)
+            s.append(wdi_core.WDString(id, PROPS[key], references=[ref]))
 
     key = 'RefSeq RNA ID'
     if key in external_ids:
         for id in external_ids[key]:
-            s.append(wdi_core.WDString(id, PROPS[key], references=[entrez_ref]))
+            ref = make_ref_source(record['refseq']['@source'], PROPS[key], id, login=login)
+            s.append(wdi_core.WDString(id, PROPS[key], references=[ref]))
 
     ############
     # Gene statements
