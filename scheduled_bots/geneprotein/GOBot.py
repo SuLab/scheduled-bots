@@ -10,14 +10,14 @@ Data source: Quickgo mongo
 import argparse
 import json
 import os
+from collections import defaultdict
 from datetime import datetime
-from itertools import chain
-from typing import List, Dict, Sequence, Container, Set
+from typing import Dict, Set
 
 import pandas as pd
 import pymongo
 from pymongo import MongoClient
-from scheduled_bots.geneprotein import go_props, go_evidence_codes, curators_wdids, sources_wdids
+from scheduled_bots.geneprotein import go_props, go_evidence_codes, curators_wdids, curator_ref, PROPS
 from tqdm import tqdm
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 
@@ -40,8 +40,44 @@ ENTREZ = "P351"
 UNIPROT = "P352"
 
 
+def make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, pmid=None):
+    # initialize this reference for this evidence code with retrieved
+    reference = [wdi_core.WDTime(retrieved.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', is_reference=True)]
+
+    # stated in pmid
+    if pmid:
+        if pmid in pmid_map:
+            reference.append(wdi_core.WDItemID(pmid_map[pmid], 'P248', is_reference=True))
+        else:
+            raise ValueError("article item for pmid {} not found. skipping item".format(pmid))
+
+    # stated in uniprot-GOA Q28018111
+    reference.append(wdi_core.WDItemID('Q28018111', 'P248', is_reference=True))
+
+    # curator
+    if curator in curators_wdids:
+        reference.append(wdi_core.WDItemID(curators_wdids[curator], 'P1640', is_reference=True))
+        # curator-specific reference URLs
+        # If curator is SGD, add external ID to ref
+        if curator in curator_ref and curator_ref[curator] in external_id:
+            reference.append(
+                wdi_core.WDString(external_id[curator_ref[curator]], PROPS[curator_ref[curator]],
+                                  is_reference=True))
+    else:
+        raise ValueError("curator not found: {}".format(curator))
+
+    # reference URL
+    ref_url = "http://www.ebi.ac.uk/QuickGO/GAnnotation?protein={}".format(uniprot_id)
+    reference.append(wdi_core.WDString(ref_url, 'P854', is_reference=True))
+
+    # ref determination method
+    reference.append(wdi_core.WDItemID(evidence_wdid, 'P459', is_reference=True))
+
+    return reference
+
+
 def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, retrieved: datetime, go_map: dict,
-                       pmid_map: dict, login: wdi_login.WDLogin):
+                       pmid_map: dict, external_id: dict, login: wdi_login.WDLogin):
     """
     add go terms to a protein item.
     Follows the schema described here:
@@ -53,6 +89,7 @@ def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, r
     :param retrieved: date that the GO annotations were retrieved
     :param go_map: mapping of GO terms from GOID -> wdid
     :param pmid_map: mapping of PMIDs to wdid
+    :param external_id:
     :param login: wdi_core login instance
     :return:
     :
@@ -66,45 +103,35 @@ def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, r
         go_wdid = go_map[go_id]
 
         statement = wdi_core.WDItemID(go_wdid, level_wdid)
-        reference = []
         for evidence, ss_df in sub_df.groupby(level=1):
             evidence_wdid = go_evidence_codes[evidence]
             statement.qualifiers.append(wdi_core.WDItemID(value=evidence_wdid, prop_nr='P459', is_qualifier=True))
 
-            # initialize this reference for this evidence code with retrieved
-            reference = [wdi_core.WDTime(retrieved.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', is_reference=True)]
+            # ss_df looks like this:
+            """
+            GO ID       Evidence  Source  DB         Aspect
+            GO:0000171  IDA       MGI     UniProtKB  Function    [PMID:11413139, PMID:1234]
+                                  SGD     UniProtKB  Function     [PMID:9620854]
+            """
+            # or
+            """
+            GO ID       Evidence  Source    DB         Aspect
+            GO:0004526  IEA       InterPro  UniProtKB  Function    [GO_REF:0000002]
+                                  UniProt   UniProtKB  Function    [GO_REF:0000003]
+            """
 
-            # stated in pmids
-            pmids = set([x[5:] for x in list(chain(*list(ss_df))) if x.startswith("PMID:")])
-            for pmid in pmids:
-                if pmid in pmid_map:
-                    reference.append(wdi_core.WDItemID(pmid_map[pmid], 'P248', is_reference=True))
+            for keys, refs in ss_df.items():
+                # keys looks like: ('GO:0000171', 'IDA', 'MGI', 'UniProtKB', 'Function')
+                # refs looks like: ['PMID:11413139']
+                curator = keys[2]
+                pmids = set([x[5:] for x in refs if x.startswith("PMID:")])
+                if pmids:
+                    for pmid in pmids:
+                        reference = make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, pmid=pmid)
+                        statement.references.append(reference)
                 else:
-                    raise ValueError("article item for pmid {} not found. skipping item".format(pmid))
-
-            # stated in dbs
-            dbs = set(ss_df.index.get_level_values("DB"))
-            for db in dbs:
-                reference.append(wdi_core.WDItemID(sources_wdids[db], 'P248', is_reference=True))
-
-            # curators
-            curators = list(ss_df.index.get_level_values("Source"))
-            for curator in curators:
-                if curator in curators_wdids:
-                    reference.append(wdi_core.WDItemID(curators_wdids[curator], 'P1640', is_reference=True))
-                    # TODO: # curator-specific reference URLs
-                    # If curator is SGD, add external ID to ref
-                else:
-                    raise ValueError("curator not found: {}".format(curator))
-
-            # reference URL
-            ref_url = "http://www.ebi.ac.uk/QuickGO/GAnnotation?protein={}".format(uniprot_id)
-            reference.append(wdi_core.WDString(ref_url, 'P854', is_reference=True))
-
-            # ref determination method
-            reference.append(wdi_core.WDItemID(evidence_wdid, 'P459', is_reference=True))
-
-            statement.references.append(reference)
+                    reference = make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid)
+                    statement.references.append(reference)
 
         # not required, but for asthetics...
         statement.references = statement.references[::-1]
@@ -173,20 +200,35 @@ def main(coll: pymongo.collection.Collection, taxon: str, retrieved: datetime, l
     pmid_map.update(new_pmids)
     print("Done creating pmid items")
 
+    # get all external IDs we may need by uniprot id
+    external_ids = defaultdict(dict)
+    external_ids_info = {'Saccharomyces Genome Database ID': 'P3406', 'Mouse Genome Informatics ID': 'P671',
+                         'UniProt ID': 'P352'}
+    for external_id_name, prop in external_ids_info.items():
+        id_map = wdi_helpers.id_mapper(prop, (("P703", organism_wdid),))
+        if not id_map:
+            continue
+        for id, wdid in id_map.items():
+            external_ids[wdid][external_id_name] = id
+
     # groupby ID, GOID & evidence, the make references a list
     go_annotations = df.groupby(['ID', 'GO ID', 'Evidence', 'Source', 'DB', 'Aspect'])['Reference'].apply(list)
 
     # iterate through all proteins & write
     failed_items = []
     for uniprot_id, item_wdid in tqdm(prot_wdid_mapping.items()):
+        #if uniprot_id != "P28005":
+        #    continue
         if uniprot_id not in go_annotations:
             continue
         this_go = go_annotations[uniprot_id]
+        external_id = external_ids[item_wdid]
         try:
-            statements = make_go_statements(item_wdid, uniprot_id, this_go, retrieved, go_map, pmid_map, login)
-            wditem = wdi_core.WDItemEngine(wd_item_id=item_wdid, domain='protein', data=statements, fast_run=True,
+            statements = make_go_statements(item_wdid, uniprot_id, this_go, retrieved, go_map, pmid_map, external_id,
+                                            login)
+            wditem = wdi_core.WDItemEngine(wd_item_id=item_wdid, domain='protein', data=statements, fast_run=False,
                                            fast_run_base_filter={UNIPROT: "", "P703": organism_wdid})
-                                           #good_refs=[{'P248': None}], keep_good_ref_statements=True)
+            # good_refs=[{'P248': None}], keep_good_ref_statements=True)
             wdi_helpers.try_write(wditem, record_id=uniprot_id, record_prop=UNIPROT, edit_summary="update GO terms",
                                   login=login, write=write)
         except Exception as e:
