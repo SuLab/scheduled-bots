@@ -29,16 +29,26 @@ def validate_docs(docs, external_id_prop):
         yield doc
 
 
-def validate_doc(doc):
+def alwayslist(value):
+    """If input value if not a list/tuple type, return it as a single value list."""
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return value
+    else:
+        return [value]
+
+
+def validate_doc(d):
     """
     Check fields in mygene doc. and neccessary transformations
-    :param doc:
+    :param d:
     :return:
     """
     # make sure only one genomic position and its a dict
-    assert 'genomic_pos' in doc and isinstance(doc['genomic_pos'], dict), 'genomic_pos'
-    if 'genomic_pos_hg19' in doc:
-        assert isinstance(doc['genomic_pos_hg19'], dict), 'genomic_pos_hg19'
+    assert 'genomic_pos' in d and isinstance(d['genomic_pos'], dict), 'genomic_pos'
+    if 'genomic_pos_hg19' in d:
+        assert isinstance(d['genomic_pos_hg19'], dict), 'genomic_pos_hg19'
 
     # existence required keys and sub keys
     required = {'entrezgene': None,
@@ -50,39 +60,37 @@ def validate_doc(doc):
                 'uniprot': {'Swiss-Prot'}
                 }
     for key, value in required.items():
-        assert key in doc, "{} not in record".format(key)
+        assert key in d, "{} not in record".format(key)
         if hasattr(value, "__iter__"):
             for sub_key in required[key]:
-                assert sub_key in doc[key], "{} not in {}".format(sub_key, key)
+                assert sub_key in d[key], "{} not in {}".format(sub_key, key)
 
     # make sure these fields are lists
-    if not isinstance(doc['ensembl']['transcript'], list):
-        doc['ensembl']['transcript'] = [doc['ensembl']['transcript']]
-    if not isinstance(doc['ensembl']['protein'], list):
-        doc['ensembl']['protein'] = [doc['ensembl']['protein']]
-    if not isinstance(doc['refseq']['rna'], list):
-        doc['refseq']['rna'] = [doc['refseq']['rna']]
-    if not isinstance(doc['refseq']['protein'], list):
-        doc['refseq']['protein'] = [doc['refseq']['protein']]
+    d['ensembl']['transcript'] = alwayslist(d['ensembl']['transcript'])
+    d['ensembl']['protein'] = alwayslist(d['ensembl']['protein'])
+    d['refseq']['rna'] = alwayslist(d['refseq']['rna'])
+    d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
+    if 'alias' in d:
+        d['alias'] = alwayslist(d['alias'])
 
     # make sure these fields are not lists
-    assert isinstance(doc['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
-    assert isinstance(doc['entrezgene'], (int, str)), "incorrect type: doc['entrezgene']"
-    assert isinstance(doc['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
+    assert isinstance(d['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
+    assert isinstance(d['entrezgene'], (int, str)), "incorrect type: doc['entrezgene']"
+    assert isinstance(d['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
     # assert isinstance(record['refseq']['genomic'], str)  # this isn't used
 
     # check types of optional and required fields
     fields = {'SGD': str, 'HGNC': str, 'MIM': str, 'MGI': str, 'locus_tag': str, 'symbol': str, 'taxid': int,
               'type_of_gene': str, 'name': str}
     for field, field_type in fields.items():
-        if field in doc:
-            assert isinstance(doc[field], field_type), "incorrect type: {}".format(field)
+        if field in d:
+            assert isinstance(d[field], field_type), "incorrect type: {}".format(field)
 
     # check optional dict fields
-    if 'uniprot' in doc:
-        assert "Swiss-Prot" in doc['uniprot'] and isinstance(doc['uniprot']['Swiss-Prot'], str), "doc['uniprot']['Swiss-Prot']"
+    if 'uniprot' in d:
+        assert "Swiss-Prot" in d['uniprot'] and isinstance(d['uniprot']['Swiss-Prot'], str), "doc['uniprot']['Swiss-Prot']"
 
-    return doc
+    return d
 
 
 def get_mygene_src_version():
@@ -125,7 +133,8 @@ def tag_mygene_docs(docs):
                   'taxid': 'entrez',
                   'type_of_gene': 'entrez',
                   'refseq': 'entrez',
-                  'uniprot': 'uniprot'
+                  'uniprot': 'uniprot',
+                  'homologene': 'entrez',
                   }
     # todo: automate getting this list of ensembl taxids
     # http://uswest.ensembl.org/info/about/species.html

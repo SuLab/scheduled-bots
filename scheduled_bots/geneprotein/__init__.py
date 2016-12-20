@@ -63,18 +63,28 @@ sources_wdids = {'UniProt': 'Q905695',
                  'refseq': 'Q7307074'
                  }
 
-# property ID
-prop_ids = {'uniprot': 'P352',
-            'ncbi_gene': 'P351',
-            'entrez_gene': 'P351',
-            'ncbi_taxonomy': 'P685',
-            'ncbi_locus_tag': 'P2393',
-            'ensembl_gene': 'P594',
-            'ensembl_protein': 'P705',
-            'refseq_protein': 'P637',
-            'sgd_id': None,
-            'mgi_id': 'P671'
-            }
+PROPS = {'found in taxon': 'P703',
+         'subclass of': 'P279',
+         'strand orientation': 'P2548',
+         'Entrez Gene ID': 'P351',
+         'NCBI Locus tag': 'P2393',
+         'Ensembl Gene ID': 'P594',
+         'Ensembl Transcript ID': 'P704',
+         'genomic assembly': 'P659',
+         'genomic start': 'P644',
+         'genomic end': 'P645',
+         'chromosome': 'P1057',
+         'Saccharomyces Genome Database ID': 'P3406',
+         'Mouse Genome Informatics ID': 'P671',
+         'HGNC ID': 'P354',
+         'HGNC Gene Symbol': 'P353',
+         'RefSeq RNA ID': 'P639',
+         'encoded by': 'P702',
+         'RefSeq Protein ID': 'P637',
+         'UniProt ID': 'P352',
+         'Ensembl Protein ID': 'P705',
+         'OMIM ID': 'P492',
+         }
 
 # http://www.geneontology.org/doc/GO.xrf_abbs
 curators_wdids = {'AgBase': 'Q4690901',
@@ -94,12 +104,10 @@ curators_wdids = {'AgBase': 'Q4690901',
                   'UniProt': 'Q905695',
                   'WormBase': 'Q3570042'}
 
-# These are for reference URLs for GO annotations and are not necessarily the same
-# as the formatter URL for the property for the IDs
-curator_ref_urls = {'SGD': {'url': 'http://www.yeastgenome.org/locus/$1/overview#go', 'id': 'sgd_id'},
-                    'MGI': {'url': 'http://www.informatics.jax.org/go/marker/$1', 'id': 'mgi_id'}
-                    }
-
+# These are for reference external IDs to use for GO annotations curators
+curator_ref = {'SGD': 'Saccharomyces Genome Database ID',
+               'MGI': 'Mouse Genome Informatics ID',
+               'UniProt': 'UniProt ID',}
 
 
 #########
@@ -113,9 +121,27 @@ organisms_info = {
         'taxid': 559292
     },
     9606: {
-        "type": "mammalian",
         "name": "Homo sapiens",
+        "type": "mammalian",
         "wdid": "Q15978631",
         'taxid': 9606
+    },
+    10090: {
+        "name": "Mus musculus",
+        "type": "mammalian",
+        "wdid": "Q83310",
+        'taxid': 10090
+    },
+    10116: {
+        "name": "Rattus norvegicus",
+        "type": "mammalian",
+        "wdid": "Q184224",
+        'taxid': 10116
+    },
+    9545: {
+        "name": "Macaca nemestrina",
+        "type": "mammalian",
+        "wdid": "Q618026",
+        'taxid': 9545
     }
 }
