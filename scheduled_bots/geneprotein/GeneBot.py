@@ -79,8 +79,7 @@ __metadata__ = {'name': 'GeneBot',
 
 # If the source is "entrez", the reference identifier to be used is "Ensembl Gene ID" (P594)
 source_ref_id = {'ensembl': "Ensembl Gene ID",
-                 'entrez': 'Entrez Gene ID',
-                 'uniprot': None}
+                 'entrez': 'Entrez Gene ID'}
 
 class Gene:
     """
@@ -203,14 +202,12 @@ class Gene:
         key = 'Ensembl Transcript ID'
         if key in self.external_ids:
             for id in self.external_ids[key]:
-                ref = make_ref_source(self.record['ensembl']['@source'], PROPS[key], id, login=self.login)
-                s.append(wdi_core.WDString(id, PROPS[key], references=[ref]))
+                s.append(wdi_core.WDString(id, PROPS[key], references=[ensembl_ref]))
 
         key = 'RefSeq RNA ID'
         if key in self.external_ids:
             for id in self.external_ids[key]:
-                ref = make_ref_source(self.record['refseq']['@source'], PROPS[key], id, login=self.login)
-                s.append(wdi_core.WDString(id, PROPS[key], references=[ref]))
+                s.append(wdi_core.WDString(id, PROPS[key], references=[entrez_ref]))
 
         for key in ['NCBI Locus tag', 'Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID']:
             if key in self.external_ids:
@@ -233,11 +230,12 @@ class Gene:
         self.statements = self.create_statements()
         self.create_label()
         self.create_description()
+        self.create_aliases()
 
         try:
             wd_item_gene = wdi_core.WDItemEngine(item_name=self.label, domain='genes', data=self.statements,
                                                  append_value=[PROPS['subclass of']],
-                                                 fast_run=False,
+                                                 fast_run=True,
                                                  fast_run_base_filter={PROPS['Entrez Gene ID']: '',
                                                                        PROPS['found in taxon']: self.organism_info['wdid']})
             self.set_languages(wd_item_gene)

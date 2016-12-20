@@ -184,7 +184,7 @@ class Protein:
         key = 'RefSeq Protein ID'
         if key in self.external_ids:
             for id in self.external_ids[key]:
-                ref = make_ref_source(self.record['refseq']['@source'], PROPS[key], id, login=self.login)
+                ref = make_ref_source(self.record['refseq']['@source'], PROPS['Entrez Gene ID'], id, login=self.login)
                 s.append(wdi_core.WDString(id, PROPS[key], references=[ref]))
 
         ############
@@ -211,7 +211,7 @@ class Protein:
         try:
             wd_item_protein = wdi_core.WDItemEngine(item_name=self.label, domain='proteins', data=self.statements,
                                                     append_value=[PROPS['subclass of']],
-                                                    fast_run=False,
+                                                    fast_run=True,
                                                     fast_run_base_filter={PROPS['UniProt ID']: '',
                                                                           PROPS['found in taxon']: self.organism_info['wdid']})
             wd_item_protein.set_label(self.label)
