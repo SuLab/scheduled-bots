@@ -81,6 +81,7 @@ __metadata__ = {'name': 'GeneBot',
 source_ref_id = {'ensembl': "Ensembl Gene ID",
                  'entrez': 'Entrez Gene ID'}
 
+
 class Gene:
     """
     Generic gene class. Subclasses: Human, Mammal, Microbe
@@ -91,7 +92,7 @@ class Gene:
     aliases = None
     external_ids = None
 
-    def __init__(self, record, organism_info, login, write=True):
+    def __init__(self, record, organism_info, login):
         """
         generate pbb_core item object
 
@@ -109,7 +110,6 @@ class Gene:
         self.record = record
         self.organism_info = organism_info
         self.login = login
-        self.write = write
 
         self.statements = None
 
@@ -127,11 +127,10 @@ class Gene:
             aliases.extend(self.record['alias'])
         self.aliases = aliases
 
-
     def validate_record(self):
         # handled by HelperBot
         # allow for subclasses to add additional checks
-        pass
+        raise NotImplementedError()
 
     def parse_external_ids(self):
         ############
@@ -166,7 +165,7 @@ class Gene:
             external_ids['Mouse Genome Informatics ID'] = self.record['MGI']['@value']
 
         if 'homologene' in self.record:
-            external_ids['HomoloGene ID'] = self.record['homologene']['@value']
+            external_ids['HomoloGene ID'] = str(self.record['homologene']['@value']['id'])
 
         ############
         # optional external IDs (can have more than one)
@@ -225,7 +224,7 @@ class Gene:
 
         return s
 
-    def create_item(self):
+    def create_item(self, write=True):
         self.parse_external_ids()
         self.statements = self.create_statements()
         self.create_label()
@@ -235,13 +234,13 @@ class Gene:
         try:
             wd_item_gene = wdi_core.WDItemEngine(item_name=self.label, domain='genes', data=self.statements,
                                                  append_value=[PROPS['subclass of']],
-                                                 fast_run=True,
+                                                 fast_run=False,
                                                  fast_run_base_filter={PROPS['Entrez Gene ID']: '',
                                                                        PROPS['found in taxon']: self.organism_info['wdid']})
             self.set_languages(wd_item_gene)
             wd_item_gene.set_aliases(self.aliases)
             wdi_helpers.try_write(wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], self.login,
-                                  write=self.write)
+                                  write=write)
         except Exception as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
@@ -265,7 +264,7 @@ class MicrobeGene(Gene):
         self.description = '{} gene found in {}'.format(self.organism_info['type'], self.organism_info['name'])
 
     def create_label(self):
-        self.label = self.record['name']['@value']
+        self.label = self.record['name']['@value'] + " " + self.record['locus_tag']['@value']
 
     def create_statements(self):
 
@@ -289,6 +288,11 @@ class MicrobeGene(Gene):
                                           self.external_ids[genomic_pos_id_prop], login=self.login)
 
         s = []
+
+        # TODO: create qualifier for chromosome REFSEQ ID (not chrom item)
+        # chromosome = gene_record['genomic_pos']['chr']
+        # rs_chrom = PBB_Core.WDString(value=chromosome, prop_nr='P2249', is_qualifier=True)
+
         # strand orientation
         strand_orientation = 'Q22809680' if genomic_pos_value['strand'] == 1 else 'Q22809711'
         s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'], references=[genomic_pos_ref]))
@@ -317,7 +321,7 @@ class MammalianGene(Gene):
     # languages to set the gene label to
     label_languages = gene_of_the_species.keys()
 
-    def __init__(self, record, organism_info, chr_num_wdid, login, write=True):
+    def __init__(self, record, organism_info, chr_num_wdid, login):
         """
         :param chr_num_wdid: mapping of chr number (str) to wdid
         """
@@ -380,14 +384,15 @@ class MammalianGene(Gene):
 class HumanGene(MammalianGene):
 
     def create_statements(self):
-        # create all mammalian gene statements
-        s = super().create_statements()
+        # create gene statements
+        s = Gene.create_statements(self)
         entrez_ref = make_ref_source(self.record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
                                      self.external_ids['Entrez Gene ID'], login=self.login)
 
         # add on human specific gene statements
-        for key in ['HGNC ID', 'HGNC Gene Symbol']:
-            s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=[entrez_ref]))
+        for key in ['HGNC ID', 'HGNC Gene Symbol', 'HomoloGene ID']:
+            if key in self.external_ids:
+                s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=[entrez_ref]))
 
         # add on gene position statements
         s.extend(self.do_gp_human())
@@ -406,9 +411,15 @@ class HumanGene(MammalianGene):
         """
         create genomic pos, chr, strand statements for human
         includes genomic assembly
+
+        genes that are on an unlocalized scaffold will have no genomic position statements
+        example: https://mygene.info/v3/gene/102724770
+        https://www.wikidata.org/wiki/Q20970159
         :return:
         """
         genomic_pos_value = self.record['genomic_pos']['@value']
+        if genomic_pos_value['chr'] not in self.chr_num_wdid:
+            return []
         genomic_pos_source = self.record['genomic_pos']['@source']
         genomic_pos_id_prop = source_ref_id[genomic_pos_source['id']]
         genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop],
@@ -494,8 +505,8 @@ class GeneBot:
 
     def run(self, records, total=None, write=True):
         for record in tqdm(records, mininterval=2, total=total):
-            gene = self.GENE_CLASS(record, self.organism_info, self.login, write=write)
-            gene.create_item()
+            gene = self.GENE_CLASS(record, self.organism_info, self.login)
+            gene.create_item(write=write)
 
 
 class MammalianGeneBot(GeneBot):
@@ -507,19 +518,22 @@ class MammalianGeneBot(GeneBot):
 
     def run(self, records, total=None, write=True):
         for record in tqdm(records, mininterval=2, total=total):
-            gene = self.GENE_CLASS(record, self.organism_info, self.chr_num_wdid, self.login, write=write)
-            gene.create_item()
+            print(record)
+            gene = self.GENE_CLASS(record, self.organism_info, self.chr_num_wdid, self.login)
+            gene.create_item(write=write)
+            print(gene.external_ids)
 
 class HumanGeneBot(MammalianGeneBot):
     GENE_CLASS = HumanGene
 
 
-def main(coll: pymongo.collection.Collection, taxid: str, log_dir: str = "./logs", write: bool = True) -> None:
+def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_dir: str = "./logs", write: bool = True) -> None:
     """
     Main function for creating/updating genes
 
     :param coll: mongo collection containing gene data from mygene
     :param taxid: taxon to use (ncbi tax id)
+    :param metadata: looks like: {"ensembl" : 84, "cpdb" : 31, "netaffy" : "na35", "ucsc" : "20160620", .. }
     :param log_dir: dir to store logs
     :param write: actually perform write
     :return:
@@ -542,6 +556,7 @@ def main(coll: pymongo.collection.Collection, taxid: str, log_dir: str = "./logs
         # make sure all chromosome items are found in wikidata
         cb = ChromosomeBot()
         chr_num_wdid = cb.get_or_create(organism_info)
+        #chr_num_wdid = cb.get(organism_info['wdid'])
         if int(organism_info['taxid']) == 9606:
             bot = HumanGeneBot(organism_info, chr_num_wdid, login)
         else:
@@ -555,28 +570,32 @@ def main(coll: pymongo.collection.Collection, taxid: str, log_dir: str = "./logs
     docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding'})
     total = docs.count()
     docs = HelperBot.validate_docs(docs, PROPS['Entrez Gene ID'])
-    records = HelperBot.tag_mygene_docs(docs)
+    records = HelperBot.tag_mygene_docs(docs, metadata)
 
-    bot.run(records, total=total)
-
-
-
-
+    bot.run(records, total=total, write=write)
 
 
 if __name__ == "__main__":
+    """
+    Data to be used is stored in a mongo collection. collection name: "mygene"
+    """
     parser = argparse.ArgumentParser(description='run wikidata gene bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
     parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id)", type=str)
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
-    parser.add_argument('--mongo-coll', type=str, default="mygene")
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     taxon = args.taxon
-    coll = MongoClient(args.mongo_uri)[args.mongo_db][args.mongo_coll]
+    coll = MongoClient(args.mongo_uri)[args.mongo_db]["mygene"]
+
+    # get metadata about sources
+    # this should be stored in the same db under the collection: mygene_sources
+    metadata_coll = MongoClient(args.mongo_uri)[args.mongo_db]["mygene_sources"]
+    assert metadata_coll.count() == 1
+    metadata = metadata_coll.find_one()
 
     log_name = '{}-{}.log'.format(__metadata__['name'], datetime.now().strftime('%Y%m%d_%H:%M'))
     if wdi_core.WDItemEngine.logger is not None:
@@ -584,4 +603,4 @@ if __name__ == "__main__":
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='gene{}'.format(taxon))
 
-    main(coll, taxon, log_dir=log_dir, write=not args.dummy)
+    main(coll, taxon, metadata, log_dir=log_dir, write=not args.dummy)

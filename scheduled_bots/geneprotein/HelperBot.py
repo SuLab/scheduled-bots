@@ -2,7 +2,6 @@ import sys
 import traceback
 from datetime import datetime
 
-import requests
 from wikidataintegrator import wdi_core, wdi_helpers
 
 # item for a database
@@ -42,6 +41,7 @@ def alwayslist(value):
 def validate_doc(d):
     """
     Check fields in mygene doc. and neccessary transformations
+    Remove version numbers from genomic/transcriptomic seq IDs
     :param d:
     :return:
     """
@@ -89,20 +89,27 @@ def validate_doc(d):
     # check optional dict fields
     if 'uniprot' in d:
         assert "Swiss-Prot" in d['uniprot'] and isinstance(d['uniprot']['Swiss-Prot'], str), "doc['uniprot']['Swiss-Prot']"
+    if 'homologene' in d:
+        assert "id" in d['homologene'] and isinstance(d['homologene']['id'], (int, str)), "doc['homologene']['id']"
+
+    # remove version numbers (these are always lists)
+    remove_version = lambda ss: [s.rsplit(".")[0] if "." in s else s for s in ss]
+    d['refseq']['rna'] = remove_version(d['refseq']['rna'])
+    d['refseq']['protein'] = remove_version(d['refseq']['protein'])
 
     return d
 
 
-def get_mygene_src_version():
+def parse_mygene_src_version(d):
     """
-    Get source information from mygene. Make sure they are annotated as releases or with a timestamp
+    Parse source information. Make sure they are annotated as releases or with a timestamp
+    d: looks like: {"ensembl" : 84, "cpdb" : 31, "netaffy" : "na35", "ucsc" : "20160620", .. }
     :return: dict, looks likes:
         {'ensembl': {'id': 'ensembl', 'release': '87'},
         'entrez': {'id': 'entrez', 'timestamp': '20161204'}}
     """
-    d = requests.get("http://mygene.info/v3/metadata").json()
     d2 = {}
-    for source, version in d['src_version'].items():
+    for source, version in d.items():
         if source in {'ensembl', 'refseq'}:
             d2[source] = {'id': source, 'release': str(version)}
         elif source in {'uniprot', 'entrez', 'ucsc'}:
@@ -110,14 +117,15 @@ def get_mygene_src_version():
     return d2
 
 
-def tag_mygene_docs(docs):
+def tag_mygene_docs(docs, metadata):
     """
     The purpose of this to is to tag each field with its source. This is hardcoded/defined here for now.
     Until it comes from mygene.info itself
     :param docs: list of dicts. Keys not in key_source are removed!!
+    :param metadata: looks like: {"ensembl" : 84, "cpdb" : 31, "netaffy" : "na35", "ucsc" : "20160620", .. }
     :return:
     """
-    source_dict = get_mygene_src_version()
+    source_dict = parse_mygene_src_version(metadata)
     key_source = {'SGD': 'entrez',
                   'HGNC': 'entrez',
                   'MIM': 'entrez',
