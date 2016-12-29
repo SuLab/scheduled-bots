@@ -225,13 +225,13 @@ class Gene:
         return s
 
     def create_item(self, write=True):
-        self.parse_external_ids()
-        self.statements = self.create_statements()
-        self.create_label()
-        self.create_description()
-        self.create_aliases()
-
         try:
+            self.parse_external_ids()
+            self.statements = self.create_statements()
+            self.create_label()
+            self.create_description()
+            self.create_aliases()
+
             wd_item_gene = wdi_core.WDItemEngine(item_name=self.label, domain='genes', data=self.statements,
                                                  append_value=[PROPS['subclass of']],
                                                  fast_run=False,
@@ -518,10 +518,9 @@ class MammalianGeneBot(GeneBot):
 
     def run(self, records, total=None, write=True):
         for record in tqdm(records, mininterval=2, total=total):
-            print(record)
+            #print(record['entrezgene'])
             gene = self.GENE_CLASS(record, self.organism_info, self.chr_num_wdid, self.login)
             gene.create_item(write=write)
-            print(gene.external_ids)
 
 class HumanGeneBot(MammalianGeneBot):
     GENE_CLASS = HumanGene
@@ -567,9 +566,9 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_di
         raise ValueError("unknown organism")
 
     # only do certain records
-    docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding'})
+    docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}})
     total = docs.count()
-    docs = HelperBot.validate_docs(docs, PROPS['Entrez Gene ID'])
+    docs = HelperBot.validate_docs(docs, 'gene', PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, write=write)

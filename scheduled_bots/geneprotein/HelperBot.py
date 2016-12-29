@@ -15,10 +15,11 @@ source_items = {'uniprot': 'Q905695',
                 'refseq': 'Q7307074'}
 
 
-def validate_docs(docs, external_id_prop):
+def validate_docs(docs, doc_type, external_id_prop):
+    assert doc_type in {'gene', 'protein'}
     for doc in docs:
         try:
-            doc = validate_doc(doc)
+            doc = validate_doc(doc, doc_type)
         except AssertionError as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
@@ -38,45 +39,62 @@ def alwayslist(value):
         return [value]
 
 
-def validate_doc(d):
+def validate_doc(d, doc_type):
     """
     Check fields in mygene doc. and neccessary transformations
     Remove version numbers from genomic/transcriptomic seq IDs
     :param d:
+    :param doc_type: is one of 'gene' or 'protein'
     :return:
     """
-    # make sure only one genomic position and its a dict
-    assert 'genomic_pos' in d and isinstance(d['genomic_pos'], dict), 'genomic_pos'
-    if 'genomic_pos_hg19' in d:
-        assert isinstance(d['genomic_pos_hg19'], dict), 'genomic_pos_hg19'
+    assert doc_type in {'gene', 'protein'}
 
-    # existence required keys and sub keys
+    if doc_type == 'gene':
+        # make sure only one genomic position and its a dict
+        assert 'genomic_pos' in d and isinstance(d['genomic_pos'], dict), 'genomic_pos'
+        if 'genomic_pos_hg19' in d:
+            assert isinstance(d['genomic_pos_hg19'], dict), 'genomic_pos_hg19'
+
+    # check existence required keys and sub keys
+    def check_keys_subkeys(required):
+        for key, value in required.items():
+            assert key in d, "{} not in record".format(key)
+            if hasattr(value, "__iter__"):
+                for sub_key in required[key]:
+                    assert sub_key in d[key], "{} not in {}".format(sub_key, key)
+
     required = {'entrezgene': None,
-                'ensembl': {'gene', 'transcript', 'protein'},
-                'refseq': {'rna', 'protein'},  # not using refseq['genomic']
                 'type_of_gene': None,
-                'name': None,
-                'genomic_pos': {'start', 'end', 'chr', 'strand'},
-                'uniprot': {'Swiss-Prot'}
-                }
-    for key, value in required.items():
-        assert key in d, "{} not in record".format(key)
-        if hasattr(value, "__iter__"):
-            for sub_key in required[key]:
-                assert sub_key in d[key], "{} not in {}".format(sub_key, key)
+                'name': None }
+    required_gene = {'ensembl': {'gene', 'transcript'},
+                     'refseq': {'rna'},  # not using refseq['genomic']
+                     'genomic_pos': {'start', 'end', 'chr', 'strand'} }
+    required_protein = {'ensembl': {'protein'},
+                        'refseq': {'protein'},
+                        'uniprot': {'Swiss-Prot'}}
+
+    check_keys_subkeys(required)
+    if doc_type == "gene":
+        check_keys_subkeys(required_gene)
+    if doc_type == "protein":
+        check_keys_subkeys(required_protein)
 
     # make sure these fields are lists
-    d['ensembl']['transcript'] = alwayslist(d['ensembl']['transcript'])
-    d['ensembl']['protein'] = alwayslist(d['ensembl']['protein'])
-    d['refseq']['rna'] = alwayslist(d['refseq']['rna'])
-    d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
+    if doc_type == "gene":
+        d['ensembl']['transcript'] = alwayslist(d['ensembl']['transcript'])
+        d['refseq']['rna'] = alwayslist(d['refseq']['rna'])
+    if doc_type == "protein":
+        d['ensembl']['protein'] = alwayslist(d['ensembl']['protein'])
+        d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
     if 'alias' in d:
         d['alias'] = alwayslist(d['alias'])
 
     # make sure these fields are not lists
-    assert isinstance(d['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
-    assert isinstance(d['entrezgene'], (int, str)), "incorrect type: doc['entrezgene']"
-    assert isinstance(d['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
+    if doc_type == "gene":
+        assert isinstance(d['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
+        assert isinstance(d['entrezgene'], (int, str)), "incorrect type: doc['entrezgene']"
+    if doc_type == "protein":
+        assert isinstance(d['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
     # assert isinstance(record['refseq']['genomic'], str)  # this isn't used
 
     # check types of optional and required fields
@@ -87,15 +105,18 @@ def validate_doc(d):
             assert isinstance(d[field], field_type), "incorrect type: {}".format(field)
 
     # check optional dict fields
-    if 'uniprot' in d:
-        assert "Swiss-Prot" in d['uniprot'] and isinstance(d['uniprot']['Swiss-Prot'], str), "doc['uniprot']['Swiss-Prot']"
-    if 'homologene' in d:
+    if doc_type == "protein":
+        d['uniprot']['Swiss-Prot'] = alwayslist(d['uniprot']['Swiss-Prot'])
+
+    if doc_type == "gene" and 'homologene' in d:
         assert "id" in d['homologene'] and isinstance(d['homologene']['id'], (int, str)), "doc['homologene']['id']"
 
     # remove version numbers (these are always lists)
     remove_version = lambda ss: [s.rsplit(".")[0] if "." in s else s for s in ss]
-    d['refseq']['rna'] = remove_version(d['refseq']['rna'])
-    d['refseq']['protein'] = remove_version(d['refseq']['protein'])
+    if doc_type == "gene":
+        d['refseq']['rna'] = remove_version(d['refseq']['rna'])
+    if doc_type == "protein":
+        d['refseq']['protein'] = remove_version(d['refseq']['protein'])
 
     return d
 
