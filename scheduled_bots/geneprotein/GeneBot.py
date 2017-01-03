@@ -551,11 +551,10 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_di
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__))
 
     organism_info = organisms_info[taxid]
-    if organism_info['type'] in {"fungal", "mammalian"}:
+    if organism_info['type'] in {"fungal", "mammalian", "plant"}:
         # make sure all chromosome items are found in wikidata
         cb = ChromosomeBot()
-        chr_num_wdid = cb.get_or_create(organism_info)
-        #chr_num_wdid = cb.get(organism_info['wdid'])
+        chr_num_wdid = cb.get_or_create(organism_info, login=login)
         if int(organism_info['taxid']) == 9606:
             bot = HumanGeneBot(organism_info, chr_num_wdid, login)
         else:
@@ -568,6 +567,7 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_di
     # only do certain records
     docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}}).batch_size(20)
     total = docs.count()
+    print("total number of records: {}".format(total))
     docs = HelperBot.validate_docs(docs, 'gene', PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
 

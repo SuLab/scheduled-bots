@@ -16,7 +16,14 @@ from wikidataintegrator import wdi_core, wdi_helpers
 
 
 class ChromosomeBot:
+
+    chr_type_map = {'Chromosome': 'Q37748',
+                    'Mitochondrion': 'Q18694495',
+                    'Chloroplast': 'Q22329079'}
+
     def __init__(self):
+        self.retrieved = None
+        self.login = None
         self.ass_sum = None
         self.chr_df = dict()
 
@@ -65,13 +72,20 @@ class ChromosomeBot:
     def get_or_create(self, organism_info, retrieved=None, login=None):
         """
         Make sure all chromosome items exist
-        return a map of chr num to wdid
+        return a map of chr num to wdid. looks like:
+        {'1': 'Q28114580',  '2': 'Q28114581', ..., 'MT': 'Q28114585'}
 
         :param organism_info: {'name': name, 'taxid': taxid, 'wdid': wdid, 'type': type}
+        :type organism_info: dict
+        :param retrieved: for reference statement
+        :type retrieved: datetime
         :param login:
         :return:
         """
-        taxid = organism_info['taxid']
+        self.login = login
+        self.retrieved = datetime.now() if retrieved is None else retrieved
+
+        taxid = int(organism_info['taxid'])
         if taxid not in self.chr_df:
             self.get_assembly_report(taxid)
 
@@ -81,39 +95,58 @@ class ChromosomeBot:
         # get assembled chromosomes, which we will create items for
         chrdf = self.chr_df[taxid][self.chr_df[taxid]['Sequence-Role'] == 'assembled-molecule']
 
-        # todo make chromosomes so they are found in taxon
         existing_chr = wdi_helpers.id_mapper("P2249")
         existing_chr = {k.split(".")[0]: v for k, v in existing_chr.items()}
 
         for record in chrdf.to_dict("records"):
             chrom_num = record['Sequence-Name']
             genome_id = record['RefSeq-Accn']
+            genome_id = genome_id.split(".")[0]
+            chr_type = record['Assigned-Molecule-Location/Type']
             # {'Chromosome','Mitochondrion'}
             # chrom_type = record['Assigned-Molecule-Location/Type']
-            if genome_id.split(".")[0] in existing_chr:
-                chr_num_wdid[chrom_num] = existing_chr[genome_id.split(".")[0]]
-                continue
-
-            # chromosome doesn't exist in wikidata. create it
-            raise ValueError("chromosome creation not implemented yet...")
+            if genome_id in existing_chr:
+                chr_num_wdid[chrom_num] = existing_chr[genome_id]
+            else:
+                # chromosome doesn't exist in wikidata. create it
+                print("chromosome being created: {}, {}".format(chrom_num, genome_id))
+                chr_num_wdid[chrom_num] = self.create_chrom(organism_info, chrom_num, genome_id, chr_type, login)
 
         return chr_num_wdid
 
+    def create_chrom(self, organism_info, chrom_num, genome_id, chr_type, login):
 
-    """
-    def create_chrom(self, organism_info, chrom_num, genome_id, login):
+        def make_ref(retrieved, genome_id):
+            """
+            Create reference statement for chromosomes
+            :param retrieved: datetime
+            :type retrieved: datetime
+            :param genome_id: refseq genome id
+            :type genome_id: str
+            :return:
+            """
+            refs = [
+                wdi_core.WDItemID(value='Q20641742', prop_nr='P248', is_reference=True),  # stated in ncbi gene
+                wdi_core.WDString(value=genome_id, prop_nr='P2249', is_reference=True),  # Link to Refseq Genome ID
+                wdi_core.WDTime(retrieved.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', is_reference=True)
+            ]
+            return refs
+
         item_name = '{} chromosome {}'.format(organism_info['name'], chrom_num)
         item_description = '{} chromosome'.format(organism_info['type'])
         print(item_name)
         print(genome_id)
 
-        reference = self._make_ref(genome_id)
-        statements = []
-        statements.append(
-            wdi_core.WDItemID(value='Q37748', prop_nr='P279', references=[reference]))  # subclass of chromosome
-        statements.append(wdi_core.WDItemID(value=organism_info['wdid'], prop_nr='P703',
-                                            references=[reference]))  # found in taxon
-        statements.append(wdi_core.WDString(value=genome_id, prop_nr='P2249', references=[reference]))  # genome id
+        reference = make_ref(self.retrieved, genome_id)
+
+        # subclass of chr_type
+        if chr_type not in ChromosomeBot.chr_type_map:
+            raise ValueError("unknown chromosome type: {}".format(chr_type))
+        statements = [wdi_core.WDItemID(value=ChromosomeBot.chr_type_map[chr_type], prop_nr='P279', references=[reference])]
+        # found in taxon
+        statements.append(wdi_core.WDItemID(value=organism_info['wdid'], prop_nr='P703', references=[reference]))
+        # genome id
+        statements.append(wdi_core.WDString(value=genome_id, prop_nr='P2249', references=[reference]))
 
         wd_item = wdi_core.WDItemEngine(item_name=item_name, domain='chromosome', data=statements,
                                         append_value=['P279'], fast_run=True,
@@ -126,20 +159,4 @@ class ChromosomeBot:
         wdi_helpers.try_write(wd_item, genome_id, 'P2249', login)
         return wd_item.wd_item_id
 
-    def _make_ref(self, genome_id):
-        '''
-        Create reference statement for chromosomes
-        :param retrieved: datetime
-        :type retrieved: datetime
-        :param genome_id: refseq genome id
-        :type genome_id: str
-        :return:
-        '''
-        retrieved = datetime.now()
-        refs = [
-            wdi_core.WDItemID(value='Q20641742', prop_nr='P248', is_reference=True),  # stated in ncbi gene
-            wdi_core.WDString(value=genome_id, prop_nr='P2249', is_reference=True),  # Link to Refseq Genome ID
-            wdi_core.WDTime(retrieved.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', is_reference=True)
-        ]
-        return refs
-    """
+
