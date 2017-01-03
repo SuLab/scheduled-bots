@@ -566,14 +566,12 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_di
         raise ValueError("unknown organism")
 
     # only do certain records
-    docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}},
-                     no_cursor_timeout=True)
+    docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}}).batch_size(20)
     total = docs.count()
     docs = HelperBot.validate_docs(docs, 'gene', PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, write=write)
-    docs.close()
 
 
 if __name__ == "__main__":

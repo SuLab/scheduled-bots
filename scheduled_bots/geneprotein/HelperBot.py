@@ -69,8 +69,8 @@ def validate_doc(d, doc_type):
     required_gene = {'ensembl': {'gene', 'transcript'},
                      'refseq': {'rna'},  # not using refseq['genomic']
                      'genomic_pos': {'start', 'end', 'chr', 'strand'} }
-    required_protein = {'ensembl': {'protein'},
-                        'refseq': {'protein'},
+    required_protein = {#'ensembl': {'protein'},
+                        #'refseq': {'protein'},
                         'uniprot': {'Swiss-Prot'}}
 
     check_keys_subkeys(required)
@@ -84,8 +84,10 @@ def validate_doc(d, doc_type):
         d['ensembl']['transcript'] = alwayslist(d['ensembl']['transcript'])
         d['refseq']['rna'] = alwayslist(d['refseq']['rna'])
     if doc_type == "protein":
-        d['ensembl']['protein'] = alwayslist(d['ensembl']['protein'])
-        d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
+        if 'ensembl' in d and 'protein' in d['ensembl']:
+            d['ensembl']['protein'] = alwayslist(d['ensembl']['protein'])
+        if 'refseq' in d and 'protein' in d['refseq']:
+            d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
     if 'alias' in d:
         d['alias'] = alwayslist(d['alias'])
 
@@ -103,10 +105,6 @@ def validate_doc(d, doc_type):
     for field, field_type in fields.items():
         if field in d:
             assert isinstance(d[field], field_type), "incorrect type: {}".format(field)
-
-    # check optional dict fields
-    if doc_type == "protein":
-        d['uniprot']['Swiss-Prot'] = alwayslist(d['uniprot']['Swiss-Prot'])
 
     if doc_type == "gene" and 'homologene' in d:
         assert "id" in d['homologene'] and isinstance(d['homologene']['id'], (int, str)), "doc['homologene']['id']"
