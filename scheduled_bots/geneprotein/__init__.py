@@ -143,5 +143,11 @@ organisms_info = {
         "type": "mammalian",
         "wdid": "Q618026",
         'taxid': 9545
+    },
+    3702: {
+        "name": "Arabidopsis thaliana",
+        "type": "plant",
+        "wdid": "Q158695",
+        'taxid': 3702
     }
 }
