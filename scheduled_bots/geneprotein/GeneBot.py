@@ -581,7 +581,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata gene bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id)", type=str)
+    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id)", type=str, required=True)
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
     args = parser.parse_args()
