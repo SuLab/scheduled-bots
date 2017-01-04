@@ -40,6 +40,7 @@ from scheduled_bots.geneprotein import HelperBot
 from scheduled_bots.geneprotein import type_of_gene_map, organisms_info
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
 from scheduled_bots.geneprotein.HelperBot import make_ref_source
+from scheduled_bots.geneprotein.MicrobeBotResources import get_organism_info
 from tqdm import tqdm
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 
@@ -289,18 +290,19 @@ class MicrobeGene(Gene):
 
         s = []
 
-        # TODO: create qualifier for chromosome REFSEQ ID (not chrom item)
-        # chromosome = gene_record['genomic_pos']['chr']
-        # rs_chrom = PBB_Core.WDString(value=chromosome, prop_nr='P2249', is_qualifier=True)
+        # create qualifier for chromosome REFSEQ ID (not chrom item)
+        chromosome = genomic_pos_value['chr']
+        rs_chrom = wdi_core.WDString(value=chromosome, prop_nr='P2249', is_qualifier=True)
 
         # strand orientation
         strand_orientation = 'Q22809680' if genomic_pos_value['strand'] == 1 else 'Q22809711'
-        s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'], references=[genomic_pos_ref]))
+        s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'],
+                                   references=[genomic_pos_ref], qualifiers=[rs_chrom]))
         # genomic start and end
         s.append(wdi_core.WDString(str(int(genomic_pos_value['start'])), PROPS['genomic start'],
-                                   references=[genomic_pos_ref]))
+                                   references=[genomic_pos_ref], qualifiers=[rs_chrom]))
         s.append(wdi_core.WDString(str(int(genomic_pos_value['end'])), PROPS['genomic end'],
-                                   references=[genomic_pos_ref]))
+                                   references=[genomic_pos_ref], qualifiers=[rs_chrom]))
 
         return s
 
@@ -550,8 +552,10 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_di
         wdi_core.WDItemEngine.logger.handles = []
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__))
 
-    organism_info = organisms_info[taxid]
-    if organism_info['type'] in {"fungal", "mammalian", "plant"}:
+    # get organism metadata (name, organism type, wdid)
+    if taxid in organisms_info:
+        # its one of fungal, mammalian, plant (not microbe)
+        organism_info = organisms_info[taxid]
         # make sure all chromosome items are found in wikidata
         cb = ChromosomeBot()
         chr_num_wdid = cb.get_or_create(organism_info, login=login)
@@ -559,10 +563,12 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_di
             bot = HumanGeneBot(organism_info, chr_num_wdid, login)
         else:
             bot = MammalianGeneBot(organism_info, chr_num_wdid, login)
-    elif organism_info['type'] in {"microbial"}:
-        bot = GeneBot(organism_info, login)
     else:
-        raise ValueError("unknown organism")
+        # check if its one of the microbe refs
+        # raises valueerror if not...
+        organism_info = get_organism_info(taxid)
+        print(organism_info)
+        bot = GeneBot(organism_info, login)
 
     # only do certain records
     docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}}).batch_size(20)
@@ -581,7 +587,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata gene bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id)", type=str, required=True)
+    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes", type=str, required=True)
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
     args = parser.parse_args()
