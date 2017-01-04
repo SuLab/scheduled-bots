@@ -2,6 +2,7 @@ import sys
 import traceback
 from datetime import datetime
 
+import functools
 from wikidataintegrator import wdi_core, wdi_helpers
 
 # item for a database
@@ -16,10 +17,14 @@ source_items = {'uniprot': 'Q905695',
 
 
 def validate_docs(docs, doc_type, external_id_prop):
-    assert doc_type in {'gene', 'protein'}
+    assert doc_type in {'gene', 'protein', 'microbial'}
+    if doc_type == "microbial":
+        f = validate_doc_microbial
+    else:
+        f = functools.partial(validate_doc, doc_type=doc_type)
     for doc in docs:
         try:
-            doc = validate_doc(doc, doc_type)
+            doc = f(doc)
         except AssertionError as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
@@ -37,6 +42,24 @@ def alwayslist(value):
         return value
     else:
         return [value]
+
+
+def validate_doc_microbial(d):
+    """
+    Check fields in mygene doc. and neccessary transformations
+    Remove version numbers from genomic/transcriptomic seq IDs
+    :param d:
+    :return:
+    """
+    assert 'genomic_pos' in d and isinstance(d['genomic_pos'], dict), 'genomic_pos'
+    assert "entrezgene" in d, "{} not in record".format("entrezgene")
+    assert "locus_tag" in d, "{} not in record".format("locus_tag")
+    assert "type_of_gene" in d, "{} not in record".format("type_of_gene")
+    assert "name" in d, "{} not in record".format("name")
+    assert "uniprot" in d, "{} not in record".format("uniprot")
+    assert isinstance(d['uniprot'], dict), 'uniprot is not a dict'
+
+    return d
 
 
 def validate_doc(d, doc_type):

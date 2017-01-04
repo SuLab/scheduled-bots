@@ -139,14 +139,15 @@ class Gene:
         ############
 
         entrez_gene = str(self.record['entrezgene']['@value'])
-
-        ensembl_gene = self.record['ensembl']['@value']['gene']
-
-        external_ids = {'Entrez Gene ID': entrez_gene, 'Ensembl Gene ID': ensembl_gene}
+        external_ids = {'Entrez Gene ID': entrez_gene}
 
         ############
         # optional external IDs
         ############
+        if 'ensembl' in self.record:
+            ensembl_gene = self.record['ensembl']['@value']['gene']
+            external_ids['Ensembl Gene ID'] = ensembl_gene
+
         if 'locus_tag' in self.record:
             # ncbi locus tag
             external_ids['NCBI Locus tag'] = self.record['locus_tag']['@value']
@@ -172,11 +173,11 @@ class Gene:
         # optional external IDs (can have more than one)
         ############
         # Ensembl Transcript ID
-        if 'transcript' in self.record['ensembl']['@value']:
+        if 'ensembl' in self.record and 'transcript' in self.record['ensembl']['@value']:
             external_ids['Ensembl Transcript ID'] = self.record['ensembl']['@value']['transcript']
 
         # RefSeq RNA ID
-        if 'rna' in self.record['refseq']['@value']:
+        if 'refseq' in self.record and 'rna' in self.record['refseq']['@value']:
             external_ids['RefSeq RNA ID'] = self.record['refseq']['@value']['rna']
 
         self.external_ids = external_ids
@@ -188,21 +189,26 @@ class Gene:
         s = []
 
         ############
-        # ID statements
+        # ID statements (required)
         ############
-        ensembl_ref = make_ref_source(self.record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
-                                      self.external_ids['Ensembl Gene ID'], login=self.login)
+
         entrez_ref = make_ref_source(self.record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
                                      self.external_ids['Entrez Gene ID'], login=self.login)
 
         s.append(wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref]))
-        s.append(wdi_core.WDString(self.external_ids['Ensembl Gene ID'], PROPS['Ensembl Gene ID'], references=[ensembl_ref]))
+
 
         # optional ID statements
-        key = 'Ensembl Transcript ID'
-        if key in self.external_ids:
-            for id in self.external_ids[key]:
-                s.append(wdi_core.WDString(id, PROPS[key], references=[ensembl_ref]))
+        ensembl_ref = None
+        if 'Ensembl Gene ID' in self.external_ids:
+            ensembl_ref = make_ref_source(self.record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
+                                          self.external_ids['Ensembl Gene ID'], login=self.login)
+            s.append(wdi_core.WDString(self.external_ids['Ensembl Gene ID'], PROPS['Ensembl Gene ID'],
+                                       references=[ensembl_ref]))
+            # no ensembl transcript ID unless ensembl gene is there also
+            if 'Ensembl Transcript ID' in self.external_ids:
+                for id in self.external_ids['Ensembl Transcript ID']:
+                    s.append(wdi_core.WDString(id, PROPS['Ensembl Transcript ID'], references=[ensembl_ref]))
 
         key = 'RefSeq RNA ID'
         if key in self.external_ids:
@@ -216,12 +222,15 @@ class Gene:
         ############
         # Gene statements
         ############
+        # if there is an ensembl ID, this comes from ensembl, otherwise, entrez
+        gene_ref = ensembl_ref if ensembl_ref is not None else entrez_ref
+
         # subclass of gene/protein-coding gene/etc
         type_of_gene = self.record['type_of_gene']['@value']
-        s.append(wdi_core.WDItemID(type_of_gene_map[type_of_gene], PROPS['subclass of'], references=[ensembl_ref]))
+        s.append(wdi_core.WDItemID(type_of_gene_map[type_of_gene], PROPS['subclass of'], references=[gene_ref]))
 
         # found in taxon
-        s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=[ensembl_ref]))
+        s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=[gene_ref]))
 
         return s
 
@@ -258,14 +267,18 @@ class MicrobeGene(Gene):
     Microbes
 
     """
-    def __init__(self, record, organism_info, chr_num_wdid, login):
-        super().__init__(record, organism_info, chr_num_wdid, login)
+
+    def __init__(self, record, organism_info, login):
+        super().__init__(record, organism_info, login)
+
+    def create_label(self):
+        self.label = self.record['name']['@value'] + " " + self.record['locus_tag']['@value']
 
     def create_description(self):
         self.description = '{} gene found in {}'.format(self.organism_info['type'], self.organism_info['name'])
 
-    def create_label(self):
-        self.label = self.record['name']['@value'] + " " + self.record['locus_tag']['@value']
+    def validate_record(self):
+        pass
 
     def create_statements(self):
 
@@ -524,8 +537,13 @@ class MammalianGeneBot(GeneBot):
             gene = self.GENE_CLASS(record, self.organism_info, self.chr_num_wdid, self.login)
             gene.create_item(write=write)
 
+
 class HumanGeneBot(MammalianGeneBot):
     GENE_CLASS = HumanGene
+
+
+class MicrobeGeneBot(GeneBot):
+    GENE_CLASS = MicrobeGene
 
 
 def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_dir: str = "./logs", write: bool = True) -> None:
@@ -542,7 +560,7 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_di
 
     # make sure the organism is found in wikidata
     taxid = int(taxid)
-    organism_wdid = wdi_helpers.prop2qid("P685", taxid)
+    organism_wdid = wdi_helpers.prop2qid("P685", str(taxid))
     if not organism_wdid:
         raise ValueError("organism {} not found".format(taxid))
 
@@ -555,6 +573,7 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_di
     # get organism metadata (name, organism type, wdid)
     if taxid in organisms_info:
         # its one of fungal, mammalian, plant (not microbe)
+        validate_type = 'gene'
         organism_info = organisms_info[taxid]
         # make sure all chromosome items are found in wikidata
         cb = ChromosomeBot()
@@ -568,13 +587,14 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_di
         # raises valueerror if not...
         organism_info = get_organism_info(taxid)
         print(organism_info)
-        bot = GeneBot(organism_info, login)
+        bot = MicrobeGeneBot(organism_info, login)
+        validate_type = "microbial"
 
     # only do certain records
     docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}}).batch_size(20)
     total = docs.count()
     print("total number of records: {}".format(total))
-    docs = HelperBot.validate_docs(docs, 'gene', PROPS['Entrez Gene ID'])
+    docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, write=write)
