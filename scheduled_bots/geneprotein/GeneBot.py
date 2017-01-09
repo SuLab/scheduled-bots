@@ -577,7 +577,8 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     taxid = int(taxid)
     organism_wdid = wdi_helpers.prop2qid("P685", str(taxid))
     if not organism_wdid:
-        raise ValueError("organism {} not found".format(taxid))
+        print("organism {} not found in wikidata".format(taxid))
+        return None
 
     # login
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
