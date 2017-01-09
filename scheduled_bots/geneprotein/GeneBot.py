@@ -21,8 +21,8 @@ Restructuring this: https://bitbucket.org/sulab/wikidatabots/src/226614eeda5f258
 
 
 """
-#TODO: Gene on two chromosomes
-#https://www.wikidata.org/wiki/Q20787772
+# TODO: Gene on two chromosomes
+# https://www.wikidata.org/wiki/Q20787772
 
 ## TODO: Homologues
 # do this in another bot because the items might not exist yet
@@ -36,13 +36,14 @@ from datetime import datetime
 
 import pymongo
 from pymongo import MongoClient
+from tqdm import tqdm
+from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
+
 from scheduled_bots.geneprotein import HelperBot
 from scheduled_bots.geneprotein import type_of_gene_map, organisms_info
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
 from scheduled_bots.geneprotein.HelperBot import make_ref_source
-from scheduled_bots.geneprotein.MicrobeBotResources import get_organism_info
-from tqdm import tqdm
-from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
+from scheduled_bots.geneprotein.MicrobeBotResources import get_organism_info, get_all_taxa
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -195,8 +196,8 @@ class Gene:
         entrez_ref = make_ref_source(self.record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
                                      self.external_ids['Entrez Gene ID'], login=self.login)
 
-        s.append(wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref]))
-
+        s.append(
+            wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref]))
 
         # optional ID statements
         ensembl_ref = None
@@ -234,7 +235,7 @@ class Gene:
 
         return s
 
-    def create_item(self, write=True):
+    def create_item(self, fast_run=True, write=True):
         try:
             self.parse_external_ids()
             self.statements = self.create_statements()
@@ -244,12 +245,14 @@ class Gene:
 
             wd_item_gene = wdi_core.WDItemEngine(item_name=self.label, domain='genes', data=self.statements,
                                                  append_value=[PROPS['subclass of']],
-                                                 fast_run=False,
+                                                 fast_run=fast_run,
                                                  fast_run_base_filter={PROPS['Entrez Gene ID']: '',
-                                                                       PROPS['found in taxon']: self.organism_info['wdid']})
+                                                                       PROPS['found in taxon']: self.organism_info[
+                                                                           'wdid']})
             self.set_languages(wd_item_gene)
             wd_item_gene.set_aliases(self.aliases)
-            wdi_helpers.try_write(wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], self.login,
+            wdi_helpers.try_write(wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
+                                  self.login,
                                   write=write)
         except Exception as e:
             exc_info = sys.exc_info()
@@ -281,7 +284,6 @@ class MicrobeGene(Gene):
         pass
 
     def create_statements(self):
-
         # create generic gene statements
         s = super().create_statements()
 
@@ -397,7 +399,6 @@ class MammalianGene(Gene):
 
 
 class HumanGene(MammalianGene):
-
     def create_statements(self):
         # create gene statements
         s = Gene.create_statements(self)
@@ -518,10 +519,10 @@ class GeneBot:
         self.login = login
         self.organism_info = organism_info
 
-    def run(self, records, total=None, write=True):
+    def run(self, records, total=None, fast_run=True, write=True):
         for record in tqdm(records, mininterval=2, total=total):
             gene = self.GENE_CLASS(record, self.organism_info, self.login)
-            gene.create_item(write=write)
+            gene.create_item(fast_run=fast_run, write=write)
 
 
 class MammalianGeneBot(GeneBot):
@@ -531,11 +532,11 @@ class MammalianGeneBot(GeneBot):
         super().__init__(organism_info, login)
         self.chr_num_wdid = chr_num_wdid
 
-    def run(self, records, total=None, write=True):
+    def run(self, records, total=None, fast_run=True, write=True):
         for record in tqdm(records, mininterval=2, total=total):
-            #print(record['entrezgene'])
+            # print(record['entrezgene'])
             gene = self.GENE_CLASS(record, self.organism_info, self.chr_num_wdid, self.login)
-            gene.create_item(write=write)
+            gene.create_item(fast_run=fast_run, write=write)
 
 
 class HumanGeneBot(MammalianGeneBot):
@@ -546,16 +547,21 @@ class MicrobeGeneBot(GeneBot):
     GENE_CLASS = MicrobeGene
 
 
-def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_dir: str = "./logs", write: bool = True) -> None:
+def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     """
     Main function for creating/updating genes
 
     :param coll: mongo collection containing gene data from mygene
+    :type coll: pymongo.collection.Collection
     :param taxid: taxon to use (ncbi tax id)
+    :type taxid: str
     :param metadata: looks like: {"ensembl" : 84, "cpdb" : 31, "netaffy" : "na35", "ucsc" : "20160620", .. }
+    :type metadata: dict
     :param log_dir: dir to store logs
+    :type log_dir: str
+
     :param write: actually perform write
-    :return:
+    :return: None
     """
 
     # make sure the organism is found in wikidata
@@ -591,13 +597,14 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata: dict, log_di
         validate_type = "microbial"
 
     # only do certain records
-    docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}}).batch_size(20)
+    docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}}).batch_size(
+        20)
     total = docs.count()
     print("total number of records: {}".format(total))
     docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
-    bot.run(records, total=total, write=write)
+    bot.run(records, total=total, fast_run=fast_run, write=write)
 
 
 if __name__ == "__main__":
@@ -607,13 +614,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata gene bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes", type=str, required=True)
+    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes",
+                        type=str, required=True)
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
+    parser.add_argument('--fastrun', dest='fastrun', action='store_true')
+    parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
+    parser.set_defaults(fastrun=True)
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     taxon = args.taxon
+    fast_run = args.fastrun
     coll = MongoClient(args.mongo_uri)[args.mongo_db]["mygene"]
 
     # get metadata about sources
@@ -628,4 +640,9 @@ if __name__ == "__main__":
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='gene{}'.format(taxon))
 
-    main(coll, taxon, metadata, log_dir=log_dir, write=not args.dummy)
+    if "microbe" in taxon:
+        microbe_taxa = get_all_taxa()
+        taxon = taxon.replace("microbe", ','.join(map(str, microbe_taxa)))
+
+    for taxon1 in taxon.split(","):
+        main(coll, taxon1, metadata, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)

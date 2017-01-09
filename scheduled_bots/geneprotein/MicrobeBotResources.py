@@ -38,6 +38,10 @@ def get_ref_microbe_taxids(force_download=False):
         df.taxid = df.taxid.astype(int)
         return df
 
+def get_all_taxa():
+    df = get_ref_microbe_taxids()
+    ref_taxids = df['taxid'].tolist()
+    return ref_taxids
 
 def get_organism_info(taxid):
     df = get_ref_microbe_taxids()
