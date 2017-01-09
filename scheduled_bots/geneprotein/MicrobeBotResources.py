@@ -34,7 +34,7 @@ def get_ref_microbe_taxids(force_download=False):
         return df
     else:  # use predownloaded and parsed flatfile
         columns.append('wdid')
-        df = pd.read_csv("reference_genomes.csv", sep="\t", dtype=object, skiprows=2, names=columns)
+        df = pd.read_csv("reference_genomes.csv", sep="\t", dtype=object, index_col=0)
         df.taxid = df.taxid.astype(int)
         return df
 
