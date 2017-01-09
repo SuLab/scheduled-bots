@@ -48,7 +48,7 @@ def get_organism_info(taxid):
     ref_taxids = df['taxid'].tolist()
     if taxid not in ref_taxids:
         raise ValueError("taxid {} not found in microbe ref genomes".format(taxid))
-    organism_info = dict(df.query("taxid == 295405").iloc[0])
+    organism_info = dict(df.query("taxid == @taxid").iloc[0])
     organism_info['name'] = organism_info['organism_name']
     organism_info['type'] = "microbial"
 

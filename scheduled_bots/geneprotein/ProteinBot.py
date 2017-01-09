@@ -28,12 +28,14 @@ from datetime import datetime
 
 import pymongo
 from pymongo import MongoClient
+from tqdm import tqdm
+from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
+from wikidataintegrator.wdi_helpers import id_mapper, format_msg
+
 from scheduled_bots.geneprotein import HelperBot
 from scheduled_bots.geneprotein import organisms_info
 from scheduled_bots.geneprotein.HelperBot import make_ref_source
-from tqdm import tqdm
-from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
-from wikidataintegrator.wdi_helpers import id_mapper
+from scheduled_bots.geneprotein.MicrobeBotResources import get_all_taxa, get_organism_info
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -71,7 +73,7 @@ source_ref_id = {'ensembl': "Ensembl Protein ID",
 
 class Protein:
     """
-    Generic protein class. For microbes and yeast
+    Generic protein class
     """
     record = None
     label = None
@@ -117,11 +119,6 @@ class Protein:
         if 'alias' in self.record:
             aliases.extend(self.record['alias'])
         self.aliases = aliases
-
-    def validate_record(self):
-        # handled by HelperBot
-        # allow for subclasses to add additional checks
-        pass
 
     def parse_external_ids(self):
         ############
@@ -197,22 +194,24 @@ class Protein:
         s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=[uniprot_ref]))
 
         # encoded by
-        s.append(wdi_core.WDItemID(self.gene_wdid, PROPS['encoded by'], references=[entrez_ref]))
+        s.append(wdi_core.WDItemID(self.gene_wdid, PROPS['encoded by'], references=[uniprot_ref]))
 
         return s
 
-    def create_item(self, write=True):
+    def create_item(self, fast_run=True, write=True):
         try:
             self.parse_external_ids()
             self.statements = self.create_statements()
             self.create_label()
             self.create_description()
             self.create_aliases()
+
             wd_item_protein = wdi_core.WDItemEngine(item_name=self.label, domain='proteins', data=self.statements,
                                                     append_value=[PROPS['subclass of']],
-                                                    fast_run=False,
+                                                    fast_run=fast_run,
                                                     fast_run_base_filter={PROPS['UniProt ID']: '',
-                                                                          PROPS['found in taxon']: self.organism_info['wdid']})
+                                                                          PROPS['found in taxon']: self.organism_info[
+                                                                              'wdid']})
             wd_item_protein.set_label(self.label)
             wd_item_protein.set_description(self.description, lang='en')
             wd_item_protein.set_aliases(self.aliases)
@@ -236,28 +235,39 @@ class ProteinBot:
         self.organism_info = organism_info
         self.gene_wdid_mapping = gene_wdid_mapping
 
-    def run(self, records, total=None, write=True):
+    def run(self, records, total=None, fast_run=True, write=True):
         for record in tqdm(records, mininterval=2, total=total):
-            gene_wdid = self.gene_wdid_mapping[str(record['entrezgene']['@value'])]
+            entrez_gene = str(record['entrezgene']['@value'])
+            if entrez_gene not in self.gene_wdid_mapping:
+                wdi_core.WDItemEngine.log("WARNING", format_msg(entrez_gene, "P351", None, "Gene item not found during protein creation", None))
+                continue
+            gene_wdid = self.gene_wdid_mapping[entrez_gene]
             protein = Protein(record, self.organism_info, gene_wdid, self.login)
-            protein.create_item(write=write)
+            protein.create_item(fast_run=fast_run, write=write)
 
 
-def main(coll: pymongo.collection.Collection, taxid: str, metadata, log_dir: str = "./logs",
-         write: bool = True) -> None:
+def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     """
     Main function for creating/updating proteins
 
     :param coll: mongo collection containing protein data from mygene
+    :type coll: pymongo.collection.Collection
     :param taxid: taxon to use (ncbi tax id)
+    :type taxid: str
+    :param metadata: looks like: {"ensembl" : 84, "cpdb" : 31, "netaffy" : "na35", "ucsc" : "20160620", .. }
+    :type metadata: dict
     :param log_dir: dir to store logs
+    :type log_dir: str
+    :param fast_run: use fast run mode
+    :type fast_run: bool
     :param write: actually perform write
-    :return:
+    :type write: bool
+    :return: None
     """
 
     # make sure the organism is found in wikidata
     taxid = int(taxid)
-    organism_wdid = wdi_helpers.prop2qid("P685", taxid)
+    organism_wdid = wdi_helpers.prop2qid("P685", str(taxid))
     if not organism_wdid:
         raise ValueError("organism {} not found".format(taxid))
 
@@ -267,19 +277,30 @@ def main(coll: pymongo.collection.Collection, taxid: str, metadata, log_dir: str
         wdi_core.WDItemEngine.logger.handles = []
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__))
 
-    organism_info = organisms_info[taxid]
+    # get organism metadata (name, organism type, wdid)
+    validate_type = 'protein'
+    if taxid in organisms_info:
+        organism_info = organisms_info[taxid]
+    else:
+        # check if its one of the microbe refs
+        # raises valueerror if not...
+        organism_info = get_organism_info(taxid)
+        print(organism_info)
+
     # get all entrez gene id -> wdid mappings, where found in taxon is this strain
     gene_wdid_mapping = id_mapper("P351", (("P703", organism_info['wdid']),))
 
     bot = ProteinBot(organism_info, gene_wdid_mapping, login)
 
     # only do certain records
-    docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding', 'uniprot.Swiss-Prot': {'$exists': True}}).batch_size(20)
+    doc_filter = {'taxid': taxid, 'type_of_gene': 'protein-coding', 'uniprot.Swiss-Prot': {'$exists': True}}
+    docs = coll.find(doc_filter).batch_size(20)
     total = docs.count()
-    docs = HelperBot.validate_docs(docs, 'protein', PROPS['Entrez Gene ID'])
+    print("total number of records: {}".format(total))
+    docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
-    bot.run(records, total=total, write=write)
+    bot.run(records, total=total, fast_run=fast_run, write=write)
 
 
 if __name__ == "__main__":
@@ -289,13 +310,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata protein bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id)", type=str)
+    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes. comma separated", type=str)
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
+    parser.add_argument('--fastrun', dest='fastrun', action='store_true')
+    parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
+    parser.set_defaults(fastrun=True)
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
+    __metadata__['run_id'] = run_id
     taxon = args.taxon
+    fast_run = args.fastrun
     coll = MongoClient(args.mongo_uri)[args.mongo_db]["mygene"]
 
     # get metadata about sources
@@ -304,10 +330,15 @@ if __name__ == "__main__":
     assert metadata_coll.count() == 1
     metadata = metadata_coll.find_one()
 
-    log_name = '{}-{}.log'.format(__metadata__['name'], datetime.now().strftime('%Y%m%d_%H:%M'))
+    log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
     if wdi_core.WDItemEngine.logger is not None:
         wdi_core.WDItemEngine.logger.handles = []
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='protein{}'.format(taxon))
 
-    main(coll, taxon, metadata, log_dir=log_dir, write=not args.dummy)
+    if "microbe" in taxon:
+        microbe_taxa = get_all_taxa()
+        taxon = taxon.replace("microbe", ','.join(map(str, microbe_taxa)))
+
+    for taxon1 in taxon.split(","):
+        main(coll, taxon1, metadata, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)

@@ -249,8 +249,7 @@ class Gene:
                                                  fast_run_base_filter={PROPS['Entrez Gene ID']: '',
                                                                        PROPS['found in taxon']: self.organism_info[
                                                                            'wdid']})
-            self.set_languages(wd_item_gene)
-            wd_item_gene.set_aliases(self.aliases)
+            wd_item_gene = self.set_languages(wd_item_gene)
             wdi_helpers.try_write(wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
                                   self.login,
                                   write=write)
@@ -262,7 +261,7 @@ class Gene:
             wdi_core.WDItemEngine.log("ERROR", msg)
 
     def set_languages(self, wditem):
-        pass
+        raise NotImplementedError()
 
 
 class MicrobeGene(Gene):
@@ -279,6 +278,12 @@ class MicrobeGene(Gene):
 
     def create_description(self):
         self.description = '{} gene found in {}'.format(self.organism_info['type'], self.organism_info['name'])
+
+    def set_languages(self, wditem):
+        wditem.set_description(self.description)
+        wditem.set_label(self.label)
+        wditem.set_aliases(self.aliases)
+        return wditem
 
     def validate_record(self):
         pass
@@ -346,7 +351,7 @@ class MammalianGene(Gene):
         self.chr_num_wdid = chr_num_wdid
 
     def create_description(self):
-        self.description = 'gene of the species {}'.format(self.organism_info['name'])
+        pass
 
     def create_label(self):
         self.label = self.record['symbol']['@value']
@@ -357,6 +362,8 @@ class MammalianGene(Gene):
         for lang, desc in self.gene_of_the_species.items():
             if wditem.get_description(lang=lang) == "":
                 wditem.set_description(desc.format(self.organism_info['name']), lang=lang)
+        wditem.set_aliases(self.aliases)
+        return wditem
 
     def create_statements(self):
 
@@ -559,8 +566,10 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     :type metadata: dict
     :param log_dir: dir to store logs
     :type log_dir: str
-
+    :param fast_run: use fast run mode
+    :type fast_run: bool
     :param write: actually perform write
+    :type write: bool
     :return: None
     """
 
@@ -597,8 +606,8 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
         validate_type = "microbial"
 
     # only do certain records
-    docs = coll.find({'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}}).batch_size(
-        20)
+    doc_filter = {'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}}
+    docs = coll.find(doc_filter).batch_size(20)
     total = docs.count()
     print("total number of records: {}".format(total))
     docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
@@ -614,7 +623,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata gene bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes",
+    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes. comma separated",
                         type=str, required=True)
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
@@ -624,6 +633,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
+    __metadata__['run_id'] = run_id
     taxon = args.taxon
     fast_run = args.fastrun
     coll = MongoClient(args.mongo_uri)[args.mongo_db]["mygene"]
@@ -634,7 +644,7 @@ if __name__ == "__main__":
     assert metadata_coll.count() == 1
     metadata = metadata_coll.find_one()
 
-    log_name = '{}-{}.log'.format(__metadata__['name'], datetime.now().strftime('%Y%m%d_%H:%M'))
+    log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
     if wdi_core.WDItemEngine.logger is not None:
         wdi_core.WDItemEngine.logger.handles = []
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
