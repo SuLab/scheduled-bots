@@ -39,14 +39,17 @@ class ChromosomeBot:
         if self.ass_sum is None:
             self.get_assembly_summaries()
         df = self.ass_sum.query("taxid == {} & refseq_category == 'reference genome'".format(taxid))
+        if len(df) == 0:
+            # try "representative genome" (needed for mouse and rat)
+            df = self.ass_sum.query("taxid == {} & refseq_category == 'representative genome'".format(taxid))
         if len(df) != 1:
             raise ValueError("unknown reference: {}".format(df))
         ftp_path = list(df.ftp_path)[0]
         assembly = os.path.split(ftp_path)[1]
         url = os.path.join(ftp_path, assembly + "_assembly_report.txt")
-        names = ['Sequence-Name', 'Sequence-Role', 'Assigned-Molecule', 'Assigned-Molecule-Location/Type',
-                 'GenBank-Accn', 'Relationship',
-                 'RefSeq-Accn', 'Assembly-Unit', 'Sequence-Length', 'UCSC-style-name']
+        names = ['SequenceName', 'SequenceRole', 'AssignedMolecule', 'AssignedMoleculeLocationType',
+                 'GenBankAccn', 'Relationship',
+                 'RefSeqAccn', 'AssemblyUnit', 'SequenceLength', 'UCSCstylename']
         self.chr_df[taxid] = pd.read_csv(url, sep="\t", names=names, comment='#')
 
     def get_chrom_info(self, chr_name, taxid):
@@ -65,9 +68,11 @@ class ChromosomeBot:
 
         if taxid not in self.chr_df:
             self.get_assembly_report(taxid)
-        d = self.chr_df[taxid][self.chr_df[taxid]['Sequence-Name'] == chr_name].to_dict('records')[0]
 
-        return d
+        df = self.chr_df[taxid].query("SequenceRole == 'assembled-molecule'")
+        d_list = df[(df.SequenceName == chr_name) | (df.AssignedMolecule == chr_name) | (df.UCSCstylename == chr_name)].to_dict('records')
+        if len(d_list) == 1:
+            return d_list[0]
 
     def get_or_create(self, organism_info, retrieved=None, login=None):
         """
@@ -93,16 +98,16 @@ class ChromosomeBot:
         chr_num_wdid = dict()
 
         # get assembled chromosomes, which we will create items for
-        chrdf = self.chr_df[taxid][self.chr_df[taxid]['Sequence-Role'] == 'assembled-molecule']
+        chrdf = self.chr_df[taxid][self.chr_df[taxid]['SequenceRole'] == 'assembled-molecule']
 
         existing_chr = wdi_helpers.id_mapper("P2249")
         existing_chr = {k.split(".")[0]: v for k, v in existing_chr.items()}
 
         for record in chrdf.to_dict("records"):
-            chrom_num = record['Sequence-Name']
-            genome_id = record['RefSeq-Accn']
+            chrom_num = record['SequenceName']
+            genome_id = record['RefSeqAccn']
             genome_id = genome_id.split(".")[0]
-            chr_type = record['Assigned-Molecule-Location/Type']
+            chr_type = record['AssignedMoleculeLocationType']
             # {'Chromosome','Mitochondrion'}
             # chrom_type = record['Assigned-Molecule-Location/Type']
             if genome_id in existing_chr:
