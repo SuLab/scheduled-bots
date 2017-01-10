@@ -17,8 +17,8 @@ Data used by a bot, that is regularly updated by an external source, should be h
 ## Bots
 Name | Data Source | Jenkins
 --- | --- | ---
-GeneBot | [mygene.info](https://github.com/stuppie/wdbiothings/tree/master/wdbiothings/contrib/mygene) | [human](http://34.193.174.196:8080/job/GeneBot_Homo_sapiens/), [yeast](http://34.193.174.196:8080/job/GeneBot_yeast/), [microbes](http://34.193.174.196:8080/job/GeneBot_microbes/)
-ProteinBot | [mygene.info](https://github.com/stuppie/wdbiothings/tree/master/wdbiothings/contrib/mygene) | [human](http://34.193.174.196:8080/job/ProteinBot_homo_sapiens/), [yeast](http://34.193.174.196:8080/job/ProteinBot_yeast/), [microbes](TODO)
-GoAnnotationBot | [quickgo](https://github.com/stuppie/wdbiothings/tree/master/wdbiothings/contrib/quickgo) | [currently yeast, todo set to everything](http://34.193.174.196:8080/job/GOBot/)
-GoAnnotationBot | [quickgo](https://github.com/stuppie/wdbiothings/tree/master/wdbiothings/contrib/quickgo) | [human (bigmem)](http://34.193.174.196:8080/job/GOBot_bigmem/)
-InterproBot | [interpro](https://github.com/stuppie/wdbiothings/tree/master/wdbiothings/contrib/interpro) | [all](http://34.193.174.196:8080/job/interpro/)
+[GeneBot](https://github.com/stuppie/scheduled-bots/blob/master/scheduled_bots/geneprotein/GeneBot.py) | [mygene.info](https://github.com/stuppie/wdbiothings/tree/master/wdbiothings/contrib/mygene) | [human](http://34.193.174.196:8080/job/GeneBot_Homo_sapiens/), [yeast](http://34.193.174.196:8080/job/GeneBot_yeast/), [microbes](http://34.193.174.196:8080/job/GeneBot_microbes/)
+[ProteinBot](https://github.com/stuppie/scheduled-bots/blob/master/scheduled_bots/geneprotein/ProteinBot.py) | [mygene.info](https://github.com/stuppie/wdbiothings/tree/master/wdbiothings/contrib/mygene) | [human](http://34.193.174.196:8080/job/ProteinBot_homo_sapiens/), [yeast](http://34.193.174.196:8080/job/ProteinBot_yeast/), [microbes](TODO)
+[GoAnnotationBot](https://github.com/stuppie/scheduled-bots/blob/master/scheduled_bots/geneprotein/GOBot.py) | [quickgo](https://github.com/stuppie/wdbiothings/tree/master/wdbiothings/contrib/quickgo) | [currently yeast, todo set to everything](http://34.193.174.196:8080/job/GOBot/)
+[GoAnnotationBot](https://github.com/stuppie/scheduled-bots/blob/master/scheduled_bots/geneprotein/GOBot.py) | [quickgo](https://github.com/stuppie/wdbiothings/tree/master/wdbiothings/contrib/quickgo) | [human (bigmem)](http://34.193.174.196:8080/job/GOBot_bigmem/)
+[InterproBot](https://github.com/stuppie/scheduled-bots/tree/master/scheduled_bots/interpro) | [interpro](https://github.com/stuppie/wdbiothings/tree/master/wdbiothings/contrib/interpro) | [all](http://34.193.174.196:8080/job/interpro/)
