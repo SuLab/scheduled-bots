@@ -160,16 +160,22 @@ def create_articles(pmids: Set[str], login: object, write: bool = True) -> Dict[
     return pmid_map
 
 
-def main(coll: pymongo.collection.Collection, taxon: str, retrieved: datetime, log_dir: str = "./logs",
-         write: bool = True) -> None:
+def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
     """
     Main function for annotating GO terms on proteins
     
     :param coll: mongo collection containing GO annotations
+    :type coll: pymongo.collection.Collection
     :param taxon: taxon to use (ncbi tax id)
+    :type taxid: str
     :param retrieved: date that the GO annotations were retrieved
+    :type retrieved: datetime
     :param log_dir: dir to store logs
+    :type log_dir: str
+    :param fast_run: use fast run mode
+    :type fast_run: bool
     :param write: actually perform write
+    :type write: bool
     :return: 
     """
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
@@ -226,7 +232,7 @@ def main(coll: pymongo.collection.Collection, taxon: str, retrieved: datetime, l
         try:
             statements = make_go_statements(item_wdid, uniprot_id, this_go, retrieved, go_map, pmid_map, external_id,
                                             login)
-            wditem = wdi_core.WDItemEngine(wd_item_id=item_wdid, domain='protein', data=statements, fast_run=False,
+            wditem = wdi_core.WDItemEngine(wd_item_id=item_wdid, domain='protein', data=statements, fast_run=fast_run,
                                            fast_run_base_filter={UNIPROT: "", "P703": organism_wdid})
             # good_refs=[{'P248': None}], keep_good_ref_statements=True)
             wdi_helpers.try_write(wditem, record_id=uniprot_id, record_prop=UNIPROT, edit_summary="update GO terms",
@@ -250,18 +256,23 @@ if __name__ == "__main__":
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
     parser.add_argument('--mongo-coll', type=str, default="quickgo")
     parser.add_argument('--retrieved', help="date go annotations were retrieved (YYYYMMDD)", type=str)
+    parser.add_argument('--fastrun', dest='fastrun', action='store_true')
+    parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
+    parser.set_defaults(fastrun=True)
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
+    __metadata__['run_id'] = run_id
     taxon = args.taxon
+    fast_run = args.fastrun
     coll = MongoClient(args.mongo_uri)[args.mongo_db][args.mongo_coll]
     retrieved = datetime.strptime(args.retrieved, "%Y%m%d") if args.retrieved else datetime.now()
 
-    log_name = '{}-{}.log'.format(__metadata__['name'], datetime.now().strftime('%Y%m%d_%H:%M'))
+    log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
     if wdi_core.WDItemEngine.logger is not None:
         wdi_core.WDItemEngine.logger.handles = []
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='go{}'.format(taxon))
 
     for tax in args.taxon.split(","):
-        main(coll, tax, retrieved, log_dir=log_dir, write=not args.dummy)
+        main(coll, tax, retrieved, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
