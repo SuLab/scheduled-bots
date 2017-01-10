@@ -26,6 +26,7 @@ import sys
 import traceback
 from datetime import datetime
 
+import logging
 import pymongo
 from pymongo import MongoClient
 from tqdm import tqdm
@@ -269,12 +270,11 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     taxid = int(taxid)
     organism_wdid = wdi_helpers.prop2qid("P685", str(taxid))
     if not organism_wdid:
-        raise ValueError("organism {} not found".format(taxid))
+        print("organism {} not found in wikidata".format(taxid))
+        return None
 
     # login
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
-    if wdi_core.WDItemEngine.logger is not None:
-        wdi_core.WDItemEngine.logger.handles = []
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__))
 
     # get organism metadata (name, organism type, wdid)
@@ -301,6 +301,11 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, fast_run=fast_run, write=write)
+
+    # after the run is done, disconnect the logging handler
+    # so that if we start another, it doesn't write twice
+    current_logger = logging.getLogger("WD_logger")
+    current_logger.handles = []
 
 
 if __name__ == "__main__":
