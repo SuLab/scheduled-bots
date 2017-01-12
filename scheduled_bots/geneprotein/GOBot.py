@@ -186,6 +186,7 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
     organism_wdid = wdi_helpers.prop2qid("P685", taxon)
     if not organism_wdid:
         raise ValueError("organism {} not found".format(taxon))
+    print("Running organism: {} {}".format(taxon, organism_wdid))
 
     # get all uniprot id -> wdid mappings, where found in taxon is this organism
     prot_wdid_mapping = wdi_helpers.id_mapper(UNIPROT, (("P703", organism_wdid),))
@@ -195,6 +196,9 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
 
     # Get GO terms from our local store for this taxon
     df = pd.DataFrame(list(coll.find({'Taxon': int(taxon)})))
+    if len(df) == 0:
+        print("No GO annotations found for taxid: {}".format(taxon))
+        return None
 
     # get all pmids and make items for them
     pmids = set([x[5:] for x in df['Reference'] if x.startswith("PMID:")])
@@ -246,12 +250,28 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
 
     print("{} items failed: {}".format(len(failed_items), failed_items))
 
+def get_all_taxa():
+    """
+    Get all taxa in wikidata with a protein
+    :return:
+    """
+    query = """SELECT ?taxid (COUNT(?protein) AS ?count)
+                WHERE
+                {
+                  ?protein wdt:P352 ?uni .
+                  ?protein wdt:P703 ?taxa .
+                  ?taxa wdt:P685 ?taxid .
+                } group by ?taxid order by ?count
+                """
+    response = wdi_core.WDItemEngine.execute_sparql_query(query=query)
+    taxids = [x['taxid']['value'] for x in response['results']['bindings'] if int(x['count']['value'])>=10]
+    return ",".join(taxids)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata GO bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help="only run using this taxon. Can give comma-delimited list", type=str)
+    parser.add_argument('--taxon', help="only run using this taxon. Can give comma-delimited list or 'all'", type=str)
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
     parser.add_argument('--mongo-coll', type=str, default="quickgo")
@@ -274,5 +294,8 @@ if __name__ == "__main__":
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='go{}'.format(taxon))
 
-    for tax in args.taxon.split(","):
+    if taxon == "all":
+        taxon = get_all_taxa()
+
+    for tax in taxon.split(","):
         main(coll, tax, retrieved, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
