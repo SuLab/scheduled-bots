@@ -21,12 +21,12 @@ https://mygene.info/v3/gene/7150837
 
 import argparse
 import json
+import logging
 import os
 import sys
 import traceback
 from datetime import datetime
 
-import logging
 import pymongo
 from pymongo import MongoClient
 from tqdm import tqdm
@@ -55,6 +55,7 @@ PROPS = {'found in taxon': 'P703',
          'Ensembl Protein ID': 'P705',
          'OMIM ID': 'P492',
          'Entrez Gene ID': 'P351',
+         'encodes': 'P688',
 
          'Saccharomyces Genome Database ID': 'P3406',
          'Mouse Genome Informatics ID': 'P671',
@@ -103,6 +104,7 @@ class Protein:
         self.login = login
 
         self.statements = None
+        self.protein_wdid = None
 
     def create_description(self):
         self.description = '{} protein found in {}'.format(self.organism_info['type'], self.organism_info['name'])
@@ -161,6 +163,7 @@ class Protein:
         # Required: uniprot (1)
         # Optional: OMIM (1?), Ensembl protein (0 or more), refseq protein (0 or more)
         ############
+        entrez_gene = self.external_ids['Entrez Gene ID']
         uniprot_ref = make_ref_source(self.record['uniprot']['@source'], PROPS['UniProt ID'],
                                       self.external_ids['UniProt ID'],
                                       login=self.login)
@@ -182,7 +185,7 @@ class Protein:
         key = 'RefSeq Protein ID'
         if key in self.external_ids:
             for id in self.external_ids[key]:
-                ref = make_ref_source(self.record['refseq']['@source'], PROPS['Entrez Gene ID'], id, login=self.login)
+                ref = make_ref_source(self.record['refseq']['@source'], PROPS['Entrez Gene ID'], entrez_gene, login=self.login)
                 s.append(wdi_core.WDString(id, PROPS[key], references=[ref]))
 
         ############
@@ -199,6 +202,28 @@ class Protein:
 
         return s
 
+    def make_gene_encodes(self, write=True):
+        """
+        Add an "encodes" statement to the gene item
+        :return:
+        """
+        uniprot_ref = make_ref_source(self.record['uniprot']['@source'], PROPS['UniProt ID'],
+                                      self.external_ids['UniProt ID'],
+                                      login=self.login)
+
+        try:
+            statements = [wdi_core.WDItemID(self.protein_wdid, PROPS['encodes'], references=[uniprot_ref])]
+            wd_item_gene = wdi_core.WDItemEngine(wd_item_id=self.gene_wdid, domain='genes', data=statements,
+                                                 append_value=[PROPS['encodes']])
+            wdi_helpers.try_write(wd_item_gene, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
+                                  write=write)
+        except Exception as e:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            msg = wdi_helpers.format_msg(self.external_ids['UniProt ID'], PROPS['UniProt ID'], None,
+                                         str(e), msg_type=type(e))
+            wdi_core.WDItemEngine.log("ERROR", msg)
+
     def create_item(self, fast_run=True, write=True):
         try:
             self.parse_external_ids()
@@ -208,7 +233,8 @@ class Protein:
             self.create_aliases()
 
             wd_item_protein = wdi_core.WDItemEngine(item_name=self.label, domain='proteins', data=self.statements,
-                                                    append_value=[PROPS['subclass of']],
+                                                    append_value=[PROPS['subclass of'], PROPS['encoded by'],
+                                                                  PROPS['Ensembl Protein ID'], PROPS['RefSeq Protein ID']],
                                                     fast_run=fast_run,
                                                     fast_run_base_filter={PROPS['UniProt ID']: '',
                                                                           PROPS['found in taxon']: self.organism_info[
@@ -218,6 +244,7 @@ class Protein:
             wd_item_protein.set_aliases(self.aliases)
             wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
                                   write=write)
+            self.protein_wdid = wd_item_protein.wd_item_id
         except Exception as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
@@ -240,11 +267,13 @@ class ProteinBot:
         for record in tqdm(records, mininterval=2, total=total):
             entrez_gene = str(record['entrezgene']['@value'])
             if entrez_gene not in self.gene_wdid_mapping:
-                wdi_core.WDItemEngine.log("WARNING", format_msg(entrez_gene, "P351", None, "Gene item not found during protein creation", None))
+                wdi_core.WDItemEngine.log("WARNING", format_msg(entrez_gene, "P351", None,
+                                                                "Gene item not found during protein creation", None))
                 continue
             gene_wdid = self.gene_wdid_mapping[entrez_gene]
             protein = Protein(record, self.organism_info, gene_wdid, self.login)
             protein.create_item(fast_run=fast_run, write=write)
+            protein.make_gene_encodes(write=write)
 
 
 def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
@@ -315,7 +344,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata protein bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes. comma separated", type=str)
+    parser.add_argument('--taxon',
+                        help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes. comma separated",
+                        type=str)
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
