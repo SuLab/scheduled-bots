@@ -71,7 +71,8 @@ PROPS = {'found in taxon': 'P703',
          'HGNC ID': 'P354',
          'HGNC Gene Symbol': 'P353',
          'RefSeq RNA ID': 'P639',
-         'HomoloGene ID': 'P593'
+         'HomoloGene ID': 'P593',
+         'MGI Gene Symbol': 'P2394',
          }
 
 __metadata__ = {'name': 'GeneBot',
@@ -142,6 +143,7 @@ class Gene:
 
         entrez_gene = str(self.record['entrezgene']['@value'])
         external_ids = {'Entrez Gene ID': entrez_gene}
+        taxid = self.record['taxid']['@value']
 
         ############
         # optional external IDs
@@ -160,10 +162,13 @@ class Gene:
         if 'HGNC' in self.record:
             external_ids['HGNC ID'] = self.record['HGNC']['@value']
 
-        if 'symbol' in self.record and 'HGNC' in self.record:
+        if taxid == 9606 and 'symbol' in self.record and 'HGNC' in self.record:
             # "and 'HGNC' in record" is required because there is something wrong with mygene
             # see: https://github.com/stuppie/scheduled-bots/issues/2
             external_ids['HGNC Gene Symbol'] = self.record['symbol']['@value']
+
+        if taxid == 10090 and 'symbol' in self.record:
+            external_ids['MGI Gene Symbol'] = self.record['symbol']['@value']
 
         if 'MGI' in self.record:
             external_ids['Mouse Genome Informatics ID'] = self.record['MGI']['@value']
@@ -217,7 +222,7 @@ class Gene:
             for id in self.external_ids[key]:
                 s.append(wdi_core.WDString(id, PROPS[key], references=[entrez_ref]))
 
-        for key in ['NCBI Locus tag', 'Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID']:
+        for key in ['NCBI Locus tag', 'Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID', 'MGI Gene Symbol']:
             if key in self.external_ids:
                 s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=[entrez_ref]))
 
@@ -330,7 +335,7 @@ class MicrobeGene(Gene):
 
 class MammalianGene(Gene):
     """
-    Probably should be called euakaryotes. includes yeast
+    Probably should be called euakaryotes. includes yeast, mouse, rat
     """
     gene_of_the_species = {'en': "gene of the species {}",
                            'fr': "gène de l'espèce {}",
