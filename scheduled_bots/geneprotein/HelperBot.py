@@ -139,6 +139,11 @@ def validate_doc(d, doc_type):
     if doc_type == "protein":
         d['refseq']['protein'] = remove_version(d['refseq']['protein'])
 
+    if doc_type == "gene":
+        d['genomic_pos']['chr'] = d['genomic_pos']['chr'].replace("chr", "").replace("Chr", "").replace("CHR", "")
+        if ('genomic_pos_hg19' in d) and ('chr' in d['genomic_pos_hg19']):
+            d['genomic_pos_hg19']['chr'] = d['genomic_pos_hg19']['chr'].replace("chr", "").replace("Chr", "").replace("CHR", "")
+
     return d
 
 

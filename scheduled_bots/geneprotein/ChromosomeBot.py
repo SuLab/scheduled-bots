@@ -105,6 +105,8 @@ class ChromosomeBot:
 
         for record in chrdf.to_dict("records"):
             chrom_num = record['SequenceName']
+            # if a field has "chr" in it, remove it
+            chrom_num = chrom_num.replace("chr", "").replace("Chr", "").replace("CHR", "")
             genome_id = record['RefSeqAccn']
             genome_id = genome_id.split(".")[0]
             chr_type = record['AssignedMoleculeLocationType']
