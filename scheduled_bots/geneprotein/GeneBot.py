@@ -222,7 +222,8 @@ class Gene:
             for id in self.external_ids[key]:
                 s.append(wdi_core.WDString(id, PROPS[key], references=[entrez_ref]))
 
-        for key in ['NCBI Locus tag', 'Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID', 'MGI Gene Symbol']:
+        for key in ['NCBI Locus tag', 'Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID',
+                    'MGI Gene Symbol', 'HomoloGene ID']:
             if key in self.external_ids:
                 s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=[entrez_ref]))
 
@@ -419,7 +420,7 @@ class HumanGene(MammalianGene):
                                      self.external_ids['Entrez Gene ID'], login=self.login)
 
         # add on human specific gene statements
-        for key in ['HGNC ID', 'HGNC Gene Symbol', 'HomoloGene ID']:
+        for key in ['HGNC ID', 'HGNC Gene Symbol']:
             if key in self.external_ids:
                 s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=[entrez_ref]))
 
