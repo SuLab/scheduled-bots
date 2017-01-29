@@ -29,32 +29,33 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
         uniprot2wd = wdi_helpers.id_mapper(UNIPROT)
         fast_run_base_filter = {UNIPROT: ""}
 
-    cursor = collection.find({'_id': {'$in': list(uniprot2wd.keys())}}, no_cursor_timeout=True)
+    cursor = collection.find({'_id': {'$in': list(uniprot2wd.keys())}}).batch_size(20)
     for doc in tqdm(cursor, total=cursor.count(), mininterval=1.0):
-        uniprot_id = doc['_id']
-        statements = []
-        # uniprot ID. needed for PBB_core to find uniprot item
-        # statements.append(PBB_Core.WDExternalID(value=uniprot_id, prop_nr=UNIPROT))
-
-        ## References
-        # stated in Interpro version XX.X
-        ref_stated_in = wdi_core.WDItemID(release_wdid, 'P248', is_reference=True)
-        ref_ipr = wdi_core.WDString("http://www.ebi.ac.uk/interpro/protein/{}".format(uniprot_id), "P854",
-                                    is_reference=True)
-        reference = [ref_stated_in, ref_ipr]
-
-        if doc['subclass']:
-            for f in doc['subclass']:
-                statements.append(wdi_core.WDItemID(value=IPRTerm.ipr2wd[f], prop_nr='P279', references=[reference]))
-        if doc['has_part']:
-            for hp in doc['has_part']:
-                statements.append(wdi_core.WDItemID(value=IPRTerm.ipr2wd[hp], prop_nr='P527', references=[reference]))
-
-        if uniprot_id not in uniprot2wd:
-            print("wdid_not_found " + uniprot_id + " " + uniprot2wd[uniprot_id])
-            wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(uniprot_id, UNIPROT, None, "wdid_not_found"))
-
         try:
+            uniprot_id = doc['_id']
+            statements = []
+            # uniprot ID. needed for PBB_core to find uniprot item
+            # statements.append(PBB_Core.WDExternalID(value=uniprot_id, prop_nr=UNIPROT))
+
+            ## References
+            # stated in Interpro version XX.X
+            ref_stated_in = wdi_core.WDItemID(release_wdid, 'P248', is_reference=True)
+            ref_ipr = wdi_core.WDString("http://www.ebi.ac.uk/interpro/protein/{}".format(uniprot_id), "P854",
+                                        is_reference=True)
+            reference = [ref_stated_in, ref_ipr]
+
+            if doc['subclass']:
+                for f in doc['subclass']:
+                    statements.append(wdi_core.WDItemID(value=IPRTerm.ipr2wd[f], prop_nr='P279', references=[reference]))
+            if doc['has_part']:
+                for hp in doc['has_part']:
+                    statements.append(wdi_core.WDItemID(value=IPRTerm.ipr2wd[hp], prop_nr='P527', references=[reference]))
+
+            if uniprot_id not in uniprot2wd:
+                print("wdid_not_found " + uniprot_id + " " + uniprot2wd[uniprot_id])
+                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(uniprot_id, UNIPROT, None, "wdid_not_found"))
+
+
             wd_item = wdi_core.WDItemEngine(wd_item_id=uniprot2wd[uniprot_id], domain="proteins", data=statements,
                                             fast_run=True, fast_run_base_filter=fast_run_base_filter,
                                             append_value=["P279", "P527", "P361"])
@@ -67,7 +68,6 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
         wdi_helpers.try_write(wd_item, uniprot_id, INTERPRO, login, write=write,
                               edit_summary="add/update family and/or domains")
 
-    cursor.close()
 
 
 def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb://localhost:27017",
