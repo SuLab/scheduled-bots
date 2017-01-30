@@ -112,7 +112,8 @@ class IPRTerm:
 
         wd_item.set_label(self.name, lang='en')
         for lang, description in self.lang_descr.items():
-            wd_item.set_description(description, lang=lang)
+            if wd_item.get_description(lang=lang) == "":
+                wd_item.set_description(description, lang=lang)
         wd_item.set_aliases([self.short_name, self.id])
 
         if login:
