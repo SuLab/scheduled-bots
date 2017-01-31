@@ -1,17 +1,3 @@
-"""
-In [19]: [x for x in d['graphs'][0]['edges'] if x['sub'] == 'http://purl.obolibrary.org/obo/GO_0002246']
-Out[19]:
-[{'obj': 'http://purl.obolibrary.org/obo/GO_0042060',
-  'pred': 'is_a',
-  'sub': 'http://purl.obolibrary.org/obo/GO_0002246'},
- {'obj': 'http://purl.obolibrary.org/obo/GO_0006954',
-  'pred': 'http://purl.obolibrary.org/obo/BFO_0000050',
-  'sub': 'http://purl.obolibrary.org/obo/GO_0002246'},
- {'obj': 'http://purl.obolibrary.org/obo/GO_0090594',
-  'pred': 'http://purl.obolibrary.org/obo/BFO_0000050',
-  'sub': 'http://purl.obolibrary.org/obo/GO_0002246'}]
-
-"""
 import argparse
 import json
 import os
@@ -50,39 +36,14 @@ PROPS = {'subclass of': 'P279',
          }
 
 __metadata__ = {'name': 'DOIDBot',
-                'maintainer': 'GSS',
                 'tags': ['disease', 'doid'],
                 'properties': list(PROPS.values())
                 }
-"""
-In [22]: [x for x in d['graphs'][0]['logicalDefinitionAxioms'] if x['definedClassId'] == 'http://purl.obolibrary.org/obo/GO_0010888']
-Out[22]:
-[{'definedClassId': 'http://purl.obolibrary.org/obo/GO_0010888',
-  'genusIds': ['http://purl.obolibrary.org/obo/GO_0065007'],
-  'restrictions': [{'fillerId': 'http://purl.obolibrary.org/obo/GO_0019915',
-    'propertyId': 'http://purl.obolibrary.org/obo/RO_0002212'}]}]
-"""
-
-"""
-d['graphs'][0]['logicalDefinitionAxioms']
-Out[20]:
-[{'definedClassId': 'http://purl.obolibrary.org/obo/DOID_6050',
-  'genusIds': ['http://purl.obolibrary.org/obo/DOID_4'],
-  'restrictions': [{'fillerId': 'http://purl.obolibrary.org/obo/UBERON_0001043',
-    'propertyId': 'http://purl.obolibrary.org/obo/RO_0001025'}]},
-
-"""
-
-
-# missing: Q2291130
-
-# set([x['pred'] for x in d['graphs'][0]['edges']])
-# [x for x in d['graphs'][0]['edges'] if x['pred'] == 'http://purl.obolibrary.org/obo/RO_0001025']
 
 class DOGraph:
     edge_prop = {'http://purl.obolibrary.org/obo/IDO_0000664': 'P828',  # has_material_basis_in -> has cause
-                 'http://purl.obolibrary.org/obo/RO_0001025': 'P276',  # located in. Don't use this for now
-                 #'http://purl.obolibrary.org/obo/RO_0002451': None,  # transmitted by. propose new property?
+                 'http://purl.obolibrary.org/obo/RO_0001025': 'P276',  # located in
+                 #'http://purl.obolibrary.org/obo/RO_0002451': None,  # transmitted by. "pathogen transmission process" (P1060)?
                  'is_a': 'P279'}
 
     xref_prop = {'ORDO': 'P1550',
@@ -123,7 +84,7 @@ class DOGraph:
     def parse_nodes(self, nodes):
         for node in nodes:
             tmp_node = DONode(node, self)
-            if tmp_node.namespace == "disease_ontology" and not tmp_node.deprecated and tmp_node.type == "CLASS":
+            if tmp_node.namespace == self.default_namespace and not tmp_node.deprecated and tmp_node.type == "CLASS":
                 self.nodes[tmp_node.id] = tmp_node
 
     def parse_edges(self, edges):
@@ -202,7 +163,6 @@ class DONode:
         if self.definition_xrefs:
             url_xrefs = [x for x in self.definition_xrefs if 'url:http://en.wikipedia.org/wiki/' in x]
             if len(url_xrefs) > 1:
-                #todo log
                 print("{} multiple wikilinks: {}".format(self.doid, url_xrefs))
             elif len(url_xrefs) == 1:
                 url = urllib.request.unquote(url_xrefs[0].replace("url:http://en.wikipedia.org/wiki/", ""))
@@ -302,13 +262,13 @@ class DONode:
         self.s_main.append(wdi_core.WDString(self.id, PROPS['exact match'], references=[self.reference]))
 
         if self.doid != "DOID:4":
-            self.s_main.append(wdi_core.WDItemID('Q12136', PROPS['instance of'], references=[self.reference]))  # disease
+            # instance of disease
+            self.s_main.append(wdi_core.WDItemID('Q12136', PROPS['instance of'], references=[self.reference]))
 
         miriam_ref = [wdi_core.WDItemID(value="Q16335166", prop_nr='P248', is_reference=True),
                       wdi_core.WDUrl("http://www.ebi.ac.uk/miriam/main/collections/MIR:00000233", 'P854', is_reference=True)]
         self.s_main.append(wdi_core.WDString("http://identifiers.org/doid/{}".format(self.doid), PROPS['exact match'],
                                              references=[miriam_ref]))
-
 
 
 def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
@@ -322,12 +282,11 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
     do = DOGraph(graph, login, fast_run)
     for node in tqdm(do.nodes.values()):
         node.create(write=write)
-        #return
 
 
 if __name__ == "__main__":
     """
-    Bot to add/update disease ontology to wikidata. Uses obgraphs to convert owl to json. then parse and use json
+    Bot to add/update disease ontology to wikidata. Uses obgraphs to convert owl to json
     """
     parser = argparse.ArgumentParser(description='run wikidata disease ontology bot')
     parser.add_argument('json_path', nargs='?', help='path to obographs json file', default='doid.json')
