@@ -300,7 +300,9 @@ class DONode:
                                                  self.do_graph.edge_prop[relationship[0]], references=[self.reference]))
         # add http://purl.obolibrary.org/obo/, exact match
         self.s_main.append(wdi_core.WDString(self.id, PROPS['exact match'], references=[self.reference]))
-        self.s_main.append(wdi_core.WDItemID('Q12136', PROPS['instance of'], references=[self.reference]))  # disease
+
+        if self.doid != "DOID:4":
+            self.s_main.append(wdi_core.WDItemID('Q12136', PROPS['instance of'], references=[self.reference]))  # disease
 
         miriam_ref = [wdi_core.WDItemID(value="Q16335166", prop_nr='P248', is_reference=True),
                       wdi_core.WDUrl("http://www.ebi.ac.uk/miriam/main/collections/MIR:00000233", 'P854', is_reference=True)]
