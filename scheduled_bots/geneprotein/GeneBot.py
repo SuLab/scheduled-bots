@@ -667,3 +667,6 @@ if __name__ == "__main__":
 
     for taxon1 in taxon.split(","):
         main(coll, taxon1, metadata, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
+        # done with this run, clear fast run container to save on RAM
+        wdi_core.WDItemEngine.fast_run_store = []
+        wdi_core.WDItemEngine.fast_run_container = None
