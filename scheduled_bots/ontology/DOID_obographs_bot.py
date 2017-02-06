@@ -8,6 +8,8 @@ from collections import defaultdict, Counter
 from datetime import datetime
 from itertools import chain
 from time import gmtime, strftime
+
+import requests
 from tqdm import tqdm
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
 from wikidataintegrator.wdi_helpers import id_mapper
@@ -40,10 +42,11 @@ __metadata__ = {'name': 'DOIDBot',
                 'properties': list(PROPS.values())
                 }
 
+
 class DOGraph:
     edge_prop = {'http://purl.obolibrary.org/obo/IDO_0000664': 'P828',  # has_material_basis_in -> has cause
                  'http://purl.obolibrary.org/obo/RO_0001025': 'P276',  # located in
-                 #'http://purl.obolibrary.org/obo/RO_0002451': None,  # transmitted by. "pathogen transmission process" (P1060)?
+                 # 'http://purl.obolibrary.org/obo/RO_0002451': None,  # transmitted by. "pathogen transmission process" (P1060)?
                  'is_a': 'P279'}
 
     xref_prop = {'ORDO': 'P1550',
@@ -209,12 +212,14 @@ class DONode:
             self.create_main_statements()
             self.s.extend(self.s_main)
             wd_item = wdi_core.WDItemEngine(item_name=self.lbl, data=self.s, domain="diseases",
-                                            append_value=[PROPS['subclass of'], PROPS['instance of']], fast_run=self.do_graph.fast_run,
+                                            append_value=[PROPS['subclass of'], PROPS['instance of']],
+                                            fast_run=self.do_graph.fast_run,
                                             fast_run_base_filter={'P699': ''})
             if wd_item.get_label(lang="en") == "":
                 wd_item.set_label(self.lbl, lang="en")
             current_descr = wd_item.get_description(lang='en')
-            if current_descr.lower() in {"", "human disease", "disease"} and self.definition and len(self.definition)<250:
+            if current_descr.lower() in {"", "human disease", "disease"} and self.definition and len(
+                    self.definition) < 250:
                 wd_item.set_description(description=self.definition, lang='en')
             elif current_descr.lower() == "":
                 wd_item.set_description(description="human disease", lang='en')
@@ -222,7 +227,8 @@ class DONode:
                 wd_item.set_aliases(aliases=self.synonyms, lang='en', append=True)
             if self.wikilink is not None:
                 wd_item.set_sitelink(site="enwiki", title=self.wikilink)
-            wdi_helpers.try_write(wd_item, record_id=self.id, record_prop='P699', login=self.do_graph.login, write=write)
+            wdi_helpers.try_write(wd_item, record_id=self.id, record_prop='P699', login=self.do_graph.login,
+                                  write=write)
             return wd_item
         except Exception as e:
             exc_info = sys.exc_info()
@@ -266,7 +272,8 @@ class DONode:
             self.s_main.append(wdi_core.WDItemID('Q12136', PROPS['instance of'], references=[self.reference]))
 
         miriam_ref = [wdi_core.WDItemID(value="Q16335166", prop_nr='P248', is_reference=True),
-                      wdi_core.WDUrl("http://www.ebi.ac.uk/miriam/main/collections/MIR:00000233", 'P854', is_reference=True)]
+                      wdi_core.WDUrl("http://www.ebi.ac.uk/miriam/main/collections/MIR:00000233", 'P854',
+                                     is_reference=True)]
         self.s_main.append(wdi_core.WDString("http://identifiers.org/doid/{}".format(self.doid), PROPS['exact match'],
                                              references=[miriam_ref]))
 
@@ -284,18 +291,36 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
         node.create(write=write)
 
 
+def download_and_obograph(url):
+    """
+    Requires ogger (https://github.com/geneontology/obographs/) in your path
+    :param url: path to owl file to download
+    :return:
+    """
+    # url = "http://purl.obolibrary.org/obo/doid/releases/2017-01-27/doid.owl"
+    r = requests.get(url, stream=True)
+    r.raise_for_status()
+    with open('doid.owl', 'wb') as handle:
+        for block in r.iter_content(1024):
+            handle.write(block)
+    os.system('ogger doid.owl > doid.json')
+
+
 if __name__ == "__main__":
     """
     Bot to add/update disease ontology to wikidata. Uses obgraphs to convert owl to json
     """
     parser = argparse.ArgumentParser(description='run wikidata disease ontology bot')
-    parser.add_argument('json_path', nargs='?', help='path to obographs json file', default='doid.json')
+    parser.add_argument('--json_path', help='path to obographs json file')
+    parser.add_argument('--owl_url', help='url to owl file')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
     parser.set_defaults(fastrun=True)
     args = parser.parse_args()
+    if (args.json_path and args.owl_url) or not (args.json_path or args.owl_url):
+        raise ValueError("must give one of --json_path and --owl_url")
     log_dir = args.log_dir if args.log_dir else "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     __metadata__['run_id'] = run_id
@@ -307,4 +332,8 @@ if __name__ == "__main__":
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='doid')
 
-    main(args.json_path, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
+    json_path = args.json_path
+    if args.owl_url:
+        download_and_obograph(args.owl_url)
+        json_path = "doid.json"
+    main(json_path, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
