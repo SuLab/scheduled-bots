@@ -249,6 +249,8 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
                                                              msg_type=type(e)))
 
     print("{} items failed: {}".format(len(failed_items), failed_items))
+    if wdi_core.WDItemEngine.logger is not None:
+        wdi_core.WDItemEngine.logger.handles = []
 
 def get_all_taxa():
     """

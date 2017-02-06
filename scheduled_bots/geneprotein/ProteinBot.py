@@ -323,18 +323,19 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
 
     # only do certain records
     doc_filter = {'taxid': taxid, 'type_of_gene': 'protein-coding', 'uniprot.Swiss-Prot': {'$exists': True}}
-    docs = coll.find(doc_filter).batch_size(20)
+    docs = coll.find(doc_filter, no_cursor_timeout=True)
     total = docs.count()
     print("total number of records: {}".format(total))
     docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, fast_run=fast_run, write=write)
+    docs.close()
 
     # after the run is done, disconnect the logging handler
     # so that if we start another, it doesn't write twice
-    current_logger = logging.getLogger("WD_logger")
-    current_logger.handles = []
+    if wdi_core.WDItemEngine.logger is not None:
+        wdi_core.WDItemEngine.logger.handles = []
 
 
 if __name__ == "__main__":
