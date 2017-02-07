@@ -114,6 +114,8 @@ def main(coll, metadata, log_dir="./logs", fast_run=True, write=True):
 
     ec = 0
     for taxid, subd in tqdm(d.items()):
+        if taxid != '559292':
+            continue
         for entrezgene, orthologs in tqdm(subd.items(), leave=False):
             try:
                 do_item(entrezgene, orthologs, reference, entrez_homo, entrez_taxon, taxon_wdid, entrez_wdid, login,
@@ -134,6 +136,8 @@ def do_item(entrezgene, orthologs, reference, entrez_homo, entrez_taxon, taxon_w
     this_ref = reference(entrez_homo[entrezgene])
     for ortholog in orthologs:
         ortholog = str(ortholog)
+        if ortholog == entrezgene:
+            continue
         if ortholog not in entrez_taxon:
             raise ValueError("missing taxid for: " + ortholog)
         qualifier = wdi_core.WDItemID(taxon_wdid[entrez_taxon[ortholog]], PROPS['found in taxon'], is_qualifier=True)
