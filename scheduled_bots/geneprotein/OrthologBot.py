@@ -98,6 +98,10 @@ def main(coll, metadata, log_dir="./logs", fast_run=True, write=True):
         if str(this_entrez) not in entrez_wdid:
             continue
         for taxid, entrez in doc['homologene']['@value']['genes']:
+            if taxid == 4932 and this_taxid == 559292:
+                # ridiculous workaround because entrez has the taxid for the strain and homologene has it for the species
+                # TODO: This needs to be fixed if you want to use other things that may have species/strains .. ?`
+                continue
             if taxid != this_taxid and str(entrez) in entrez_wdid:
                 d[str(this_taxid)][str(this_entrez)].add(str(entrez))
 
@@ -114,8 +118,6 @@ def main(coll, metadata, log_dir="./logs", fast_run=True, write=True):
 
     ec = 0
     for taxid, subd in tqdm(d.items()):
-        if taxid != '559292':
-            continue
         for entrezgene, orthologs in tqdm(subd.items(), leave=False):
             try:
                 do_item(entrezgene, orthologs, reference, entrez_homo, entrez_taxon, taxon_wdid, entrez_wdid, login,
