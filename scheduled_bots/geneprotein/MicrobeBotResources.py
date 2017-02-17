@@ -9,8 +9,13 @@ import urllib.request
 import pandas as pd
 from wikidataintegrator.wdi_helpers import id_mapper
 
-
 def get_ref_microbe_taxids(force_download=False):
+    df = get_microbe_taxids(force_download=force_download)
+    df = df[df['refseq_category'].isin(['reference genome'])]
+    return df
+
+
+def get_microbe_taxids(force_download=False):
     """
     Download the latest bacterial genome assembly summary from the NCBI genome ftp site
     and generate a pd.DataFrame of relevant data for strain items based on taxids of the bacterial reference genomes.
@@ -24,7 +29,7 @@ def get_ref_microbe_taxids(force_download=False):
     if force_download or not os.path.exists("reference_genomes.csv"):
         assembly = urllib.request.urlretrieve("ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt")
         df = pd.read_csv(assembly[0], sep="\t", dtype=object, skiprows=2, names=columns)
-        df = df[df['refseq_category'] == 'reference genome']
+        df = df[df['refseq_category'].isin(['reference genome', 'representative genome'])]
 
         all_tax_wdid = id_mapper('P685')
 
@@ -44,7 +49,7 @@ def get_all_taxa():
     return ref_taxids
 
 def get_organism_info(taxid):
-    df = get_ref_microbe_taxids()
+    df = get_microbe_taxids()
     ref_taxids = df['taxid'].tolist()
     if taxid not in ref_taxids:
         raise ValueError("taxid {} not found in microbe ref genomes".format(taxid))
