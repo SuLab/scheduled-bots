@@ -7,7 +7,8 @@ drug_qid,brand_rxnorm,emea,url,normalized_name
 Definitions:
 drug_qid: QID of the active ingredient
 brand_rxnorm: rxnorm CUI of the product/brand (optional)
-emea: EMEA ID of the product/brand,URL for EMEA to use as the ref
+emea: EMEA ID of the product/brand
+url: URL for EMEA to use as the ref
 normalized_name: name of the product/brand to use on the wikidata item page, this also gets removed from the aliases on the active ingredient
 
 """
