@@ -70,7 +70,7 @@ def do_compound(brand_qid, drug_qid, brand_name):
     wdi_helpers.try_write(item, '', '', login, edit_summary="add 'active ingredient in'")
 
 df = pd.read_csv("ema_do_hp_rxnorm_snomed.csv", index_col=0)
-df = df.dropna(subset=['drug_qid'])
+df = df.dropna(subset=['drug_qid', 'url'])
 
 for _,row in tqdm(df.iterrows(), total=len(df)):
     drug_qid = row.drug_qid
