@@ -88,13 +88,13 @@ def validate_doc(d, doc_type):
 
     required = {'entrezgene': None,
                 'type_of_gene': None,
-                'name': None }
+                'name': None}
     required_gene = {'ensembl': {'gene', 'transcript'},
                      'refseq': {'rna'},  # not using refseq['genomic']
                      'genomic_pos': {'start', 'end', 'chr', 'strand'} }
     required_protein = {#'ensembl': {'protein'},
                         #'refseq': {'protein'},
-                        'uniprot': {'Swiss-Prot'}}
+                        'uniprot': {}}
 
     check_keys_subkeys(required)
     if doc_type == "gene":
@@ -119,7 +119,10 @@ def validate_doc(d, doc_type):
         assert isinstance(d['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
         assert isinstance(d['entrezgene'], (int, str)), "incorrect type: doc['entrezgene']"
     if doc_type == "protein":
-        assert isinstance(d['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
+        if 'Swiss-Prot' in d['uniprot']:
+            assert isinstance(d['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
+        if 'TrEMBL' in d['uniprot']:
+            assert isinstance(d['uniprot']['TrEMBL'], str), "incorrect type: doc['uniprot']['TrEMBL']" + str(d['uniprot'])
     # assert isinstance(record['refseq']['genomic'], str)  # this isn't used
 
     # check types of optional and required fields
@@ -142,7 +145,8 @@ def validate_doc(d, doc_type):
     if doc_type == "gene":
         d['genomic_pos']['chr'] = d['genomic_pos']['chr'].replace("chr", "").replace("Chr", "").replace("CHR", "")
         if ('genomic_pos_hg19' in d) and ('chr' in d['genomic_pos_hg19']):
-            d['genomic_pos_hg19']['chr'] = d['genomic_pos_hg19']['chr'].replace("chr", "").replace("Chr", "").replace("CHR", "")
+            d['genomic_pos_hg19']['chr'] = d['genomic_pos_hg19']['chr'].replace("chr", "").replace("Chr", "").replace(
+                "CHR", "")
 
     return d
 

@@ -127,7 +127,13 @@ class Protein:
         ############
         # required external IDs
         ############
-        uniprot_id = self.record['uniprot']['@value']['Swiss-Prot']
+        if 'Swiss-Prot' in self.record['uniprot']['@value']:
+            uniprot_id = self.record['uniprot']['@value']['Swiss-Prot']
+        elif 'TrEMBL' in self.record['uniprot']['@value']:
+            uniprot_id = self.record['uniprot']['@value']['TrEMBL']
+        else:
+            raise ValueError("no uniprot found")
+
         entrez_gene = str(self.record['entrezgene']['@value'])
 
         external_ids = {'UniProt ID': uniprot_id, 'Entrez Gene ID': entrez_gene}
@@ -241,7 +247,13 @@ class Protein:
                                                                               'wdid']})
             wd_item_protein.set_label(self.label)
             wd_item_protein.set_description(self.description, lang='en')
-            wd_item_protein.set_aliases(self.aliases)
+
+            # remove the alias "protein"
+            current_aliases = set(wd_item_protein.get_aliases())
+            aliases = current_aliases | set(self.aliases)
+            aliases.remove("protein")
+            wd_item_protein.set_aliases(aliases, append=False)
+
             wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
                                   write=write)
             self.protein_wdid = wd_item_protein.wd_item_id
@@ -322,7 +334,7 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     bot = ProteinBot(organism_info, gene_wdid_mapping, login)
 
     # only do certain records
-    doc_filter = {'taxid': taxid, 'type_of_gene': 'protein-coding', 'uniprot.Swiss-Prot': {'$exists': True}}
+    doc_filter = {'taxid': taxid, 'type_of_gene': 'protein-coding'}
     docs = coll.find(doc_filter, no_cursor_timeout=True)
     total = docs.count()
     print("total number of records: {}".format(total))
