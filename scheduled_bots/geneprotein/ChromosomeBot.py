@@ -12,7 +12,10 @@ import os
 from datetime import datetime
 
 import pandas as pd
+from io import StringIO
 from wikidataintegrator import wdi_core, wdi_helpers
+from urllib import request
+
 
 
 class ChromosomeBot:
@@ -28,12 +31,10 @@ class ChromosomeBot:
         self.chr_df = dict()
 
     def get_assembly_summaries(self):
-        names = ['assembly_accession', 'bioproject', 'biosample', 'wgs_master', 'refseq_category', 'taxid',
-                 'species_taxid', 'organism_name', 'infraspecific_name', 'isolate', 'version_status', 'assembly_level',
-                 'release_type', 'genome_rep', 'seq_rel_date', 'asm_name', 'submitter', 'gbrs_paired_asm',
-                 'paired_asm_comp', 'ftp_path', 'excluded_from_refseq']
-        self.ass_sum = pd.read_csv("ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt", sep="\t",
-                                   comment="#", names=names, low_memory=False)
+        # silly me for assuming the column names won't change
+        table = request.urlopen(request.Request('ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt')).read().decode()
+        names = table.split("\n")[1].replace("# ", "").split("\t")
+        self.ass_sum = pd.read_csv(StringIO(table), sep="\t", comment="#", names=names, low_memory=False)
 
     def get_assembly_report(self, taxid):
         if self.ass_sum is None:
@@ -44,13 +45,21 @@ class ChromosomeBot:
             df = self.ass_sum.query("taxid == {} & refseq_category == 'representative genome'".format(taxid))
         if len(df) != 1:
             raise ValueError("unknown reference: {}".format(df))
+        print(df)
         ftp_path = list(df.ftp_path)[0]
         assembly = os.path.split(ftp_path)[1]
         url = os.path.join(ftp_path, assembly + "_assembly_report.txt")
-        names = ['SequenceName', 'SequenceRole', 'AssignedMolecule', 'AssignedMoleculeLocationType',
-                 'GenBankAccn', 'Relationship',
-                 'RefSeqAccn', 'AssemblyUnit', 'SequenceLength', 'UCSCstylename']
-        self.chr_df[taxid] = pd.read_csv(url, sep="\t", names=names, comment='#')
+        print(url)
+        # read the column names from the file
+        table = request.urlopen(request.Request(url)).read().decode()
+        names = [x for x in table.split("\n") if x.startswith("#")][-1].strip().replace("# ", "").split("\t")
+        self.chr_df[taxid] = pd.read_csv(StringIO(table), sep="\t", names=names, comment='#')
+        self.chr_df[taxid] = self.chr_df[taxid].rename(columns={'Sequence-Name': 'SequenceName', 'Sequence-Role': 'SequenceRole',
+                                                                'Assigned-Molecule': 'AssignedMolecule',
+                                                                'Assigned-Molecule-Location/Type': 'AssignedMoleculeLocationType',
+                                                                'GenBank-Accn': 'GenBankAccn', 'RefSeq-Accn': 'RefSeqAccn',
+                                                                'UCSC-style-name': 'UCSCstylename'})
+        #print(self.chr_df[taxid].query("SequenceRole == 'assembled-molecule'"))
 
     def get_chrom_info(self, chr_name, taxid):
         """ result looks like:
