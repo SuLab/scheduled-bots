@@ -69,7 +69,6 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
                               edit_summary="add/update family and/or domains")
 
 
-
 def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb://localhost:27017",
          mongo_db="wikidata_src", mongo_coll="interpro_protein", taxon=None, run_one=False, write=True):
     # data sources
