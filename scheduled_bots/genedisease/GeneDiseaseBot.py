@@ -10,6 +10,7 @@ from itertools import chain
 from time import gmtime, strftime
 
 import requests
+from tqdm import tqdm
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
 from wikidataintegrator.wdi_helpers import id_mapper
 
@@ -113,7 +114,7 @@ class GeneDiseaseBot(object):
     def __init__(self, catalog_tsv_path='GWAS_Catalog.tsv', login=None, fast_run=False, write=True):
         self.gwas_catalog = GWASCatalog(catalog_tsv_path=catalog_tsv_path)
 
-        self.fast_run_base_gene_filter = {PROPS['Entrez Gene ID']: ""}
+        self.fast_run_base_gene_filter = {PROPS['Entrez Gene ID']: "", PROPS['found in taxon']: 'Q15978631'}
         self.fast_run_base_disease_filter = {PROPS['Disease Ontology ID']: ""}
         self.login = login
         self.write = write
@@ -127,6 +128,7 @@ class GeneDiseaseBot(object):
 
         # Load pmid -> wdid mapper
         self.pmid_wdid_map = id_mapper(PROPS['PubMed ID'])
+        print(len(self.pmid_wdid_map))
 
         self.wd_items = []
 
@@ -134,10 +136,9 @@ class GeneDiseaseBot(object):
         wdi_core.WDItemEngine.log("INFO", "Begin processing relationships")
         wd_genes = defaultdict(list)
         wd_diseases = defaultdict(list)
-        for i, gdr in enumerate(self.gwas_catalog.data, start=1):
-            if i % 50 == 0:
-                wdi_core.WDItemEngine.log("DEBUG", "Processing Relationships: {} / {}".format(i, len(self.gwas_catalog.data)))
-
+        gdrs = list(self.gwas_catalog.data)
+        print("Building relationships & references")
+        for gdr in tqdm(gdrs):
             try:
                 # Retrieve Wikidata ID for this disease phenotype
                 doid_wdid = self.doid_wdid_map["DOID:{}".format(gdr.doid)]
@@ -164,14 +165,11 @@ class GeneDiseaseBot(object):
             # Aggregating data to reduce wikidata updates
             wd_genes[gene_wdid].append(gdr)
             wd_diseases[doid_wdid].append(gdr)
-        wdi_core.WDItemEngine.log("DEBUG", "Processing Relationships: {} / {}".format(i, len(self.gwas_catalog.data)))
 
-        wdi_core.WDItemEngine.log("INFO", "Begin creating Wikidata items with new relationships")
-        self.wd_items = []
+        print("Begin creating Wikidata Gene items with new relationships")
+
         # Create Wikidata items for genes
-        for i, (wdid, gdrs) in enumerate(wd_genes.items(), start=1):
-            if i % 100 == 0:
-                wdi_core.WDItemEngine.log("DEBUG", "Creating Wikidata Gene Items: {} / {}".format(i, len(wd_genes)))
+        for wdid, gdrs in tqdm(wd_genes.items()):
             # Attach updated disease information to gene
             try:
                 gene_wd_item = wdi_core.WDItemEngine(wd_item_id=wdid,
@@ -180,16 +178,14 @@ class GeneDiseaseBot(object):
                                                      append_value=[PROPS["genetic association"]],
                                                      fast_run=self.fast_run,
                                                      fast_run_base_filter=self.fast_run_base_gene_filter)
-                self.wd_items.append({'item': gene_wd_item, 'record_id': gdrs[0].ncbi, 'record_prop': PROPS['Entrez Gene ID']})
+                wd_item = {'item': gene_wd_item, 'record_id': gdrs[0].ncbi, 'record_prop': PROPS['Entrez Gene ID']}
+                self.write_item(wd_item)
             except Exception as e:
                 msg = "Problem Creating Gene WDItem; skipping {}".format(gdr.ncbi)
                 wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(gdr.ncbi, PROPS['Entrez Gene ID'], wdid, msg, type(e)))
 
-        wdi_core.WDItemEngine.log("DEBUG", "Creating Wikidata Gene Items: {} / {}".format(i, len(wd_genes)))
-
-        for i, (wdid, gdrs) in enumerate(wd_diseases.items(), start=1):
-            if i % 10 == 0:
-                wdi_core.WDItemEngine.log("DEBUG", "Creating Wikidata Disease Items: {} / {}".format(i, len(wd_diseases)))
+        print("Begin creating Wikidata Disease items with new relationships")
+        for wdid, gdrs in tqdm(wd_diseases.items()):
             # Attach updated gene information to disease
             try:
                 disease_wd_item = wdi_core.WDItemEngine(wd_item_id=wdid,
@@ -198,28 +194,22 @@ class GeneDiseaseBot(object):
                                                         append_value=[PROPS["genetic association"]],
                                                         fast_run=self.fast_run,
                                                         fast_run_base_filter=self.fast_run_base_disease_filter)
-                self.wd_items.append({'item': disease_wd_item, 'record_id': "DOID:{}".format(gdrs[0].doid), 'record_prop': PROPS['Disease Ontology ID']})
+                wd_item = {'item': disease_wd_item, 'record_id': "DOID:{}".format(gdrs[0].doid), 'record_prop': PROPS['Disease Ontology ID']}
+                self.write_item(wd_item)
             except Exception as e:
                 msg = "Problem Creating Disease WDItem; skipping {}".format(gdr.doid)
                 wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(gdr.doid, PROPS['Disease Ontology ID'], wdid, msg, type(e)))
-        wdi_core.WDItemEngine.log("DEBUG", "Creating Wikidata Disease Items: {} / {}".format(i, len(wd_diseases)))
-        wdi_core.WDItemEngine.log("INFO", "All Items Created")
-
-        self.write_all()
 
         if self.write:
             wdi_core.WDItemEngine.log("INFO", "All Items Written")
 
     def write_item(self, wd_item):
-        try:
-            wdi_helpers.try_write(wd_item['item'], record_id=wd_item['record_id'], record_prop=wd_item['record_prop'], edit_summary='edit genetic association', login=self.login, write=self.write)
-        except Exception as e:
-            print(e)
-            wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(wd_item['record_id'], wd_item['record_prop'], wd_item['item'].wd_item_id, str(e), type(e)))
-
-    def write_all(self):
-        for wd_item in self.wd_items:
-            self.write_item(wd_item)
+        if self.write:
+            try:
+                wdi_helpers.try_write(wd_item['item'], record_id=wd_item['record_id'], record_prop=wd_item['record_prop'], edit_summary='edit genetic association', login=self.login, write=self.write)
+            except Exception as e:
+                print(e)
+                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(wd_item['record_id'], wd_item['record_prop'], wd_item['item'].wd_item_id, str(e), type(e)))
 
     def process_relationship(self, gene_wdid, doid_wdid, gdr):
         """
@@ -325,7 +315,7 @@ if __name__ == "__main__":
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
-    parser.set_defaults(fastrun=False)
+    parser.set_defaults(fastrun=True)
 
     args = parser.parse_args()
     if (args.gwas_path and args.gwas_url) or not (args.gwas_path or args.gwas_url):
