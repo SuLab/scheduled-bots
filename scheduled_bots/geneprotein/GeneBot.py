@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import sys
+sys.path.insert(0, '/home/gstupp/projects/WikidataIntegrator/')
 import traceback
 from datetime import datetime
 
@@ -246,12 +247,13 @@ class Gene:
             self.create_description()
             self.create_aliases()
 
+            fast_run_base_filter = {PROPS['Entrez Gene ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
+
             wd_item_gene = wdi_core.WDItemEngine(item_name=self.label, domain='genes', data=self.statements,
                                                  append_value=[PROPS['instance of']],
                                                  fast_run=fast_run,
-                                                 fast_run_base_filter={PROPS['Entrez Gene ID']: '',
-                                                                       PROPS['found in taxon']: self.organism_info[
-                                                                           'wdid']})
+                                                 fast_run_base_filter=fast_run_base_filter)
+
             wd_item_gene = self.set_languages(wd_item_gene)
             wdi_helpers.try_write(wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
                                   self.login,
@@ -334,15 +336,7 @@ class MammalianGene(Gene):
     """
     Probably should be called euakaryotes. includes yeast, mouse, rat
     """
-    gene_of_the_species = {'en': "gene of the species {}",
-                           'fr': "gène de l'espèce {}",
-                           'nl': "gen van de soort {}",
-                           'de': "Gen der Spezies {}",
-                           'es': "gen de la especie {}",
-                           'pt': "gene da espécie {}",
-                           'sv': "Genen från arten {}",
-                           'srn': "gen fu a sortu {}",
-                           }
+    gene_of_the_species = {'en': "gene of the species {}"}
     # languages to set the gene label to
     label_languages = gene_of_the_species.keys()
 
