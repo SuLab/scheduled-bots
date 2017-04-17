@@ -48,7 +48,7 @@ except ImportError:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
 PROPS = {'found in taxon': 'P703',
-         'subclass of': 'P279',
+         'instance of': 'P31',
          'encoded by': 'P702',
          'RefSeq Protein ID': 'P637',
          'UniProt ID': 'P352',
@@ -197,8 +197,8 @@ class Protein:
         ############
         # Protein statements
         ############
-        # subclass of protein
-        s.append(wdi_core.WDItemID("Q8054", PROPS['subclass of'], references=[uniprot_ref]))
+        # instance of protein
+        s.append(wdi_core.WDItemID("Q8054", PROPS['instance of'], references=[uniprot_ref]))
 
         # found in taxon
         s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=[uniprot_ref]))
@@ -239,7 +239,7 @@ class Protein:
             self.create_aliases()
 
             wd_item_protein = wdi_core.WDItemEngine(item_name=self.label, domain='proteins', data=self.statements,
-                                                    append_value=[PROPS['subclass of'], PROPS['encoded by'],
+                                                    append_value=[PROPS['instance of'], PROPS['encoded by'],
                                                                   PROPS['Ensembl Protein ID'], PROPS['RefSeq Protein ID']],
                                                     fast_run=fast_run,
                                                     fast_run_base_filter={PROPS['UniProt ID']: '',

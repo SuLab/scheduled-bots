@@ -24,9 +24,6 @@ Restructuring this: https://bitbucket.org/sulab/wikidatabots/src/226614eeda5f258
 # TODO: Gene on two chromosomes
 # https://www.wikidata.org/wiki/Q20787772
 
-## TODO: Homologues
-# do this in another bot because the items might not exist yet
-
 import argparse
 import json
 import os
@@ -41,7 +38,7 @@ from tqdm import tqdm
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 
 from scheduled_bots.geneprotein import HelperBot
-from scheduled_bots.geneprotein import type_of_gene_map, organisms_info
+from scheduled_bots.geneprotein import organisms_info
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
 from scheduled_bots.geneprotein.HelperBot import make_ref_source
 from scheduled_bots.geneprotein.MicrobeBotResources import get_organism_info, get_all_taxa
@@ -56,7 +53,7 @@ except ImportError:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
 PROPS = {'found in taxon': 'P703',
-         'subclass of': 'P279',
+         'instance of': 'P31',
          'strand orientation': 'P2548',
          'Entrez Gene ID': 'P351',
          'NCBI Locus tag': 'P2393',
@@ -233,9 +230,8 @@ class Gene:
         # if there is an ensembl ID, this comes from ensembl, otherwise, entrez
         gene_ref = ensembl_ref if ensembl_ref is not None else entrez_ref
 
-        # subclass of gene/protein-coding gene/etc
-        type_of_gene = self.record['type_of_gene']['@value']
-        s.append(wdi_core.WDItemID(type_of_gene_map[type_of_gene], PROPS['subclass of'], references=[gene_ref]))
+        # instance of gene
+        s.append(wdi_core.WDItemID('Q7187', PROPS['instance of'], references=[gene_ref]))  # instance of 'gene'
 
         # found in taxon
         s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=[gene_ref]))
@@ -251,7 +247,7 @@ class Gene:
             self.create_aliases()
 
             wd_item_gene = wdi_core.WDItemEngine(item_name=self.label, domain='genes', data=self.statements,
-                                                 append_value=[PROPS['subclass of']],
+                                                 append_value=[PROPS['instance of']],
                                                  fast_run=fast_run,
                                                  fast_run_base_filter={PROPS['Entrez Gene ID']: '',
                                                                        PROPS['found in taxon']: self.organism_info[

@@ -2,6 +2,7 @@
 # Helper functions
 #########
 
+""" # don't use this
 type_of_gene_map = {'ncRNA': 'Q427087',
                     'snRNA': 'Q284578',
                     'snoRNA': 'Q284416',
@@ -9,7 +10,7 @@ type_of_gene_map = {'ncRNA': 'Q427087',
                     'tRNA': 'Q201448',
                     'pseudo': 'Q277338',
                     'protein-coding': 'Q20747295'}
-
+"""
 
 #########
 # Mappings for GO
