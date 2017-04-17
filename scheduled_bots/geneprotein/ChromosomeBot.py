@@ -155,17 +155,17 @@ class ChromosomeBot:
 
         reference = make_ref(self.retrieved, genome_id)
 
-        # subclass of chr_type
+        # instance of chr_type
         if chr_type not in ChromosomeBot.chr_type_map:
             raise ValueError("unknown chromosome type: {}".format(chr_type))
-        statements = [wdi_core.WDItemID(value=ChromosomeBot.chr_type_map[chr_type], prop_nr='P279', references=[reference])]
+        statements = [wdi_core.WDItemID(value=ChromosomeBot.chr_type_map[chr_type], prop_nr='P31', references=[reference])]
         # found in taxon
         statements.append(wdi_core.WDItemID(value=organism_info['wdid'], prop_nr='P703', references=[reference]))
         # genome id
         statements.append(wdi_core.WDString(value=genome_id, prop_nr='P2249', references=[reference]))
 
         wd_item = wdi_core.WDItemEngine(item_name=item_name, domain='chromosome', data=statements,
-                                        append_value=['P279'], fast_run=True,
+                                        append_value=['P31'], fast_run=True,
                                         fast_run_base_filter={'P703': organism_info['wdid'], 'P2249': ''})
         if wd_item.wd_item_id:
             return wd_item.wd_item_id
