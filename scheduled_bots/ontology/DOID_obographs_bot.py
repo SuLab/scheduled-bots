@@ -80,7 +80,7 @@ class DOGraph:
         self.version = meta['version']
         datestr = [x['val'] for x in meta['basicPropertyValues'] if
                    x['pred'] == 'http://www.geneontology.org/formats/oboInOwl#date'][0]
-        self.date = datetime.strptime(datestr, '%m:%d:%Y %H:%M')
+        self.date = datetime.strptime(datestr, '%d:%m:%Y %H:%M')
         self.default_namespace = [x['val'] for x in meta['basicPropertyValues'] if
                                   x['pred'] == 'http://www.geneontology.org/formats/oboInOwl#default-namespace'][0]
 
