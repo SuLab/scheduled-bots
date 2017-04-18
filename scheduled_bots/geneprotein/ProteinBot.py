@@ -251,7 +251,8 @@ class Protein:
             # remove the alias "protein"
             current_aliases = set(wd_item_protein.get_aliases())
             aliases = current_aliases | set(self.aliases)
-            aliases.remove("protein")
+            if "protein" in aliases:
+                aliases.remove("protein")
             wd_item_protein.set_aliases(aliases, append=False)
 
             wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
