@@ -64,13 +64,17 @@ PROPS = {'found in taxon': 'P703',
          'genomic start': 'P644',
          'genomic end': 'P645',
          'chromosome': 'P1057',
-         'Saccharomyces Genome Database ID': 'P3406',
-         'Mouse Genome Informatics ID': 'P671',
          'HGNC ID': 'P354',
          'HGNC Gene Symbol': 'P353',
          'RefSeq RNA ID': 'P639',
          'HomoloGene ID': 'P593',
+         'Saccharomyces Genome Database ID': 'P3406',
+         #'Mouse Genome Informatics ID': 'P671',
          'MGI Gene Symbol': 'P2394',
+         'Wormbase Gene ID': 'P3860',
+         'FlyBase Gene ID': 'P3852',
+         'ZFIN Gene ID': 'P3870',
+         'Rat Genome Database ID': 'P3853',
          }
 
 __metadata__ = {'name': 'GeneBot',
@@ -146,30 +150,45 @@ class Gene:
         ############
         # optional external IDs
         ############
+        # taxid, example gene
+        # mouse: 10090, 102466888
+        # rat: 10116, 100362233
+        # sgd: 559292, 853415
+        # fly: 7227, 31303
+        # worm: 6239, 174065
+        # zfin: 7955, 368434
+
         if 'ensembl' in self.record:
             ensembl_gene = self.record['ensembl']['@value']['gene']
             external_ids['Ensembl Gene ID'] = ensembl_gene
 
+        # ncbi locus tag
         if 'locus_tag' in self.record:
-            # ncbi locus tag
             external_ids['NCBI Locus tag'] = self.record['locus_tag']['@value']
 
+        if 'MGI' in self.record:
+            external_ids['Mouse Genome Informatics ID'] = self.record['MGI']['@value']
+        if 'RGD' in self.record:
+            external_ids['Rat Genome Database ID'] = self.record['RGD']['@value']
         if 'SGD' in self.record:
             external_ids['Saccharomyces Genome Database ID'] = self.record['SGD']['@value']
+        if 'FLYBASE' in self.record:
+            external_ids['FlyBase Gene ID'] = self.record['FLYBASE']['@value']
+        if 'WormBase' in self.record:
+            external_ids['Wormbase Gene ID'] = self.record['WormBase']['@value']
+        if 'ZFIN' in self.record:
+            external_ids['ZFIN Gene ID'] = self.record['ZFIN']['@value']
 
         if 'HGNC' in self.record:
             external_ids['HGNC ID'] = self.record['HGNC']['@value']
 
         if taxid == 9606 and 'symbol' in self.record and 'HGNC' in self.record:
-            # "and 'HGNC' in record" is required because there is something wrong with mygene
             # see: https://github.com/stuppie/scheduled-bots/issues/2
+            # "and 'HGNC' in record" is required because there is something wrong with mygene
             external_ids['HGNC Gene Symbol'] = self.record['symbol']['@value']
 
         if taxid == 10090 and 'symbol' in self.record:
             external_ids['MGI Gene Symbol'] = self.record['symbol']['@value']
-
-        if 'MGI' in self.record:
-            external_ids['Mouse Genome Informatics ID'] = self.record['MGI']['@value']
 
         if 'homologene' in self.record:
             external_ids['HomoloGene ID'] = str(self.record['homologene']['@value']['id'])
@@ -221,7 +240,8 @@ class Gene:
                 s.append(wdi_core.WDString(id, PROPS[key], references=[entrez_ref]))
 
         for key in ['NCBI Locus tag', 'Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID',
-                    'MGI Gene Symbol', 'HomoloGene ID']:
+                    'MGI Gene Symbol', 'HomoloGene ID', 'Rat Genome Database ID', 'FlyBase Gene ID',
+                    'Wormbase Gene ID', 'ZFIN Gene ID']:
             if key in self.external_ids:
                 s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=[entrez_ref]))
 
@@ -282,7 +302,10 @@ class MicrobeGene(Gene):
         self.label = self.record['name']['@value'] + " " + self.record['locus_tag']['@value']
 
     def create_description(self):
-        self.description = '{} gene found in {}'.format(self.organism_info['type'], self.organism_info['name'])
+        if self.organism_info['type']:
+            self.description = '{} gene found in {}'.format(self.organism_info['type'], self.organism_info['name'])
+        else:
+            self.description = 'Gene found in {}'.format(self.organism_info['name'])
 
     def set_languages(self, wditem):
         wditem.set_description(self.description)

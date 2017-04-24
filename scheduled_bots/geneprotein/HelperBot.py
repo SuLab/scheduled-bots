@@ -127,7 +127,7 @@ def validate_doc(d, doc_type):
 
     # check types of optional and required fields
     fields = {'SGD': str, 'HGNC': str, 'MIM': str, 'MGI': str, 'locus_tag': str, 'symbol': str, 'taxid': int,
-              'type_of_gene': str, 'name': str}
+              'type_of_gene': str, 'name': str, 'RGD': str, 'FLYBASE': str, 'WormBase': str, 'ZFIN': str}
     for field, field_type in fields.items():
         if field in d:
             assert isinstance(d[field], field_type), "incorrect type: {}".format(field)
@@ -180,6 +180,10 @@ def tag_mygene_docs(docs, metadata):
     key_source = {'SGD': 'entrez',
                   'HGNC': 'entrez',
                   'MIM': 'entrez',
+                  'FLYBASE': 'entrez',
+                  'WormBase': 'entrez',
+                  'ZFIN': 'entrez',
+                  'RGD': 'entrez',
                   'MGI': 'entrez',
                   'exons': 'ucsc',
                   'ensembl': 'ensembl',

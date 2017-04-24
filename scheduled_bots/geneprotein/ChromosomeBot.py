@@ -149,7 +149,7 @@ class ChromosomeBot:
             return refs
 
         item_name = '{} chromosome {}'.format(organism_info['name'], chrom_num)
-        item_description = '{} chromosome'.format(organism_info['type'])
+        item_description = '{} chromosome'.format(organism_info['type']) if organism_info['type'] else "chromosome"
         print(item_name)
         print(genome_id)
 

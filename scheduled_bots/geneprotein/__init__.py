@@ -160,5 +160,23 @@ organisms_info = {
         "type": "plant",
         "wdid": "Q158695",
         'taxid': 3702
-    }
+    },
+    7227: {
+        "name": "Drosophila melanogaster",
+        "type": None,
+        "wdid": "Q130888",
+        'taxid': 7227
+    },
+    6239: {
+        "name": "Caenorhabditis elegans",
+        "type": None,
+        "wdid": "Q91703",
+        'taxid': 6239
+    },
+    7955: {
+        "name": "Danio rerio", # zebrafish
+        "type": None,
+        "wdid": "Q169444",
+        'taxid': 7955
+    },
 }
