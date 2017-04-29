@@ -8,7 +8,19 @@ import jenkins
 import pandas as pd
 import requests
 from datetime import datetime
-from local import JENKINS_PASS, WDUSER, WDPASS
+
+
+try:
+    from scheduled_bots.local import JENKINS_PASS, WDUSER, WDPASS
+except ImportError:
+    if "WDUSER" in os.environ and "WDPASS" in os.environ and "JENKINS_PASS" in os.environ:
+        WDUSER = os.environ['WDUSER']
+        WDPASS = os.environ['WDPASS']
+        JENKINS_PASS = os.environ['JENKINS_PASS']
+    else:
+        raise ValueError("WDUSER and WDPASS and JENKINS_PASS must be specified in local.py or as environment variables")
+
+
 
 # jenkins url
 HOST = "http://52.15.200.208:8080"
