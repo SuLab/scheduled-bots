@@ -3,7 +3,7 @@ Hit jenkins API to get the status of all jobs.
 Creates a table at: https://www.wikidata.org/w/index.php?title=User:ProteinBoxBot/Bot_Status
 
 """
-
+import os
 import jenkins
 import pandas as pd
 import requests
