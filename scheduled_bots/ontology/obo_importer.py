@@ -14,7 +14,7 @@ import requests
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 
 __author__ = 'Sebastian Burgstaller'
-__license__ = 'AGPLv3'
+__license__ = 'MIT'
 __metadata__ = {'name': 'GoOntologyBot',
                 'tags': ['GO'],
                 }
@@ -193,6 +193,9 @@ class OBOImporter(object):
 
                 exact_match_string = 'http://purl.obolibrary.org/obo/{}_{}'.format(self.ontology, go_id)
                 data.append(wdi_core.WDUrl(value=exact_match_string, prop_nr='P2888'))
+                
+                # add instance of ontology term
+                data.append(wdi_core.WDItemID(value='Q29647497', prop_nr='P31'))
 
                 # add xrefs
                 if go_term_data['obo_xref']:
