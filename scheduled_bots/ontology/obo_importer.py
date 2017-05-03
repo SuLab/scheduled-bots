@@ -85,15 +85,16 @@ class OBOImporter(object):
     ols_session = requests.Session()
 
     def __init__(self, root_objects, ontology, core_property_nr, ontology_ref_item, login, local_qid_onto_map,
-                 use_prefix=True, fast_run=True, fast_run_base_filter=None, write=True):
+                 use_prefix=True, fast_run=True, fast_run_base_filter=None, write=True, sub_ontology=None):
 
         # run go prefix fixer before any attempts to make new go terms!
         self.login_obj = login
         self.root_objects = root_objects
         self.core_property_nr = core_property_nr
         self.ontology = ontology
+        self.sub_ontology = sub_ontology
         self.ontology_ref_item = ontology_ref_item
-        self.base_url = 'http://www.ebi.ac.uk/ols/beta/api/ontologies/{}/terms/'.format(ontology)
+        self.base_url = 'http://www.ebi.ac.uk/ols/api/ontologies/{}/terms/'.format(ontology)
         self.base_url += 'http%253A%252F%252Fpurl.obolibrary.org%252Fobo%252F'
         self.use_prefix = use_prefix
         self.fast_run = fast_run
@@ -109,13 +110,19 @@ class OBOImporter(object):
         # pprint.pprint(self.local_qid_onto_map)
 
         for ro in root_objects:
+            if not self.sub_ontology:
+                so = self.get_sub_ontology(ro)
+            else:
+                so = self.sub_ontology
+          
             if ro in self.local_qid_onto_map and self.local_qid_onto_map[ro]['had_root_write'] and \
                     ('children' in self.local_qid_onto_map[ro] or 'parents' in self.local_qid_onto_map[ro]):
 
                 OBOImporter(root_objects=self.local_qid_onto_map[ro]['children'], ontology=ontology,
                             core_property_nr=self.core_property_nr, ontology_ref_item=self.ontology_ref_item,
                             login=login, local_qid_onto_map=self.local_qid_onto_map, use_prefix=self.use_prefix,
-                            fast_run=self.fast_run, fast_run_base_filter=self.fast_run_base_filter, write=self.write)
+                            fast_run=self.fast_run, fast_run_base_filter=self.fast_run_base_filter, write=self.write,
+                            sub_ontology=so)
             else:
                 try:
                     r = OBOImporter.ols_session.get(url=self.base_url + '{}_{}/graph'.format(self.ontology, ro),
@@ -154,7 +161,8 @@ class OBOImporter(object):
                 OBOImporter(root_objects=children, ontology=ontology, core_property_nr=self.core_property_nr,
                             ontology_ref_item=self.ontology_ref_item, login=login,
                             local_qid_onto_map=self.local_qid_onto_map, use_prefix=self.use_prefix,
-                            fast_run=self.fast_run, fast_run_base_filter=self.fast_run_base_filter, write=self.write)
+                            fast_run=self.fast_run, fast_run_base_filter=self.fast_run_base_filter, write=self.write, 
+                            sub_ontology=so)
 
     def write_term(self, current_root_id, parents, children):
         print('current_root', current_root_id, parents, children)
@@ -194,8 +202,10 @@ class OBOImporter(object):
                 exact_match_string = 'http://purl.obolibrary.org/obo/{}_{}'.format(self.ontology, go_id)
                 data.append(wdi_core.WDUrl(value=exact_match_string, prop_nr='P2888'))
                 
-                # add instance of ontology term
-                data.append(wdi_core.WDItemID(value='Q29647497', prop_nr='P31'))
+                # add instance of sub-ontology
+                if self.sub_ontology:
+                    data.append(wdi_core.WDItemID(value=self.sub_ontology, prop_nr='P31',
+                                references=[self.create_reference()]))
 
                 # add xrefs
                 if go_term_data['obo_xref']:
@@ -319,7 +329,7 @@ class OBOImporter(object):
             wdi_core.WDItemID(value='Q22230760', prop_nr='P143', is_reference=True),
             wdi_core.WDTime(time=time.strftime('+%Y-%m-%dT00:00:00Z', time.gmtime()), prop_nr='P813',
                             is_reference=True),
-            wdi_core.WDItemID(value='Q1860', prop_nr='P407', is_reference=True),  # language of work
+            # wdi_core.WDItemID(value='Q1860', prop_nr='P407', is_reference=True),  # language of work
         ]
         # old references should be overwritten
         # refs[0].overwrite_references = True
@@ -335,6 +345,19 @@ class OBOImporter(object):
 
             return wdi_core.WDItemID(value=value, prop_nr=prop_nr, qualifiers=qualifiers,
                                      references=[self.create_reference()])
+          
+    def get_sub_ontology(self, oid):
+        ontology_id = oid if oid.startswith(self.ontology) else '{}:{}'.format(self.ontology, oid)
+        query = '''
+        SELECT DISTINCT * WHERE {{
+            ?qid wdt:{} '{}' .
+        }}
+        '''.format(self.core_property_nr, ontology_id)
+
+        r = wdi_core.WDItemEngine.execute_sparql_query(query=query)
+
+        for x in r['results']['bindings']:
+            return x['qid']['value'].split('/').pop()
 
     @staticmethod
     def cleanup_obsolete_edges(ontology_id, core_property_nr, login, current_node_qids=(), obsolete_term=False, write=True):
