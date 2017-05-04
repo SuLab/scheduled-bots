@@ -33,7 +33,7 @@ from tqdm import tqdm
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 from wikidataintegrator.wdi_helpers import id_mapper, format_msg
 
-from scheduled_bots.geneprotein import HelperBot
+from scheduled_bots.geneprotein import HelperBot, descriptions_by_type
 from scheduled_bots.geneprotein import organisms_info
 from scheduled_bots.geneprotein.HelperBot import make_ref_source
 from scheduled_bots.geneprotein.MicrobeBotResources import get_all_taxa, get_organism_info
@@ -107,7 +107,10 @@ class Protein:
         self.protein_wdid = None
 
     def create_description(self):
-        self.description = '{} protein found in {}'.format(self.organism_info['type'], self.organism_info['name'])
+        if self.organism_info['type']:
+            self.description = '{} protein found in {}'.format(self.organism_info['type'], self.organism_info['name'])
+        else:
+            self.description = 'Protein found in {}'.format(self.organism_info['name'])
 
     def create_label(self):
         self.label = self.record['name']['@value']
@@ -121,42 +124,45 @@ class Protein:
             aliases.append(self.external_ids['NCBI Locus tag'])
         if 'alias' in self.record:
             aliases.extend(self.record['alias'])
-        self.aliases = aliases
+        aliases = set(aliases) - {self.label} - set(descriptions_by_type.keys())
+        self.aliases = list(aliases)
 
     def parse_external_ids(self):
         ############
         # required external IDs
+        # only using items with exactly one swiss-prot or trembl ID
         ############
+
+        entrez_gene = str(self.record['entrezgene']['@value'])
+        self.external_ids = {'Entrez Gene ID': entrez_gene}
+
         if 'Swiss-Prot' in self.record['uniprot']['@value']:
             uniprot_id = self.record['uniprot']['@value']['Swiss-Prot']
         elif 'TrEMBL' in self.record['uniprot']['@value']:
             uniprot_id = self.record['uniprot']['@value']['TrEMBL']
         else:
             raise ValueError("no uniprot found")
+        assert isinstance(uniprot_id, str), (entrez_gene, uniprot_id)
 
-        entrez_gene = str(self.record['entrezgene']['@value'])
-
-        external_ids = {'UniProt ID': uniprot_id, 'Entrez Gene ID': entrez_gene}
+        self.external_ids['UniProt ID'] = uniprot_id
 
         ############
         # optional external IDs
         ############
         # SGD on both gene and protein item
         if 'SGD' in self.record:
-            external_ids['Saccharomyces Genome Database ID'] = self.record['SGD']['@value']
+            self.external_ids['Saccharomyces Genome Database ID'] = self.record['SGD']['@value']
 
         ############
         # optional external IDs (can have more than one)
         ############
         if 'ensembl' in self.record and 'protein' in self.record['ensembl']['@value']:
             # Ensembl Protein ID
-            external_ids['Ensembl Protein ID'] = self.record['ensembl']['@value']['protein']
+            self.external_ids['Ensembl Protein ID'] = self.record['ensembl']['@value']['protein']
 
         if 'refseq' in self.record and 'protein' in self.record['refseq']['@value']:
             # RefSeq Protein ID
-            external_ids['RefSeq Protein ID'] = self.record['refseq']['@value']['protein']
-
-        self.external_ids = external_ids
+            self.external_ids['RefSeq Protein ID'] = self.record['refseq']['@value']['protein']
 
     def create_statements(self):
         """
@@ -258,12 +264,14 @@ class Protein:
             wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
                                   write=write)
             self.protein_wdid = wd_item_protein.wd_item_id
+            return wd_item_protein
         except Exception as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
-            msg = wdi_helpers.format_msg(self.external_ids['UniProt ID'], PROPS['UniProt ID'], None,
+            msg = wdi_helpers.format_msg(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], None,
                                          str(e), msg_type=type(e))
             wdi_core.WDItemEngine.log("ERROR", msg)
+            return None
 
 
 class ProteinBot:
@@ -285,8 +293,9 @@ class ProteinBot:
                 continue
             gene_wdid = self.gene_wdid_mapping[entrez_gene]
             protein = Protein(record, self.organism_info, gene_wdid, self.login)
-            protein.create_item(fast_run=fast_run, write=write)
-            protein.make_gene_encodes(write=write)
+            wditem = protein.create_item(fast_run=fast_run, write=write)
+            if wditem is not None:
+                protein.make_gene_encodes(write=write)
 
 
 def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
@@ -320,13 +329,14 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__))
 
     # get organism metadata (name, organism type, wdid)
-    validate_type = 'protein'
     if taxid in organisms_info:
+        validate_type = 'eukaryotic'
         organism_info = organisms_info[taxid]
     else:
         # check if its one of the microbe refs
         # raises valueerror if not...
         organism_info = get_organism_info(taxid)
+        validate_type = 'microbial'
         print(organism_info)
 
     # get all entrez gene id -> wdid mappings, where found in taxon is this strain
@@ -335,7 +345,7 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     bot = ProteinBot(organism_info, gene_wdid_mapping, login)
 
     # only do certain records
-    doc_filter = {'taxid': taxid, 'type_of_gene': 'protein-coding'}
+    doc_filter = {'taxid': taxid, 'type_of_gene': 'protein-coding', 'uniprot': {'$exists': True}, 'entrezgene': {'$exists': True}}
     docs = coll.find(doc_filter, no_cursor_timeout=True)
     total = docs.count()
     print("total number of records: {}".format(total))
