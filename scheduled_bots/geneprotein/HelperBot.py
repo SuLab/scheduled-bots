@@ -58,6 +58,10 @@ def validate_doc_microbial(d):
     assert "name" in d, "{} not in record".format("name")
     assert "uniprot" in d, "{} not in record".format("uniprot")
     assert isinstance(d['uniprot'], dict), 'uniprot is not a dict'
+    if 'uniprot' in d and 'Swiss-Prot' in d['uniprot']:
+        assert isinstance(d['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
+    if 'uniprot' in d and 'Swiss-Prot' not in d['uniprot']:
+        assert 'TrEMBL' in d['uniprot'] and isinstance(d['uniprot']['TrEMBL'], str)
 
     return d
 
