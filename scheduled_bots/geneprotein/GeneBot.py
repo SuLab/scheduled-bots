@@ -270,6 +270,10 @@ class Gene:
         self.type_of_gene = type_of_gene
         s.append(wdi_core.WDItemID(type_of_gene_map[type_of_gene], PROPS['instance of'], references=[gene_ref]))
 
+        if type_of_gene_map[type_of_gene] != "Q7187":
+            # make sure we add instance of "gene" as well
+            s.append(wdi_core.WDItemID("Q7187", PROPS['instance of'], references=[gene_ref]))
+
         # found in taxon
         s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=[gene_ref]))
 
