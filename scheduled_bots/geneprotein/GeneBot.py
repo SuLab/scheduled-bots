@@ -18,8 +18,6 @@ https://mygene.info/v3/gene/7150837
 
 Restructuring this: https://bitbucket.org/sulab/wikidatabots/src/226614eeda5f258fc913b10fdcaa3c22c7f64045/automated_bots/genes/mammals/gene.py?at=jenkins-automation&fileviewer=file-view-default
 
-
-
 """
 # TODO: Gene on two chromosomes
 # https://www.wikidata.org/wiki/Q20787772
@@ -28,18 +26,16 @@ import argparse
 import json
 import os
 import sys
-sys.path.insert(0, '/home/gstupp/projects/WikidataIntegrator/')
 import traceback
 from datetime import datetime
 
-import logging
-import pymongo
 from pymongo import MongoClient
 from tqdm import tqdm
+import sys
+sys.path.insert(0, '/home/gstupp/projects/WikidataIntegrator')
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 
-from scheduled_bots.geneprotein import HelperBot
-from scheduled_bots.geneprotein import organisms_info
+from scheduled_bots.geneprotein import HelperBot, organisms_info, type_of_gene_map, descriptions_by_type
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
 from scheduled_bots.geneprotein.HelperBot import make_ref_source
 from scheduled_bots.geneprotein.MicrobeBotResources import get_organism_info, get_all_taxa
@@ -97,6 +93,7 @@ class Gene:
     description = None
     aliases = None
     external_ids = None
+    type_of_gene = None
 
     def __init__(self, record, organism_info, login):
         """
@@ -120,18 +117,35 @@ class Gene:
         self.statements = None
 
     def create_description(self):
-        self.description = '{} gene found in {}'.format(self.organism_info['type'], self.organism_info['name'])
+        if self.type_of_gene is None:
+            raise ValueError("must set type_of_gene first")
+        self.description = descriptions_by_type[self.type_of_gene].format(self.organism_info['name'])
 
     def create_label(self):
         self.label = self.record['name']['@value']
 
     def create_aliases(self):
-        aliases = [self.record['symbol']['@value']]
+        if self.label is None:
+            self.create_label()
+        aliases = []
+        if 'symbol' in self.record:
+            aliases.append(self.record['symbol']['@value'])
+        if 'name' in self.record:
+            aliases.append(self.record['name']['@value'])
         if 'NCBI Locus tag' in self.external_ids:
             aliases.append(self.external_ids['NCBI Locus tag'])
         if 'alias' in self.record:
             aliases.extend(self.record['alias'])
-        self.aliases = aliases
+        aliases = set(aliases) - {self.label} - set(descriptions_by_type.keys())
+        self.aliases = list(aliases)
+
+    def set_label_desc_aliases(self, wditem):
+        wditem.set_label(self.label)
+        curr_descr = wditem.get_description()
+        if curr_descr == "" or "of the species" in curr_descr or "gene found in" in curr_descr.lower():
+            wditem.set_description(self.description)
+        wditem.set_aliases(self.aliases)
+        return wditem
 
     def validate_record(self):
         # handled by HelperBot
@@ -219,8 +233,7 @@ class Gene:
         entrez_ref = make_ref_source(self.record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
                                      self.external_ids['Entrez Gene ID'], login=self.login)
 
-        s.append(
-            wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref]))
+        s.append(wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref]))
 
         # optional ID statements
         ensembl_ref = None
@@ -251,8 +264,11 @@ class Gene:
         # if there is an ensembl ID, this comes from ensembl, otherwise, entrez
         gene_ref = ensembl_ref if ensembl_ref is not None else entrez_ref
 
-        # instance of gene
-        s.append(wdi_core.WDItemID('Q7187', PROPS['instance of'], references=[gene_ref]))  # instance of 'gene'
+        # instance of gene, ncRNA.. etc
+        type_of_gene = self.record['type_of_gene']['@value']
+        assert type_of_gene in type_of_gene_map, "unknown type of gene: {}".format(type_of_gene)
+        self.type_of_gene = type_of_gene
+        s.append(wdi_core.WDItemID(type_of_gene_map[type_of_gene], PROPS['instance of'], references=[gene_ref]))
 
         # found in taxon
         s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=[gene_ref]))
@@ -274,19 +290,15 @@ class Gene:
                                                  fast_run=fast_run,
                                                  fast_run_base_filter=fast_run_base_filter)
 
-            wd_item_gene = self.set_languages(wd_item_gene)
-            wdi_helpers.try_write(wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
-                                  self.login,
-                                  write=write)
+            wd_item_gene = self.set_label_desc_aliases(wd_item_gene)
+            wdi_helpers.try_write(wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], self.login, write=write)
+
         except Exception as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
             msg = wdi_helpers.format_msg(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], None,
                                          str(e), msg_type=type(e))
             wdi_core.WDItemEngine.log("ERROR", msg)
-
-    def set_languages(self, wditem):
-        raise NotImplementedError()
 
 
 class MicrobeGene(Gene):
@@ -306,12 +318,6 @@ class MicrobeGene(Gene):
             self.description = '{} gene found in {}'.format(self.organism_info['type'], self.organism_info['name'])
         else:
             self.description = 'Gene found in {}'.format(self.organism_info['name'])
-
-    def set_languages(self, wditem):
-        wditem.set_description(self.description)
-        wditem.set_label(self.label)
-        wditem.set_aliases(self.aliases)
-        return wditem
 
     def validate_record(self):
         pass
@@ -355,14 +361,10 @@ class MicrobeGene(Gene):
         return s
 
 
-class MammalianGene(Gene):
+class EukaryoticGene(Gene):
     """
-    Probably should be called euakaryotes. includes yeast, mouse, rat
+    yeast, mouse, rat, worm, fly, zebrafish
     """
-    gene_of_the_species = {'en': "gene of the species {}"}
-    # languages to set the gene label to
-    label_languages = gene_of_the_species.keys()
-
     def __init__(self, record, organism_info, chr_num_wdid, login):
         """
         :param chr_num_wdid: mapping of chr number (str) to wdid
@@ -370,20 +372,8 @@ class MammalianGene(Gene):
         super().__init__(record, organism_info, login)
         self.chr_num_wdid = chr_num_wdid
 
-    def create_description(self):
-        pass
-
     def create_label(self):
         self.label = self.record['symbol']['@value']
-
-    def set_languages(self, wditem):
-        for lang in self.label_languages:
-            wditem.set_label(self.label, lang=lang)
-        for lang, desc in self.gene_of_the_species.items():
-            if wditem.get_description(lang=lang) == "":
-                wditem.set_description(desc.format(self.organism_info['name']), lang=lang)
-        wditem.set_aliases(self.aliases)
-        return wditem
 
     def create_statements(self):
 
@@ -391,7 +381,8 @@ class MammalianGene(Gene):
         s = super().create_statements()
 
         # add on gene position statements
-        s.extend(self.create_gp_statements_chr())
+        if 'genomic_pos' in self.record:
+            s.extend(self.create_gp_statements_chr())
 
         return s
 
@@ -425,7 +416,7 @@ class MammalianGene(Gene):
         return s
 
 
-class HumanGene(MammalianGene):
+class HumanGene(EukaryoticGene):
     def create_statements(self):
         # create gene statements
         s = Gene.create_statements(self)
@@ -438,7 +429,8 @@ class HumanGene(MammalianGene):
                 s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=[entrez_ref]))
 
         # add on gene position statements
-        s.extend(self.do_gp_human())
+        if 'genomic_pos' in self.record:
+            s.extend(self.do_gp_human())
 
         return s
 
@@ -446,8 +438,8 @@ class HumanGene(MammalianGene):
         assert 'locus_tag' in self.record
         assert 'HGNC' in self.record
         assert 'symbol' in self.record
-        assert 'ensembl' in self.record and 'transcript' in self.record['ensemb']
-        assert 'refseq' in self.record and 'rna' in self.record['ensemb']
+        assert 'ensembl' in self.record and 'transcript' in self.record['ensembl']
+        assert 'refseq' in self.record and 'rna' in self.record['ensembl']
         assert 'alias' in self.record
 
     def do_gp_human(self):
@@ -553,7 +545,7 @@ class GeneBot:
 
 
 class MammalianGeneBot(GeneBot):
-    GENE_CLASS = MammalianGene
+    GENE_CLASS = EukaryoticGene
 
     def __init__(self, organism_info, chr_num_wdid, login):
         super().__init__(organism_info, login)
@@ -602,12 +594,12 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
 
     # login
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
-    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, logger_name='WD_logger', log_name=log_name, header=json.dumps(__metadata__))
+    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, logger_name='WD_logger', log_name=log_name,
+                                        header=json.dumps(__metadata__))
 
     # get organism metadata (name, organism type, wdid)
-    if taxid in organisms_info:
-        # its one of fungal, mammalian, plant (not microbe)
-        validate_type = 'gene'
+    if taxid in organisms_info and organisms_info[taxid]['type'] != "microbial":
+        validate_type = 'eukaryotic'
         organism_info = organisms_info[taxid]
         # make sure all chromosome items are found in wikidata
         cb = ChromosomeBot()
@@ -625,15 +617,14 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
         validate_type = "microbial"
 
     # only do certain records
-    doc_filter = {'taxid': taxid, 'type_of_gene': 'protein-coding', 'genomic_pos': {'$exists': True}}
-    docs = coll.find(doc_filter, no_cursor_timeout=True)
+    doc_filter = {'taxid': taxid, 'entrezgene': {'$exists': True}}
+    docs = coll.find(doc_filter).batch_size(20)
     total = docs.count()
     print("total number of records: {}".format(total))
     docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, fast_run=fast_run, write=write)
-    docs.close()
 
     # after the run is done, disconnect the logging handler
     # so that if we start another, it doesn't write twice
@@ -648,7 +639,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata gene bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes. comma separated",
+    parser.add_argument('--taxon',
+                        help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes. comma separated",
                         type=str, required=True)
     parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")

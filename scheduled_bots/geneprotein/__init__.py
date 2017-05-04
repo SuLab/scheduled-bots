@@ -1,16 +1,30 @@
 #########
 # Helper functions
 #########
-
-""" # don't use this
 type_of_gene_map = {'ncRNA': 'Q427087',
                     'snRNA': 'Q284578',
                     'snoRNA': 'Q284416',
                     'rRNA': 'Q215980',
                     'tRNA': 'Q201448',
                     'pseudo': 'Q277338',
-                    'protein-coding': 'Q20747295'}
-"""
+                    'protein-coding': 'Q7187',  # replaced 'Q20747295'(protein coding gene) with gene
+                    'other': 'Q7187',
+                    'unknown': 'Q7187',
+                    'miscRNA': 'Q11053'
+                    }
+
+descriptions_by_type = {
+    'ncRNA': 'non-coding RNA in the species {}',
+    'snRNA': 'small nuclear RNA in the species {}',
+    'snoRNA': 'small nucleolar RNA in the species {}',
+    'rRNA': 'ribosomal RNA in the species {}',
+    'tRNA': 'transfer RNA in the species {}',
+    'pseudo': 'pseudogene in the species {}',
+    'protein-coding': 'protein-coding gene in the species {}',
+    'other': 'gene in the species {}',
+    'unknown': 'genetic element in the species {}',
+    'miscRNA': 'RNA in the species {}',
+}
 
 #########
 # Mappings for GO

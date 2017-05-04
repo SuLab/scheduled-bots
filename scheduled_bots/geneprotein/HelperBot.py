@@ -17,11 +17,11 @@ source_items = {'uniprot': 'Q905695',
 
 
 def validate_docs(docs, doc_type, external_id_prop):
-    assert doc_type in {'gene', 'protein', 'microbial'}
+    assert doc_type in {'eukaryotic', 'microbial'}
     if doc_type == "microbial":
         f = validate_doc_microbial
     else:
-        f = functools.partial(validate_doc, doc_type=doc_type)
+        f = validate_doc_eukaryotic
     for doc in docs:
         try:
             doc = f(doc)
@@ -62,91 +62,87 @@ def validate_doc_microbial(d):
     return d
 
 
-def validate_doc(d, doc_type):
-    """
-    Check fields in mygene doc. and neccessary transformations
-    Remove version numbers from genomic/transcriptomic seq IDs
-    :param d:
-    :param doc_type: is one of 'gene' or 'protein'
-    :return:
-    """
-    assert doc_type in {'gene', 'protein'}
+def validate_doc_eukaryotic(d):
+    d = format_doc_eukaryotic(d)
 
-    if doc_type == 'gene':
-        # make sure only one genomic position and its a dict
-        assert 'genomic_pos' in d and isinstance(d['genomic_pos'], dict), 'genomic_pos'
-        if 'genomic_pos_hg19' in d:
-            assert isinstance(d['genomic_pos_hg19'], dict), 'genomic_pos_hg19'
+    # required keys
+    required = {'entrezgene', 'type_of_gene', 'name', 'symbol'}
+    for key in required:
+        assert key in d, "{} not in record".format(key)
+    assert isinstance(d['entrezgene'], (int, str)), "incorrect type: doc['entrezgene']"
+    assert isinstance(d['type_of_gene'], str), "incorrect type: doc['type_of_gene']"
+    assert isinstance(d['name'], str), "incorrect type: doc['name']"
+    assert isinstance(d['symbol'], str), "incorrect type: doc['symbol']"
 
-    # check existence required keys and sub keys
-    def check_keys_subkeys(required):
-        for key, value in required.items():
-            assert key in d, "{} not in record".format(key)
-            if hasattr(value, "__iter__"):
-                for sub_key in required[key]:
-                    assert sub_key in d[key], "{} not in {}".format(sub_key, key)
-
-    required = {'entrezgene': None,
-                'type_of_gene': None,
-                'name': None}
-    required_gene = {'ensembl': {'gene', 'transcript'},
-                     'refseq': {'rna'},  # not using refseq['genomic']
-                     'genomic_pos': {'start', 'end', 'chr', 'strand'} }
-    required_protein = {#'ensembl': {'protein'},
-                        #'refseq': {'protein'},
-                        'uniprot': {}}
-
-    check_keys_subkeys(required)
-    if doc_type == "gene":
-        check_keys_subkeys(required_gene)
-    if doc_type == "protein":
-        check_keys_subkeys(required_protein)
-
-    # make sure these fields are lists
-    if doc_type == "gene":
-        d['ensembl']['transcript'] = alwayslist(d['ensembl']['transcript'])
-        d['refseq']['rna'] = alwayslist(d['refseq']['rna'])
-    if doc_type == "protein":
-        if 'ensembl' in d and 'protein' in d['ensembl']:
-            d['ensembl']['protein'] = alwayslist(d['ensembl']['protein'])
-        if 'refseq' in d and 'protein' in d['refseq']:
-            d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
-    if 'alias' in d:
-        d['alias'] = alwayslist(d['alias'])
-
-    # make sure these fields are not lists
-    if doc_type == "gene":
-        assert isinstance(d['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
-        assert isinstance(d['entrezgene'], (int, str)), "incorrect type: doc['entrezgene']"
-    if doc_type == "protein":
-        if 'Swiss-Prot' in d['uniprot']:
-            assert isinstance(d['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
-        if 'TrEMBL' in d['uniprot']:
-            assert isinstance(d['uniprot']['TrEMBL'], str), "incorrect type: doc['uniprot']['TrEMBL']" + str(d['uniprot'])
-    # assert isinstance(record['refseq']['genomic'], str)  # this isn't used
-
-    # check types of optional and required fields
+    # check types of optional fields
     fields = {'SGD': str, 'HGNC': str, 'MIM': str, 'MGI': str, 'locus_tag': str, 'symbol': str, 'taxid': int,
               'type_of_gene': str, 'name': str, 'RGD': str, 'FLYBASE': str, 'WormBase': str, 'ZFIN': str}
     for field, field_type in fields.items():
         if field in d:
             assert isinstance(d[field], field_type), "incorrect type: {}".format(field)
 
-    if doc_type == "gene" and 'homologene' in d:
+    # if there is a genomic position, assert there is only one
+    if 'genomic_pos' in d:
+        assert isinstance(d['genomic_pos'], dict), 'genomic_pos is {} expecting dict'.format(type(d['genomic_pos']))
+    if 'genomic_pos_hg19' in d:
+        assert isinstance(d['genomic_pos_hg19'], dict), 'genomic_pos_hg19 {} expecting dict'.format(
+            type(d['genomic_pos_hg19']))
+
+    # if the key is in doc, the values are required
+    optional_required = {'genomic_pos': {'start', 'end', 'chr', 'strand'},
+                         'genomic_pos_hg19': {'start', 'end', 'chr', 'strand'}}
+    for key, value in optional_required.items():
+        if key in d:
+            assert isinstance(d[key], dict)
+            for sub_key in optional_required[key]:
+                assert sub_key in d[key], "{} not in {}".format(sub_key, key)
+
+    # make sure these fields are not lists
+    if 'ensembl' in d and 'gene' in d['ensembl']:
+        assert isinstance(d['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
+    if 'uniprot' in d and 'Swiss-Prot' in d['uniprot']:
+        assert isinstance(d['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
+
+    if 'homologene' in d:
         assert "id" in d['homologene'] and isinstance(d['homologene']['id'], (int, str)), "doc['homologene']['id']"
 
-    # remove version numbers (these are always lists)
+    return d
+
+
+def format_doc_eukaryotic(d):
+    # make sure these are lists
+    if 'ensembl' in d and 'transcript' in d['ensembl']:
+        d['ensembl']['transcript'] = alwayslist(d['ensembl']['transcript'])
+    if 'refseq' in d and 'rna' in d['refseq']:
+        d['refseq']['rna'] = alwayslist(d['refseq']['rna'])
+    if 'refseq' in d and 'protein' in d['refseq']:
+        d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
+
+    # for protein
+    if 'ensembl' in d and 'protein' in d['ensembl']:
+        d['ensembl']['protein'] = alwayslist(d['ensembl']['protein'])
+    if 'refseq' in d and 'protein' in d['refseq']:
+        d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
+
+    if 'alias' in d:
+        d['alias'] = alwayslist(d['alias'])
+
+    if 'taxid' in d:
+        d['taxid'] = int(d['taxid'])
+
+    # remove version numbers (these are always lists, see above)
     remove_version = lambda ss: [s.rsplit(".")[0] if "." in s else s for s in ss]
-    if doc_type == "gene":
+    if 'refseq' in d and 'rna' in d['refseq']:
         d['refseq']['rna'] = remove_version(d['refseq']['rna'])
-    if doc_type == "protein":
+    if 'refseq' in d and 'protein' in d['refseq']:
         d['refseq']['protein'] = remove_version(d['refseq']['protein'])
 
-    if doc_type == "gene":
+    # remove chr
+    if ('genomic_pos' in d) and ('chr' in d['genomic_pos']):
         d['genomic_pos']['chr'] = d['genomic_pos']['chr'].replace("chr", "").replace("Chr", "").replace("CHR", "")
-        if ('genomic_pos_hg19' in d) and ('chr' in d['genomic_pos_hg19']):
-            d['genomic_pos_hg19']['chr'] = d['genomic_pos_hg19']['chr'].replace("chr", "").replace("Chr", "").replace(
-                "CHR", "")
+    if ('genomic_pos_hg19' in d) and ('chr' in d['genomic_pos_hg19']):
+        d['genomic_pos_hg19']['chr'] = d['genomic_pos_hg19']['chr'].replace("chr", "").replace("Chr", "").replace("CHR",
+                                                                                                                  "")
 
     return d
 
@@ -201,12 +197,12 @@ def tag_mygene_docs(docs, metadata):
                   }
     # todo: automate getting this list of ensembl taxids
     # http://uswest.ensembl.org/info/about/species.html
-    ensembl_taxids = [1230840, 30538, 48698, 28377, 9361, 13146, 30611, 7719, 51511, 6239, 9685, 7994, 9031, 9598, 9598,
-                      10029, 13735, 8049, 7897, 9913, 9541, 9615, 9739, 9739, 8839, 9785, 9669, 59894, 7227, 31033,
-                      31033, 61853, 9595, 10141, 9557, 9365, 9365, 9796, 9606, 9813, 10020, 7757, 9371, 9544, 9483,
-                      8090, 132908, 59463, 10090, 30608, 10181, 9555, 13616, 9601, 8479, 9646, 9823, 9978, 9978, 8083,
-                      9258, 79684, 9986, 10116, 73337, 4932, 9940, 42254, 42254, 9358, 9755, 7918, 43179, 39432, 69293,
-                      1868482, 9305, 99883, 8128, 37347, 9103, 60711, 9315, 8364, 59729, 7955]
+    ensembl_taxids = [4932, 6239, 7227, 7719, 7757, 7897, 7918, 7955, 7994, 8049, 8083, 8090, 8128, 8364, 8479, 8839,
+                      9031, 9103, 9258, 9305, 9315, 9358, 9361, 9365, 9365, 9371, 9483, 9541, 9544, 9555, 9557, 9595,
+                      9598, 9598, 9601, 9606, 9615, 9646, 9669, 9685, 9739, 9739, 9755, 9785, 9796, 9813, 9823, 9913,
+                      9940, 9978, 9978, 9986, 10020, 10029, 10090, 10116, 10141, 10181, 13146, 13616, 13735, 28377,
+                      30538, 30608, 30611, 31033, 31033, 37347, 39432, 42254, 42254, 43179, 48698, 51511, 59463, 59729,
+                      59894, 60711, 61853, 69293, 73337, 79684, 99883, 132908, 1230840, 1868482]
 
     for doc in docs:
         if doc['taxid'] in ensembl_taxids:
