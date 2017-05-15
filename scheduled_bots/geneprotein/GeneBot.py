@@ -135,7 +135,7 @@ class Gene:
         if 'NCBI Locus tag' in self.external_ids:
             aliases.append(self.external_ids['NCBI Locus tag'])
         if 'alias' in self.record:
-            aliases.extend(self.record['alias'])
+            aliases.extend(self.record['alias']['@value'])
         aliases = set(aliases) - {self.label} - set(descriptions_by_type.keys())
         self.aliases = list(aliases)
 

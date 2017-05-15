@@ -131,6 +131,9 @@ def format_doc_eukaryotic(d):
     if 'alias' in d:
         d['alias'] = alwayslist(d['alias'])
 
+    if 'other_names' in d:
+        d['other_names'] = alwayslist(d['other_names'])
+
     if 'taxid' in d:
         d['taxid'] = int(d['taxid'])
 
@@ -198,6 +201,8 @@ def tag_mygene_docs(docs, metadata):
                   'refseq': 'entrez',
                   'uniprot': 'uniprot',
                   'homologene': 'entrez',
+                  'other_names': 'entrez',
+                  'alias': 'entrez'
                   }
     # todo: automate getting this list of ensembl taxids
     # http://uswest.ensembl.org/info/about/species.html

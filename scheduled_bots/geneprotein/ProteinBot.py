@@ -122,8 +122,8 @@ class Protein:
         aliases = [self.record['symbol']['@value']]
         if 'NCBI Locus tag' in self.external_ids:
             aliases.append(self.external_ids['NCBI Locus tag'])
-        if 'alias' in self.record:
-            aliases.extend(self.record['alias'])
+        if 'other_names' in self.record:
+            aliases.extend(self.record['other_names']['@value'])
         aliases = set(aliases) - {self.label} - set(descriptions_by_type.keys())
         self.aliases = list(aliases)
 
@@ -346,14 +346,13 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
 
     # only do certain records
     doc_filter = {'taxid': taxid, 'type_of_gene': 'protein-coding', 'uniprot': {'$exists': True}, 'entrezgene': {'$exists': True}}
-    docs = coll.find(doc_filter, no_cursor_timeout=True)
+    docs = coll.find(doc_filter).batch_size(20)
     total = docs.count()
     print("total number of records: {}".format(total))
     docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, fast_run=fast_run, write=write)
-    docs.close()
 
     # after the run is done, disconnect the logging handler
     # so that if we start another, it doesn't write twice
