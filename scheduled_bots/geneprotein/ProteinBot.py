@@ -285,6 +285,7 @@ class ProteinBot:
         self.gene_wdid_mapping = gene_wdid_mapping
 
     def run(self, records, total=None, fast_run=True, write=True):
+        records = self.filter(records)
         for record in tqdm(records, mininterval=2, total=total):
             entrez_gene = str(record['entrezgene']['@value'])
             if entrez_gene not in self.gene_wdid_mapping:
@@ -296,6 +297,18 @@ class ProteinBot:
             wditem = protein.create_item(fast_run=fast_run, write=write)
             if wditem is not None:
                 protein.make_gene_encodes(write=write)
+
+    def filter(self, records):
+        """
+        This is used to selectively skip certain records based on conditions within the record or to specifically
+        alter certain fields before sending to the Bot
+        """
+        # If we are processing zebrafish records, skip the record if it doesn't have a zfin ID
+        for record in records:
+            if record['taxid']['@value'] == 7955 and 'ZFIN' not in record:
+                continue
+            else:
+                yield record
 
 
 def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):

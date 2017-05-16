@@ -543,9 +543,23 @@ class GeneBot:
         self.organism_info = organism_info
 
     def run(self, records, total=None, fast_run=True, write=True):
+        records = self.filter(records)
         for record in tqdm(records, mininterval=2, total=total):
             gene = self.GENE_CLASS(record, self.organism_info, self.login)
             gene.create_item(fast_run=fast_run, write=write)
+
+    def filter(self, records):
+        """
+        This is used to selectively skip certain records based on conditions within the record or to specifically
+        alter certain fields before sending to the Bot
+        """
+        # If we are processing zebrafish records, skip the record if it doesn't have a zfin ID
+        for record in records:
+            if record['taxid']['@value'] == 7955 and 'ZFIN' not in record:
+                continue
+            else:
+                yield record
+
 
 
 class MammalianGeneBot(GeneBot):
@@ -556,6 +570,7 @@ class MammalianGeneBot(GeneBot):
         self.chr_num_wdid = chr_num_wdid
 
     def run(self, records, total=None, fast_run=True, write=True):
+        records = self.filter(records)
         for record in tqdm(records, mininterval=2, total=total):
             # print(record['entrezgene'])
             gene = self.GENE_CLASS(record, self.organism_info, self.chr_num_wdid, self.login)

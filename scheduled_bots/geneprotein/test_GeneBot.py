@@ -1,26 +1,22 @@
-# 9606
-chr_num_wdid = {'1': 'Q430258',
- '10': 'Q840737',
- '11': 'Q847096',
- '12': 'Q847102',
- '13': 'Q840734',
- '14': 'Q138955',
- '15': 'Q765245',
- '16': 'Q742870',
- '17': 'Q220677',
- '18': 'Q780468',
- '19': 'Q510786',
- '2': 'Q638893',
- '20': 'Q666752',
- '21': 'Q753218',
- '22': 'Q753805',
- '3': 'Q668633',
- '4': 'Q836605',
- '5': 'Q840741',
- '6': 'Q540857',
- '7': 'Q657319',
- '8': 'Q572848',
- '9': 'Q840604',
- 'MT': 'Q27973632',
- 'X': 'Q61333',
- 'Y': 'Q202771'}
+from .GeneBot import *
+
+
+def test_write_one_human_gene():
+    login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
+
+    coll = MongoClient().wikidata_src.mygene
+    metadata_coll = MongoClient().wikidata_src.mygene_sources
+    metadata = metadata_coll.find_one()
+    organism_info = organisms_info[9606]
+
+    doc_filter = {'taxid': 9606, 'entrezgene': {'$exists': True}, '_id': '1107'}
+    docs = coll.find(doc_filter).batch_size(20)
+    total = docs.count()
+    print("total number of records: {}".format(total))
+    docs = HelperBot.validate_docs(docs, 'eukaryotic', PROPS['Entrez Gene ID'])
+    records = HelperBot.tag_mygene_docs(docs, metadata)
+
+    cb = ChromosomeBot()
+    chr_num_wdid = cb.get_or_create(organism_info, login=login)
+    bot = HumanGeneBot(organism_info, chr_num_wdid, login)
+    bot.run(records, total=total, fast_run=False, write=False)
