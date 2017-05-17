@@ -395,27 +395,36 @@ class EukaryoticGene(Gene):
         Create genomic_pos start stop orientation on a chromosome
         :return:
         """
-        genomic_pos_value = self.record['genomic_pos']['@value'][0]
+        genomic_pos_values = self.record['genomic_pos']['@value']
         genomic_pos_source = self.record['genomic_pos']['@source']
         genomic_pos_id_prop = source_ref_id[genomic_pos_source['id']]
         genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop],
                                           self.external_ids[genomic_pos_id_prop], login=self.login)
 
-        # create qualifier for start/stop/orientation
-        chrom_wdid = self.chr_num_wdid[genomic_pos_value['chr']]
-        qualifiers = [wdi_core.WDItemID(chrom_wdid, PROPS['chromosome'], is_qualifier=True)]
+        all_chr = set([self.chr_num_wdid[x['chr']] for x in genomic_pos_values])
+        all_strand = set(['Q22809680' if x['strand'] == 1 else 'Q22809711' for x in genomic_pos_values])
 
         s = []
-        # strand orientation
-        strand_orientation = 'Q22809680' if genomic_pos_value['strand'] == 1 else 'Q22809711'
-        s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'], references=[genomic_pos_ref]))
-        # genomic start and end
-        s.append(wdi_core.WDString(str(int(genomic_pos_value['start'])), PROPS['genomic start'],
-                                   references=[genomic_pos_ref], qualifiers=qualifiers))
-        s.append(wdi_core.WDString(str(int(genomic_pos_value['end'])), PROPS['genomic end'],
-                                   references=[genomic_pos_ref], qualifiers=qualifiers))
-        # chromosome
-        s.append(wdi_core.WDItemID(chrom_wdid, PROPS['chromosome'], references=[genomic_pos_ref]))
+        print(genomic_pos_values)
+        for genomic_pos_value in genomic_pos_values:
+            # create qualifier for start/stop/orientation
+            chrom_wdid = self.chr_num_wdid[genomic_pos_value['chr']]
+            qualifiers = [wdi_core.WDItemID(chrom_wdid, PROPS['chromosome'], is_qualifier=True)]
+
+            # genomic start and end
+            s.append(wdi_core.WDString(str(int(genomic_pos_value['start'])), PROPS['genomic start'],
+                                       references=[genomic_pos_ref], qualifiers=qualifiers))
+            s.append(wdi_core.WDString(str(int(genomic_pos_value['end'])), PROPS['genomic end'],
+                                       references=[genomic_pos_ref], qualifiers=qualifiers))
+
+        for chr in all_chr:
+            s.append(wdi_core.WDItemID(chr, PROPS['chromosome'], references=[genomic_pos_ref]))
+
+        if len(all_strand) == 1:
+            # todo: not sure what to do if you have both orientations on the same chr
+            strand_orientation = list(all_strand)[0]
+            s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'], references=[genomic_pos_ref]))
+
 
         return s
 
@@ -482,7 +491,7 @@ class HumanGene(EukaryoticGene):
 
         # remove those where we don't know the chromosome
         genomic_pos_values = [x for x in genomic_pos_values if x['chr'] in self.chr_num_wdid]
-        print(len(genomic_pos_values))
+        #print(len(genomic_pos_values))
 
         all_chr = set([self.chr_num_wdid[x['chr']] for x in genomic_pos_values])
         all_strand = set(['Q22809680' if x['strand'] == 1 else 'Q22809711' for x in genomic_pos_values])
@@ -528,7 +537,7 @@ class HumanGene(EukaryoticGene):
             s.append(wdi_core.WDItemID(chrom_wdid, PROPS['chromosome'],
                                        references=[genomic_pos_ref], qualifiers=[assembly_hg38]))
 
-        print(s)
+        #print(s)
         return s
 
 
@@ -585,7 +594,7 @@ class MicrobeGeneBot(GeneBot):
     GENE_CLASS = MicrobeGene
 
 
-def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
+def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, doc_filter=None):
     """
     Main function for creating/updating genes
 
@@ -601,6 +610,8 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     :type fast_run: bool
     :param write: actually perform write
     :type write: bool
+    :param doc_filter: Override the doc_filter for determining which docs to write. Useful for testing
+    :type doc_filter: dict
     :return: None
     """
 
@@ -613,8 +624,14 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
 
     # login
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
-    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, logger_name='WD_logger', log_name=log_name,
-                                        header=json.dumps(__metadata__))
+    if wdi_core.WDItemEngine.logger is not None:
+        wdi_core.WDItemEngine.logger.handles = []
+        wdi_core.WDItemEngine.logger.handlers = []
+
+    run_id = run_id if run_id is not None else datetime.now().strftime('%Y%m%d_%H:%M')
+    log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
+    __metadata__['taxid'] = taxid
+    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, logger_name='WD_logger', log_name=log_name, header=json.dumps(__metadata__))
 
     # get organism metadata (name, organism type, wdid)
     if taxid in organisms_info and organisms_info[taxid]['type'] != "microbial":
@@ -636,7 +653,7 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
         validate_type = "microbial"
 
     # only do certain records
-    doc_filter = {'taxid': taxid, 'entrezgene': {'$exists': True}}
+    doc_filter = doc_filter if doc_filter is not None else {'taxid': taxid, 'entrezgene': {'$exists': True}}
     docs = coll.find(doc_filter).batch_size(20)
     total = docs.count()
     print("total number of records: {}".format(total))
@@ -644,11 +661,6 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, fast_run=fast_run, write=write)
-
-    # after the run is done, disconnect the logging handler
-    # so that if we start another, it doesn't write twice
-    if wdi_core.WDItemEngine.logger is not None:
-        wdi_core.WDItemEngine.logger.handles = []
 
 
 if __name__ == "__main__":
@@ -680,18 +692,12 @@ if __name__ == "__main__":
     assert metadata_coll.count() == 1
     metadata = metadata_coll.find_one()
 
-    log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
-    if wdi_core.WDItemEngine.logger is not None:
-        wdi_core.WDItemEngine.logger.handles = []
-    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
-                                        logger_name='gene{}'.format(taxon))
-
     if "microbe" in taxon:
         microbe_taxa = get_all_taxa()
         taxon = taxon.replace("microbe", ','.join(map(str, microbe_taxa)))
 
     for taxon1 in taxon.split(","):
-        main(coll, taxon1, metadata, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
+        main(coll, taxon1, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
         # done with this run, clear fast run container to save on RAM
         wdi_core.WDItemEngine.fast_run_store = []
         wdi_core.WDItemEngine.fast_run_container = None
