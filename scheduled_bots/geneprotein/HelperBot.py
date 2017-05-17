@@ -51,7 +51,10 @@ def validate_doc_microbial(d):
     :param d:
     :return:
     """
-    assert 'genomic_pos' in d and isinstance(d['genomic_pos'], dict), 'genomic_pos'
+    assert "genomic_pos" in d
+    d['genomic_pos'] = alwayslist(d['genomic_pos'])
+    assert len(d['genomic_pos']) == 1
+    assert isinstance(d['genomic_pos'][0], dict), 'genomic_pos'
     assert "entrezgene" in d, "{} not in record".format("entrezgene")
     assert "locus_tag" in d, "{} not in record".format("locus_tag")
     assert "type_of_gene" in d, "{} not in record".format("type_of_gene")
@@ -85,23 +88,9 @@ def validate_doc_eukaryotic(d):
         if field in d:
             assert isinstance(d[field], field_type), "incorrect type: {}".format(field)
 
-    # if there is a genomic position, assert there is only one
-    if 'genomic_pos' in d:
-        assert isinstance(d['genomic_pos'], dict), 'genomic_pos is {} expecting dict'.format(type(d['genomic_pos']))
-    if 'genomic_pos_hg19' in d:
-        assert isinstance(d['genomic_pos_hg19'], dict), 'genomic_pos_hg19 {} expecting dict'.format(
-            type(d['genomic_pos_hg19']))
-
-    # if the key is in doc, the values are required
-    optional_required = {'genomic_pos': {'start', 'end', 'chr', 'strand'},
-                         'genomic_pos_hg19': {'start', 'end', 'chr', 'strand'}}
-    for key, value in optional_required.items():
-        if key in d:
-            assert isinstance(d[key], dict)
-            for sub_key in optional_required[key]:
-                assert sub_key in d[key], "{} not in {}".format(sub_key, key)
-
     # make sure these fields are not lists
+    if 'ensembl' in d:
+        assert isinstance(d['ensembl'], dict)
     if 'ensembl' in d and 'gene' in d['ensembl']:
         assert isinstance(d['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
     if 'uniprot' in d and 'Swiss-Prot' in d['uniprot']:
@@ -137,19 +126,24 @@ def format_doc_eukaryotic(d):
     if 'taxid' in d:
         d['taxid'] = int(d['taxid'])
 
+    if 'genomic_pos' in d:
+        d['genomic_pos'] = alwayslist(d['genomic_pos'])
+        for genomic_pos in d['genomic_pos']:
+            if 'chr' in genomic_pos:
+                genomic_pos['chr'] = genomic_pos['chr'].replace("chr", "").replace("Chr", "").replace("CHR", "")
+
+    if 'genomic_pos_hg19' in d:
+        d['genomic_pos_hg19'] = alwayslist(d['genomic_pos_hg19'])
+        for genomic_pos in d['genomic_pos_hg19']:
+            if 'chr' in genomic_pos:
+                genomic_pos['chr'] = genomic_pos['chr'].replace("chr", "").replace("Chr", "").replace("CHR", "")
+
     # remove version numbers (these are always lists, see above)
     remove_version = lambda ss: [s.rsplit(".")[0] if "." in s else s for s in ss]
     if 'refseq' in d and 'rna' in d['refseq']:
         d['refseq']['rna'] = remove_version(d['refseq']['rna'])
     if 'refseq' in d and 'protein' in d['refseq']:
         d['refseq']['protein'] = remove_version(d['refseq']['protein'])
-
-    # remove chr
-    if ('genomic_pos' in d) and ('chr' in d['genomic_pos']):
-        d['genomic_pos']['chr'] = d['genomic_pos']['chr'].replace("chr", "").replace("Chr", "").replace("CHR", "")
-    if ('genomic_pos_hg19' in d) and ('chr' in d['genomic_pos_hg19']):
-        d['genomic_pos_hg19']['chr'] = d['genomic_pos_hg19']['chr'].replace("chr", "").replace("Chr", "").replace("CHR",
-                                                                                                                  "")
 
     return d
 

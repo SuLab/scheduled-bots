@@ -340,7 +340,7 @@ class MicrobeGene(Gene):
         Create genomic_pos start stop orientation no chromosome
         :return:
         """
-        genomic_pos_value = self.record['genomic_pos']['@value']
+        genomic_pos_value = self.record['genomic_pos']['@value'][0]
         genomic_pos_source = self.record['genomic_pos']['@source']
         genomic_pos_id_prop = source_ref_id[genomic_pos_source['id']]
         genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop],
@@ -395,7 +395,7 @@ class EukaryoticGene(Gene):
         Create genomic_pos start stop orientation on a chromosome
         :return:
         """
-        genomic_pos_value = self.record['genomic_pos']['@value']
+        genomic_pos_value = self.record['genomic_pos']['@value'][0]
         genomic_pos_source = self.record['genomic_pos']['@source']
         genomic_pos_id_prop = source_ref_id[genomic_pos_source['id']]
         genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop],
@@ -456,21 +456,17 @@ class HumanGene(EukaryoticGene):
         https://www.wikidata.org/wiki/Q20970159
         :return:
         """
-        genomic_pos_value = self.record['genomic_pos']['@value']
-        if genomic_pos_value['chr'] not in self.chr_num_wdid:
-            return []
+        genomic_pos_values = self.record['genomic_pos']['@value']
         genomic_pos_source = self.record['genomic_pos']['@source']
         genomic_pos_id_prop = source_ref_id[genomic_pos_source['id']]
         genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop],
                                           self.external_ids[genomic_pos_id_prop], login=self.login)
-        assembly = wdi_core.WDItemID("Q20966585", PROPS['genomic assembly'], is_qualifier=True)
+        assembly_hg38 = wdi_core.WDItemID("Q20966585", PROPS['genomic assembly'], is_qualifier=True)
 
-        # create qualifier for start/stop
-        chrom_wdid = self.chr_num_wdid[genomic_pos_value['chr']]
-        qualifiers = [wdi_core.WDItemID(chrom_wdid, PROPS['chromosome'], is_qualifier=True), assembly]
+        for x in genomic_pos_values:
+            x['assembly'] = 'hg38'
 
-        strand_orientation = 'Q22809680' if genomic_pos_value['strand'] == 1 else 'Q22809711'
-
+        do_hg19 = False
         if 'genomic_pos_hg19' in self.record:
             do_hg19 = True
             genomic_pos_value_hg19 = self.record['genomic_pos_hg19']['@value']
@@ -479,56 +475,60 @@ class HumanGene(EukaryoticGene):
             genomic_pos_ref_hg19 = make_ref_source(genomic_pos_source_hg19, PROPS[genomic_pos_id_prop_hg19],
                                                    self.external_ids[genomic_pos_id_prop_hg19], login=self.login)
             assembly_hg19 = wdi_core.WDItemID("Q21067546", PROPS['genomic assembly'], is_qualifier=True)
-            chrom_wdid_hg19 = self.chr_num_wdid[genomic_pos_value_hg19['chr']]
-            qualifiers_hg19 = [wdi_core.WDItemID(chrom_wdid_hg19, PROPS['chromosome'], is_qualifier=True),
-                               assembly_hg19]
-            strand_orientation_hg19 = 'Q22809680' if genomic_pos_value_hg19['strand'] == 1 else 'Q22809711'
-        else:
-            do_hg19 = False
-            strand_orientation_hg19 = None
-            assembly_hg19 = None
-            genomic_pos_ref_hg19 = None
-            genomic_pos_value_hg19 = None
-            qualifiers_hg19 = None
-            chrom_wdid_hg19 = None
+            # combine all together
+            for x in genomic_pos_value_hg19:
+                x['assembly'] = 'hg19'
+            genomic_pos_values.extend(genomic_pos_value_hg19)
+
+        # remove those where we don't know the chromosome
+        genomic_pos_values = [x for x in genomic_pos_values if x['chr'] in self.chr_num_wdid]
+        print(len(genomic_pos_values))
+
+        all_chr = set([self.chr_num_wdid[x['chr']] for x in genomic_pos_values])
+        all_strand = set(['Q22809680' if x['strand'] == 1 else 'Q22809711' for x in genomic_pos_values])
 
         s = []
+        for genomic_pos_value in genomic_pos_values:
 
-        # strand orientation
-        # if the same for both assemblies, only put one statement
-        if do_hg19 and strand_orientation == strand_orientation_hg19:
-            s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'],
-                                       references=[genomic_pos_ref], qualifiers=[assembly, assembly_hg19]))
-        else:
-            s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'],
-                                       references=[genomic_pos_ref], qualifiers=[assembly]))
-            if do_hg19:
-                s.append(wdi_core.WDItemID(strand_orientation_hg19, PROPS['strand orientation'],
-                                           references=[genomic_pos_ref_hg19], qualifiers=[assembly_hg19]))
+            # create qualifiers (chromosome and assembly)
+            chrom_wdid = self.chr_num_wdid[genomic_pos_value['chr']]
+            qualifiers = [wdi_core.WDItemID(chrom_wdid, PROPS['chromosome'], is_qualifier=True)]
+            if genomic_pos_value['assembly'] == 'hg38':
+                qualifiers.append(assembly_hg38)
+                ref = genomic_pos_ref
+            elif genomic_pos_value['assembly'] == 'hg19':
+                qualifiers.append(assembly_hg19)
+                ref = genomic_pos_ref_hg19
 
-        # genomic start and end for both assemblies
-        s.append(wdi_core.WDString(str(int(genomic_pos_value['start'])), PROPS['genomic start'],
-                                   references=[genomic_pos_ref], qualifiers=qualifiers))
-        s.append(wdi_core.WDString(str(int(genomic_pos_value['end'])), PROPS['genomic end'],
-                                   references=[genomic_pos_ref], qualifiers=qualifiers))
-        if do_hg19:
-            s.append(wdi_core.WDString(str(int(genomic_pos_value_hg19['start'])), PROPS['genomic start'],
-                                       references=[genomic_pos_ref_hg19], qualifiers=qualifiers_hg19))
-            s.append(wdi_core.WDString(str(int(genomic_pos_value_hg19['end'])), PROPS['genomic end'],
-                                       references=[genomic_pos_ref_hg19], qualifiers=qualifiers_hg19))
+            # genomic start and end
+            s.append(wdi_core.WDString(str(int(genomic_pos_value['start'])), PROPS['genomic start'],
+                                       references=[ref], qualifiers=qualifiers))
+            s.append(wdi_core.WDString(str(int(genomic_pos_value['end'])), PROPS['genomic end'],
+                                       references=[ref], qualifiers=qualifiers))
+
+        # strand orientations
+        # if the same for all, only put one statement
+        if len(all_strand) == 1 and do_hg19:
+            strand_orientation = list(all_strand)[0]
+            s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'],
+                                       references=[genomic_pos_ref], qualifiers=[assembly_hg38, assembly_hg19]))
+        elif len(all_strand) == 1 and not do_hg19:
+            strand_orientation = list(all_strand)[0]
+            s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'],
+                                       references=[genomic_pos_ref], qualifiers=[assembly_hg38]))
 
         # chromosome
-        # if the same for both assemblies, only put one statement
-        if do_hg19 and chrom_wdid == chrom_wdid_hg19:
+        # if the same for all, only put one statement
+        if do_hg19 and len(all_chr) == 1:
+            chrom_wdid = list(all_chr)[0]
             s.append(wdi_core.WDItemID(chrom_wdid, PROPS['chromosome'],
-                                       references=[genomic_pos_ref], qualifiers=[assembly, assembly_hg19]))
-        else:
+                                       references=[genomic_pos_ref], qualifiers=[assembly_hg38, assembly_hg19]))
+        elif len(all_chr) == 1 and not do_hg19:
+            chrom_wdid = list(all_chr)[0]
             s.append(wdi_core.WDItemID(chrom_wdid, PROPS['chromosome'],
-                                       references=[genomic_pos_ref], qualifiers=[assembly]))
-            if do_hg19:
-                s.append(wdi_core.WDItemID(chrom_wdid_hg19, PROPS['chromosome'],
-                                           references=[genomic_pos_ref_hg19], qualifiers=[assembly_hg19]))
+                                       references=[genomic_pos_ref], qualifiers=[assembly_hg38]))
 
+        print(s)
         return s
 
 
