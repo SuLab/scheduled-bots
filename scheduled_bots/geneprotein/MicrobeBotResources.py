@@ -21,24 +21,19 @@ def get_microbe_taxids(force_download=False):
     and generate a pd.DataFrame of relevant data for strain items based on taxids of the bacterial reference genomes.
     :return: pandas dataframe of bacteria reference genome data
     """
-    columns = ['assembly_accession', 'bioproject', 'biosample', 'wgs_master', 'refseq_category', 'taxid',
-               'species_taxid', 'organism_name', 'infraspecific_name', 'isolate', 'version_status', 'assembly_level',
-               'release_type', 'genome_rep', 'seq_rel_date', 'asm_name', 'submitter', 'gbrs_paired_asm',
-               'paired_asm_comp', 'ftp_path', 'excluded_from_refseq']
-
     if force_download or not os.path.exists("reference_genomes.csv"):
         assembly = urllib.request.urlretrieve("ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt")
-        df = pd.read_csv(assembly[0], sep="\t", dtype=object, skiprows=2, names=columns)
+        df = pd.read_csv(assembly[0], sep="\t", dtype=object, skiprows=1, header=0)
         df = df[df['refseq_category'].isin(['reference genome', 'representative genome'])]
 
         all_tax_wdid = id_mapper('P685')
 
         df['wdid'] = df['taxid'].apply(lambda x: all_tax_wdid.get(x, None))
+        df = df.rename(columns={'# assembly_accession': 'assembly_accession'})
         df.to_csv('reference_genomes.csv', sep="\t")
         df.taxid = df.taxid.astype(int)
         return df
     else:  # use predownloaded and parsed flatfile
-        columns.append('wdid')
         df = pd.read_csv("reference_genomes.csv", sep="\t", dtype=object, index_col=0)
         df.taxid = df.taxid.astype(int)
         return df
