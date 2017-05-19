@@ -13,7 +13,9 @@ import argparse
 import os
 from collections import Counter
 import itertools
+
 import requests
+
 try:
     from scheduled_bots.local import WDUSER, WDPASS
 except ImportError:
@@ -28,7 +30,7 @@ from pymongo import MongoClient
 from scheduled_bots.utils import login_to_wikidata
 
 
-# todo: add microbial (checked may 2017 there are only 9 deprecated microbial)
+# todo: add microbial (checked may 2017 there were only 9 deprecated microbial)
 # from scheduled_bots.geneprotein.MicrobeBotResources import get_ref_microbe_taxids
 # df = get_ref_microbe_taxids()
 # ref_taxids = list(map(str, df['taxid'].tolist()))
@@ -37,7 +39,7 @@ from scheduled_bots.utils import login_to_wikidata
 def get_deprecated_genes(taxids=None):
     if taxids is None:
         taxids = ['3702', '559292', '123', '10090', '9606', '10116', '243161', '10116', '7227', '6239', '7955',
-              '515635', '765698', '525903', '759362', '565050', '446465', '9545', '9913']
+                  '515635', '765698', '525903', '759362', '565050', '446465', '9545', '9913']
     taxid_str = '{' + " ".join(['"' + x + '"' for x in taxids]) + '}'
 
     # get all genes that DONT Have any sitelinks and dont have any item links to them
@@ -53,7 +55,8 @@ def get_deprecated_genes(taxids=None):
     }""".replace("{taxid}", taxid_str)
     bindings = wdi_core.WDItemEngine.execute_sparql_query(s)['results']['bindings']
     entrez_qid = {x['entrez']['value']: x['item']['value'].rsplit("/")[-1] for x in bindings}
-    gene_protein = {x['item']['value'].rsplit("/")[-1]: x['prot']['value'].rsplit("/")[-1] for x in bindings if 'prot' in x}
+    gene_protein = {x['item']['value'].rsplit("/")[-1]: x['prot']['value'].rsplit("/")[-1] for x in bindings if
+                    'prot' in x}
 
     print("{} wikidata".format(len(entrez_qid)))
     wd = set(entrez_qid.keys())
@@ -68,7 +71,7 @@ def get_deprecated_genes(taxids=None):
     # a thousand something deprecated genes
     protein_qids = {gene_protein[x] for x in qids if x in gene_protein}
     print("Check these protein items: {}".format(protein_qids))
-    #qids.update(protein_qids)
+    # qids.update(protein_qids)
     return qids
 
 
@@ -114,13 +117,20 @@ def get_count_by_species(missing):
 
 
 if __name__ == "__main__":
-    title = "Delete deprecated genes"
-    reason = "These genes are deprecated by NCBI"
-    from scheduled_bots.geneprotein.MicrobeBotResources import get_ref_microbe_taxids
-    df = get_ref_microbe_taxids()
-    ref_taxids = list(map(str, df['taxid'].tolist()))
-    qids = get_deprecated_genes(taxids=ref_taxids)
+    parser = argparse.ArgumentParser(description='run wikidata gene bot')
+    parser.add_argument('--title', help='deletion request title', type=str, default="Delete deprecated genes")
+    parser.add_argument('--reason', help='deletion request reason', type=str,
+                        default="These genes are deprecated by NCBI")
+    parser.add_argument('--force', help='force run if deleting a large number of genes', action='store_true')
+    args = parser.parse_args()
+
+    qids = get_deprecated_genes()
+    if len(qids) > 200 and not args.force:
+        raise ValueError("Trying to delete {} genes. If you really want to do this, re run with --force".format(len(qids)))
     if len(qids) > 0:
-        s = make_deletion_templates(qids, title, reason)
+        s = make_deletion_templates(qids, args.title, args.reason)
         create_rfd(s)
+        log_path = "deletion_log.txt"
+        with open(log_path, 'w') as f:
+            f.write("\n".join(qids))
 
