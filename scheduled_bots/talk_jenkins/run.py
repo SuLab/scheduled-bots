@@ -39,9 +39,14 @@ for job in jobs:
         # this job has never been run
         continue
 
-    last_build_success = "Success" if job_info['color'] == 'blue' else "Failed"
     last_build = job_info['lastBuild']['number']
     build_info = server.get_build_info(job_name, last_build)
+
+    if build_info['building']:
+        # this job is currently running
+        # use the 'lastCompletedBuild'
+        last_build = job_info['lastCompletedBuild']['number']
+        build_info = server.get_build_info(job_name, last_build)
 
     """
     # add optional metadata
@@ -61,6 +66,7 @@ for job in jobs:
                 elif param['name'] == "CODE_URL":
                     code_url = param['value']
 
+    last_build_success = build_info['result']
     timestamp_int = build_info['timestamp']
     timestamp = datetime.fromtimestamp(int(timestamp_int) / 1000).strftime('%Y-%m-%d %H:%M:%S')
     log_path = (HOST + "/job/{job_name}/{job_num}/artifact/".format(job_name=job_name, job_num=last_build)
