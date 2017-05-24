@@ -32,12 +32,13 @@ from datetime import datetime
 from pymongo import MongoClient
 from tqdm import tqdm
 import sys
+
 sys.path.insert(0, '/home/gstupp/projects/WikidataIntegrator')
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 
 from scheduled_bots.geneprotein import HelperBot, organisms_info, type_of_gene_map, descriptions_by_type
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
-from scheduled_bots.geneprotein.HelperBot import make_ref_source
+from scheduled_bots.geneprotein.HelperBot import make_ref_source, alwayslist
 from scheduled_bots.geneprotein.MicrobeBotResources import get_organism_info, get_all_taxa
 
 try:
@@ -71,6 +72,7 @@ PROPS = {'found in taxon': 'P703',
          'FlyBase Gene ID': 'P3852',
          'ZFIN Gene ID': 'P3870',
          'Rat Genome Database ID': 'P3853',
+         'encodes': 'P688'
          }
 
 __metadata__ = {'name': 'GeneBot',
@@ -114,6 +116,7 @@ class Gene:
         self.organism_info = organism_info
         self.login = login
 
+        self.wd_item_gene = None
         self.statements = None
 
     def create_description(self):
@@ -233,7 +236,8 @@ class Gene:
         entrez_ref = make_ref_source(self.record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
                                      self.external_ids['Entrez Gene ID'], login=self.login)
 
-        s.append(wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref]))
+        s.append(
+            wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], references=[entrez_ref]))
 
         # optional ID statements
         ensembl_ref = None
@@ -289,13 +293,14 @@ class Gene:
 
             fast_run_base_filter = {PROPS['Entrez Gene ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
 
-            wd_item_gene = wdi_core.WDItemEngine(item_name=self.label, domain='genes', data=self.statements,
-                                                 append_value=[PROPS['instance of']],
-                                                 fast_run=fast_run,
-                                                 fast_run_base_filter=fast_run_base_filter)
+            self.wd_item_gene = wdi_core.WDItemEngine(item_name=self.label, domain='genes', data=self.statements,
+                                                      append_value=[PROPS['instance of']],
+                                                      fast_run=fast_run,
+                                                      fast_run_base_filter=fast_run_base_filter)
 
-            wd_item_gene = self.set_label_desc_aliases(wd_item_gene)
-            wdi_helpers.try_write(wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], self.login, write=write)
+            self.wd_item_gene = self.set_label_desc_aliases(self.wd_item_gene)
+            wdi_helpers.try_write(self.wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
+                                  self.login, write=write)
 
         except Exception as e:
             exc_info = sys.exc_info()
@@ -303,6 +308,132 @@ class Gene:
             msg = wdi_helpers.format_msg(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], None,
                                          str(e), msg_type=type(e))
             wdi_core.WDItemEngine.log("ERROR", msg)
+
+    def get_existing_fastrun(self):
+        """
+        Get the current, existing values for this item from wikidata. Use the fastrun container
+        Only get the props below (check_props)
+        """
+        assert len(wdi_core.WDItemEngine.fast_run_store) == 1, "fast_run_store len"
+        frs = wdi_core.WDItemEngine.fast_run_store[0]
+        check_props = ['NCBI Locus tag', 'Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID',
+                       'MGI Gene Symbol', 'HomoloGene ID', 'Rat Genome Database ID', 'FlyBase Gene ID',
+                       'Wormbase Gene ID', 'ZFIN Gene ID', 'Ensembl Gene ID', 'Ensembl Transcript ID',
+                       'RefSeq RNA ID', 'strand orientation', 'chromosome', 'genomic start', 'genomic end',
+                       'encodes', 'HGNC ID', 'HGNC Gene Symbol']
+        for prop in check_props:
+            frs.check_data([wdi_core.WDString("fake value", PROPS[prop])])
+
+        check_props_p = {PROPS[prop] for prop in check_props}
+        qid = self.wd_item_gene.wd_item_id
+        if qid not in frs.prop_data:
+            print("qid: {} not found in fastrun container".format(qid))
+            return {}
+        existing = {prop: set([x['v'] for x in frs.prop_data[qid][prop]]) for prop in check_props_p if
+                    prop in frs.prop_data[qid]}
+
+        return existing
+
+    def get_existing(self, qid):
+        """
+        Get the current, existing values for this item from wikidata. Uses an api call
+        """
+        existing = dict()
+        wd_item = wdi_core.WDItemEngine(wd_item_id=qid)
+        claims = wd_item.wd_json_representation['claims']
+        for key, values in claims.items():
+            existing[key] = list(set([x['mainsnak']['datavalue']['value'] for x in values if
+                                      x['mainsnak']['datatype'] in {'external-id', 'string'}]))
+        for prop in {'strand orientation', 'chromosome', 'encodes'}:
+            if PROPS[prop] in claims:
+                existing[prop] = list(set([x['mainsnak']['datavalue']['value']['id'] for x in claims[PROPS[prop]] if
+                                           x['mainsnak']['datatype'] == 'wikibase-item']))
+
+        existing = {k: alwayslist(v) for k, v in existing.items() if v}
+        return existing
+
+    def remove_deprecated_statements(self):
+        """
+        Look through the all external ids, genomic start, genomic end, strand orientation, chromosome, and encodes
+        If this information is no longer in the mygene doc, but is on the item, remove it
+        """
+        # https://www.wikidata.org/wiki/Q17915124
+        # https://mygene.info/v3/gene/1878
+        qid = None
+        if self.wd_item_gene and self.wd_item_gene.wd_item_id and self.wd_item_gene.fast_run and not self.wd_item_gene.create_new_item:
+            existing = self.get_existing_fastrun()
+        elif self.wd_item_gene and self.wd_item_gene.wd_item_id:
+            existing = self.get_existing(self.wd_item_gene.wd_item_id)
+        else:
+            # wd_item_gene creation failed, possibly because of external ID conflicts, so
+            # try getting the qid just from the entrez id
+            self.parse_external_ids()
+            if 'Entrez Gene ID' not in self.external_ids:
+                msg = wdi_helpers.format_msg(None, None, None, str(self.record), None)
+                wdi_core.WDItemEngine.log("ERROR", msg)
+                return None
+            entrez = self.external_ids['Entrez Gene ID']
+            try:
+                qid = wdi_helpers.prop2qid(PROPS['Entrez Gene ID'], entrez)
+            except ValueError as e:
+                exc_info = sys.exc_info()
+                traceback.print_exception(*exc_info)
+                msg = wdi_helpers.format_msg(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], None,
+                                             str(e), msg_type=type(e))
+                wdi_core.WDItemEngine.log("ERROR", msg)
+                print(msg)
+                return None
+            if not qid:
+                msg = wdi_helpers.format_msg(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], None, "multiple qids", None)
+                wdi_core.WDItemEngine.log("ERROR", msg)
+                print(msg)
+                return None
+            existing = self.get_existing(qid)
+
+        self.parse_external_ids()
+        external_ids = self.external_ids
+
+        ss = []
+        for key in ['NCBI Locus tag', 'Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID',
+                    'MGI Gene Symbol', 'HomoloGene ID', 'Rat Genome Database ID', 'FlyBase Gene ID',
+                    'Wormbase Gene ID', 'ZFIN Gene ID', 'Ensembl Gene ID', 'Ensembl Transcript ID',
+                    'RefSeq RNA ID', 'HGNC ID', 'HGNC Gene Symbol']:
+            if key not in external_ids and PROPS[key] in existing:
+                for _id in existing[PROPS[key]]:
+                    s = wdi_core.WDString(_id, PROPS[key])
+                    setattr(s, 'remove', '')
+                    ss.append(s)
+
+        # remove genomic position statements if they don't exist in mygene
+        record = self.record
+        if 'genomic_pos' not in record and 'genomic_pos_hg19' not in record:
+            for prop in {'strand orientation', 'chromosome'}:
+                # but do exist in wd
+                if PROPS[prop] in existing:
+                    for _id in existing[PROPS[prop]]:
+                        s = wdi_core.WDItemID(_id, PROPS[prop])
+                        setattr(s, 'remove', '')
+                        ss.append(s)
+            for prop in {'genomic start', 'genomic end'}:
+                if PROPS[prop] in existing:
+                    for _id in existing[PROPS[prop]]:
+                        s = wdi_core.WDString(_id, PROPS[prop])
+                        setattr(s, 'remove', '')
+                        ss.append(s)
+
+        # remove encodes if no encodes..
+        if 'uniprot' not in record and PROPS['encodes'] in existing:
+            for _id in existing[PROPS['encodes']]:
+                print("Removing encodes from {}: Check this item: {}".format(self.wd_item_gene.wd_item_id, _id))
+                s = wdi_core.WDItemID(_id, 'P688')
+                setattr(s, 'remove', '')
+                ss.append(s)
+
+        if ss:
+            qid = qid if qid else self.wd_item_gene.wd_item_id
+            wd_item = wdi_core.WDItemEngine(wd_item_id=qid, domain='genes', data=ss, fast_run=False)
+            wdi_helpers.try_write(wd_item, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
+                                  self.login, edit_summary="remove deprecated statements")
 
 
 class MicrobeGene(Gene):
@@ -369,6 +500,7 @@ class EukaryoticGene(Gene):
     """
     yeast, mouse, rat, worm, fly, zebrafish
     """
+
     def __init__(self, record, organism_info, chr_num_wdid, login):
         """
         :param chr_num_wdid: mapping of chr number (str) to wdid
@@ -424,7 +556,6 @@ class EukaryoticGene(Gene):
             # todo: not sure what to do if you have both orientations on the same chr
             strand_orientation = list(all_strand)[0]
             s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'], references=[genomic_pos_ref]))
-
 
         return s
 
@@ -491,7 +622,7 @@ class HumanGene(EukaryoticGene):
 
         # remove those where we don't know the chromosome
         genomic_pos_values = [x for x in genomic_pos_values if x['chr'] in self.chr_num_wdid]
-        #print(len(genomic_pos_values))
+        # print(len(genomic_pos_values))
 
         all_chr = set([self.chr_num_wdid[x['chr']] for x in genomic_pos_values])
         all_strand = set(['Q22809680' if x['strand'] == 1 else 'Q22809711' for x in genomic_pos_values])
@@ -537,7 +668,7 @@ class HumanGene(EukaryoticGene):
             s.append(wdi_core.WDItemID(chrom_wdid, PROPS['chromosome'],
                                        references=[genomic_pos_ref], qualifiers=[assembly_hg38]))
 
-        #print(s)
+        # print(s)
         return s
 
 
@@ -556,6 +687,7 @@ class GeneBot:
         for record in tqdm(records, mininterval=2, total=total):
             gene = self.GENE_CLASS(record, self.organism_info, self.login)
             gene.create_item(fast_run=fast_run, write=write)
+            gene.remove_deprecated_statements()
 
     def filter(self, records):
         """
@@ -568,7 +700,6 @@ class GeneBot:
                 continue
             else:
                 yield record
-
 
 
 class MammalianGeneBot(GeneBot):
@@ -584,6 +715,7 @@ class MammalianGeneBot(GeneBot):
             # print(record['entrezgene'])
             gene = self.GENE_CLASS(record, self.organism_info, self.chr_num_wdid, self.login)
             gene.create_item(fast_run=fast_run, write=write)
+            gene.remove_deprecated_statements()
 
 
 class HumanGeneBot(MammalianGeneBot):
@@ -631,7 +763,8 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
     run_id = run_id if run_id is not None else datetime.now().strftime('%Y%m%d_%H:%M')
     log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
     __metadata__['taxid'] = taxid
-    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, logger_name='WD_logger', log_name=log_name, header=json.dumps(__metadata__))
+    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, logger_name='WD_logger', log_name=log_name,
+                                        header=json.dumps(__metadata__))
 
     # get organism metadata (name, organism type, wdid)
     if taxid in organisms_info and organisms_info[taxid]['type'] != "microbial":
