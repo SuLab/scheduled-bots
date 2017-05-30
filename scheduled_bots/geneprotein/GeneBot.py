@@ -291,12 +291,12 @@ class Gene:
             self.create_description()
             self.create_aliases()
 
-            fast_run_base_filter = {PROPS['Entrez Gene ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
+            self.fast_run_base_filter = {PROPS['Entrez Gene ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
 
             self.wd_item_gene = wdi_core.WDItemEngine(item_name=self.label, domain='genes', data=self.statements,
                                                       append_value=[PROPS['instance of']],
                                                       fast_run=fast_run,
-                                                      fast_run_base_filter=fast_run_base_filter)
+                                                      fast_run_base_filter=self.fast_run_base_filter)
 
             self.wd_item_gene = self.set_label_desc_aliases(self.wd_item_gene)
             wdi_helpers.try_write(self.wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
@@ -314,8 +314,9 @@ class Gene:
         Get the current, existing values for this item from wikidata. Use the fastrun container
         Only get the props below (check_props)
         """
-        assert len(wdi_core.WDItemEngine.fast_run_store) == 1, "fast_run_store len"
-        frs = wdi_core.WDItemEngine.fast_run_store[0]
+        frs = [c for c in wdi_core.WDItemEngine.fast_run_store if c.base_filter == self.fast_run_base_filter]
+        assert len(frs) == 1, "fast run store not found"
+        frs = frs[0]
         check_props = ['NCBI Locus tag', 'Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID',
                        'MGI Gene Symbol', 'HomoloGene ID', 'Rat Genome Database ID', 'FlyBase Gene ID',
                        'Wormbase Gene ID', 'ZFIN Gene ID', 'Ensembl Gene ID', 'Ensembl Transcript ID',
@@ -537,7 +538,6 @@ class EukaryoticGene(Gene):
         all_strand = set(['Q22809680' if x['strand'] == 1 else 'Q22809711' for x in genomic_pos_values])
 
         s = []
-        print(genomic_pos_values)
         for genomic_pos_value in genomic_pos_values:
             # create qualifier for start/stop/orientation
             chrom_wdid = self.chr_num_wdid[genomic_pos_value['chr']]

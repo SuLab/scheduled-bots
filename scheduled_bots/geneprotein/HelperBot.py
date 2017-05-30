@@ -90,7 +90,7 @@ def validate_doc_eukaryotic(d):
 
     # make sure these fields are not lists
     if 'ensembl' in d:
-        assert isinstance(d['ensembl'], dict)
+        assert isinstance(d['ensembl'], dict), "incorrect type: doc['ensembl']. expecting dict"
     if 'ensembl' in d and 'gene' in d['ensembl']:
         assert isinstance(d['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
     if 'uniprot' in d and 'Swiss-Prot' in d['uniprot']:
