@@ -1,6 +1,6 @@
 # scheduled-bots
 
-These bots are running on [Jenkins](http://52.15.200.208:8080), which is hosted on AWS.
+These bots are running on [Jenkins](http://jenkins.sulab.org/), which is hosted on AWS.
 
 
 
