@@ -245,8 +245,8 @@ class Protein:
             self.create_aliases()
 
             wd_item_protein = wdi_core.WDItemEngine(item_name=self.label, domain='proteins', data=self.statements,
-                                                    append_value=[PROPS['instance of'], PROPS['encoded by'],
-                                                                  PROPS['Ensembl Protein ID'], PROPS['RefSeq Protein ID']],
+                                                    append_value=[PROPS['instance of'], PROPS['encoded by']],
+                                                                  #PROPS['Ensembl Protein ID'], PROPS['RefSeq Protein ID']],
                                                     fast_run=fast_run,
                                                     fast_run_base_filter={PROPS['UniProt ID']: '',
                                                                           PROPS['found in taxon']: self.organism_info[
@@ -311,7 +311,7 @@ class ProteinBot:
                 yield record
 
 
-def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
+def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, doc_filter=None):
     """
     Main function for creating/updating proteins
 
@@ -327,6 +327,8 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     :type fast_run: bool
     :param write: actually perform write
     :type write: bool
+    :param doc_filter: Override the doc_filter for determining which docs to write. Useful for testing
+    :type doc_filter: dict
     :return: None
     """
 
@@ -339,6 +341,13 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
 
     # login
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
+    if wdi_core.WDItemEngine.logger is not None:
+        wdi_core.WDItemEngine.logger.handles = []
+        wdi_core.WDItemEngine.logger.handlers = []
+
+    run_id = run_id if run_id is not None else datetime.now().strftime('%Y%m%d_%H:%M')
+    log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
+    __metadata__['taxid'] = taxid
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__))
 
     # get organism metadata (name, organism type, wdid)
@@ -358,7 +367,7 @@ def main(coll, taxid, metadata, log_dir="./logs", fast_run=True, write=True):
     bot = ProteinBot(organism_info, gene_wdid_mapping, login)
 
     # only do certain records
-    doc_filter = {'taxid': taxid, 'type_of_gene': 'protein-coding', 'uniprot': {'$exists': True}, 'entrezgene': {'$exists': True}}
+    doc_filter = doc_filter if doc_filter is not None else {'taxid': taxid, 'type_of_gene': 'protein-coding', 'uniprot': {'$exists': True}, 'entrezgene': {'$exists': True}}
     docs = coll.find(doc_filter).batch_size(20)
     total = docs.count()
     print("total number of records: {}".format(total))

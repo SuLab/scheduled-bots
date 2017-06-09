@@ -51,6 +51,10 @@ def validate_doc_microbial(d):
     :param d:
     :return:
     """
+    if 'refseq' in d and 'protein' in d['refseq']:
+        d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
+    if 'ensembl' in d and 'protein' in d['ensembl']:
+        d['ensembl']['protein'] = alwayslist(d['ensembl']['protein'])
     assert "genomic_pos" in d
     d['genomic_pos'] = alwayslist(d['genomic_pos'])
     assert len(d['genomic_pos']) == 1
