@@ -1,13 +1,14 @@
 import json
 import os
 from datetime import datetime
-
+import time
 
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from pymongo import MongoClient
 from tqdm import tqdm
 
-from .IPRTerm import IPRTerm
+from scheduled_bots.interpro import remove_deprecated_statements
+from scheduled_bots.interpro.IPRTerm import IPRTerm
 
 __metadata__ = {'name': 'InterproBot_Items',
                 'maintainer': 'GSS',
@@ -39,17 +40,31 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
     # create/update all interpro items
     terms = []
     cursor = interpro_coll.find().batch_size(20)
-    for doc in tqdm(cursor, total=cursor.count(), mininterval=1.0):
+    for n, doc in tqdm(enumerate(cursor), total=cursor.count(), mininterval=1.0):
         doc['release_wdid'] = release_wdid
         term = IPRTerm(**doc)
         term.create_item(login, write=write)
         terms.append(term)
         if run_one:
             break
+        if n>=1000:
+            pass
+
+    time.sleep(10*60)  # sleep for 10 min so (hopefully) the wd sparql endpoint updates
 
     # create/update interpro item relationships
     IPRTerm.refresh_ipr_wd()
     for term in tqdm(terms, mininterval=1.0):
         term.create_relationships(login, write=write)
+
+    time.sleep(10 * 60)  # sleep for 10 min so (hopefully) the wd sparql endpoint updates
+
+    print("remove deprecated statements")
+    # first remove the fastrun stores so it has to be re-updated
+    for term in terms:
+        term.wd_item.fast_run_container.clear()
+
+    for term in tqdm(terms, mininterval=1.0):
+        remove_deprecated_statements(term.wd_item, release_wdid, ["P279", "P2926", 'P527', 'P361'], login)
 
     return os.path.join(log_dir, log_name)

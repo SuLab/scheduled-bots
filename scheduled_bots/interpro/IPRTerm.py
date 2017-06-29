@@ -57,13 +57,16 @@ class IPRTerm:
         self.found_in_wdid = None
         self.type = type
         self.type_wdid = IPRTerm.type2wdid[self.type]  # subclass of (from type2wdid)
-        self.description = description
+        self.description = description if description else ''
         if self.description is None and self.type:
             self.description = IPRTerm.type2desc[self.type]
         self.lang_descr = {'en': self.description}
+        if not release_wdid:
+            raise ValueError("missing release_wdid")
         self.release_wdid = release_wdid
         self.reference = None
         self.create_reference()
+        self.wd_item = None
 
     def __repr__(self):
         return '{}: {}'.format(self.id, self.name)
@@ -104,7 +107,9 @@ class IPRTerm:
         try:
             wd_item = wdi_core.WDItemEngine(item_name=self.name, domain='interpro', data=statements,
                                             append_value=["P279", "P31"],
-                                            fast_run=fast_run, fast_run_base_filter=IPRTerm.fast_run_base_filter)
+                                            fast_run=fast_run, fast_run_base_filter=IPRTerm.fast_run_base_filter,
+                                            global_ref_mode='CUSTOM', fast_run_use_refs=True,
+                                            ref_comparison_f=wdi_core.WDBaseDataType.custom_ref_equal_dates)
         except JSONDecodeError as e:
             wdi_core.WDItemEngine.log("ERROR",
                                       wdi_helpers.format_msg(self.id, INTERPRO, None, str(e), msg_type=type(e)))
@@ -118,7 +123,7 @@ class IPRTerm:
 
         if login:
             wdi_helpers.try_write(wd_item, self.id, INTERPRO, login, write=write)
-
+        self.wd_item = wd_item
         return wd_item
 
     def create_relationships(self, login, write=True):
@@ -144,7 +149,11 @@ class IPRTerm:
 
         wd_item = wdi_core.WDItemEngine(wd_item_id=self.wdid, domain='interpro', data=statements,
                                         append_value=['P279', 'P527', 'P361'],
-                                        fast_run=True, fast_run_base_filter=IPRTerm.fast_run_base_filter)
+                                        fast_run=True, fast_run_base_filter=IPRTerm.fast_run_base_filter,
+                                        global_ref_mode='CUSTOM', fast_run_use_refs=True,
+                                        ref_comparison_f=wdi_core.WDBaseDataType.custom_ref_equal_dates)
 
         wdi_helpers.try_write(wd_item, self.id, INTERPRO, login, edit_summary="create/update subclass/has part/part of",
                               write=write)
+        self.wd_item = wd_item
+        return wd_item

@@ -3,7 +3,7 @@ import glob
 import os
 from dateutil.parser import parse as date_parse
 
-from scheduled_bots.interpro import ItemsBot
+from scheduled_bots.interpro import ItemsBot, get_all_taxa
 from scheduled_bots.interpro import ProteinBot
 
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
@@ -18,18 +18,6 @@ except ImportError:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
 
-def get_all_taxa():
-    # get all taxa with a uniprot protein
-    # http://tinyurl.com/hkdwzq9
-    query = """SELECT ?t
-    {	?a	wdt:P352	?p	; wdt:P703	?t}
-    GROUP BY ?t
-    """
-    result = wdi_core.WDItemEngine.execute_sparql_query(query=query)
-    taxa = set([x['t']['value'].replace("http://www.wikidata.org/entity/","")  for x in result['results']['bindings']])
-    return taxa
-
-# todo open ItemsBot mongouri params
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run interpro wikidata import bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
