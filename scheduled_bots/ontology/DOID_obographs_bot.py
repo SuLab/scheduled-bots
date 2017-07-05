@@ -7,12 +7,14 @@ import urllib.request
 from collections import defaultdict, Counter
 from datetime import datetime
 from itertools import chain
-from time import gmtime, strftime
+from time import gmtime, strftime, sleep
 
 import requests
 from tqdm import tqdm
-from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
+from wikidataintegrator import wdi_core, wdi_helpers, wdi_login, wdi_property_store
 from wikidataintegrator.wdi_helpers import id_mapper
+
+wdi_property_store.wd_properties['P492']['core_id'] = 'False'
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -55,13 +57,21 @@ class DOGraph:
                  'ICD10CM': 'P494',
                  'ICD9CM': 'P493',
                  'MSH': 'P486',
+                 'MESH': 'P486',
                  'NCI': 'P1748',
                  'OMIM': 'P492',
                  # 'SNOMEDCT_US_2016_03_01': ''  # can't put in wikidata...
                  }
 
+    # get all existing items we can add relationships to
     doid_wdid = id_mapper('P699')
-    doid_purl_wdid = {"http://purl.obolibrary.org/obo/{}".format(k.replace(":", "_")): v for k, v in doid_wdid.items()}
+    purl_wdid = {"http://purl.obolibrary.org/obo/{}".format(k.replace(":", "_")): v for k, v in doid_wdid.items()}
+    # add in uberon items so we can do "located in"
+    uberon_wdid = id_mapper('P1554')
+    purl_wdid.update({"http://purl.obolibrary.org/obo/UBERON_{}".format(k): v for k, v in uberon_wdid.items()})
+    # add in taxonomy items for "has_material_basis_in"
+    ncbi_wdid = id_mapper("P685")
+    purl_wdid.update({"http://purl.obolibrary.org/obo/NCBITaxon_{}".format(k): v for k,v in ncbi_wdid.items()})
 
     def __init__(self, graph, login=None, fast_run=True):
         self.fast_run = fast_run
@@ -165,9 +175,7 @@ class DONode:
 
         if self.definition_xrefs:
             url_xrefs = [x for x in self.definition_xrefs if 'url:http://en.wikipedia.org/wiki/' in x]
-            if len(url_xrefs) > 1:
-                print("{} multiple wikilinks: {}".format(self.doid, url_xrefs))
-            elif len(url_xrefs) == 1:
+            if len(url_xrefs) == 1:
                 url = urllib.request.unquote(url_xrefs[0].replace("url:http://en.wikipedia.org/wiki/", ""))
                 if '#' not in url:
                     # don't use links like 'Embryonal_carcinoma#Testicular_embryonal_carcinoma'
@@ -200,11 +208,14 @@ class DONode:
         What wikidata IDs do we need to have before we can make this item?
         :return:
         """
+        # todo: This is not implemented
         need_purl = [x[1] for x in self.relationships if x[0] in relationships]
-        return [x for x in need_purl if x not in self.do_graph.doid_purl_wdid]
+        return [x for x in need_purl if x not in self.do_graph.purl_wdid]
 
     def create(self, write=True):
         if self.deprecated:
+            # TODO: delete
+            print("delete me: {}".format(self.doid))
             return None
         try:
             self.create_xref_statements()
@@ -214,7 +225,9 @@ class DONode:
             wd_item = wdi_core.WDItemEngine(item_name=self.lbl, data=self.s, domain="diseases",
                                             append_value=[PROPS['subclass of'], PROPS['instance of']],
                                             fast_run=self.do_graph.fast_run,
-                                            fast_run_base_filter={'P699': ''})
+                                            fast_run_base_filter={'P699': ''},
+                                            global_ref_mode='CUSTOM', fast_run_use_refs=True,
+                                            ref_comparison_f=wdi_core.WDBaseDataType.custom_ref_equal_dates)
             if wd_item.get_label(lang="en") == "":
                 wd_item.set_label(self.lbl, lang="en")
             current_descr = wd_item.get_description(lang='en')
@@ -226,7 +239,9 @@ class DONode:
             if self.synonyms is not None:
                 wd_item.set_aliases(aliases=self.synonyms, lang='en', append=True)
             if self.wikilink is not None:
-                wd_item.set_sitelink(site="enwiki", title=self.wikilink)
+                # a lot of these are not right... don't do this
+                # wd_item.set_sitelink(site="enwiki", title=self.wikilink)
+                pass
             wdi_helpers.try_write(wd_item, record_id=self.id, record_prop='P699', login=self.do_graph.login,
                                   write=write)
             return wd_item
@@ -246,8 +261,8 @@ class DONode:
         self.s_xref.append(wdi_core.WDExternalID(self.doid, PROPS['Disease Ontology ID'], references=[self.reference]))
         for xref in self.xrefs:
             prefix, code = xref.split(":", 1)
-            if prefix in DOGraph.xref_prop:
-                self.s_xref.append(wdi_core.WDExternalID(code, DOGraph.xref_prop[prefix], references=[self.reference]))
+            if prefix.upper() in DOGraph.xref_prop:
+                self.s_xref.append(wdi_core.WDExternalID(code, DOGraph.xref_prop[prefix.upper()], references=[self.reference]))
 
     def create_main_statements(self):
         if not self.reference:
@@ -258,11 +273,11 @@ class DONode:
                 print("unknown relationship: {}".format(relationship[0]))
                 continue
                 # todo log
-            if relationship[1] not in self.do_graph.doid_purl_wdid:
+            if relationship[1] not in self.do_graph.purl_wdid:
                 print("unknown obj: {}".format(relationship[1]))
                 continue
                 # todo log
-            self.s_main.append(wdi_core.WDItemID(self.do_graph.doid_purl_wdid[relationship[1]],
+            self.s_main.append(wdi_core.WDItemID(self.do_graph.purl_wdid[relationship[1]],
                                                  self.do_graph.edge_prop[relationship[0]], references=[self.reference]))
         # add http://purl.obolibrary.org/obo/, exact match
         self.s_main.append(wdi_core.WDString(self.id, PROPS['exact match'], references=[self.reference]))
@@ -277,6 +292,45 @@ class DONode:
         self.s_main.append(wdi_core.WDString("http://identifiers.org/doid/{}".format(self.doid), PROPS['exact match'],
                                              references=[miriam_ref]))
 
+def get_releases():
+    s = "select ?item where {?item wdt:P856 <http://disease-ontology.org> .}"
+    return [x['item']['value'].split("/")[-1] for x in wdi_core.WDItemEngine.execute_sparql_query(s)['results']['bindings']]
+
+RELEASES = get_releases()
+
+def remove_deprecated_statements(item, release_wdid, props, login):
+    releases = set(int(x.replace("Q", "")) for x in RELEASES)
+    # don't count this release
+    releases.discard(int(release_wdid.replace("Q", "")))
+
+    if item.wd_item_id and item.fast_run and not item.create_new_item:
+        # in fastrun mode, make sure we have all statements we need
+        frc = item.fast_run_container
+        for prop in props:
+            frc.write_required([wdi_core.WDString("fake value", prop)])
+        orig_statements = frc.reconstruct_statements(item.wd_item_id)
+    elif item.wd_item_id and not item.fast_run and not item.create_new_item:
+        orig_statements = item.original_statements
+    else:
+        return None
+
+    s_dep = []
+    for s in orig_statements:
+        if any(any(x.get_prop_nr() == 'P248' and x.get_value() in releases for x in r) for r in s.get_references()):
+            setattr(s, 'remove', '')
+            s_dep.append(s)
+
+    if s_dep:
+        print("-----")
+        print(item.wd_item_id)
+        print(orig_statements)
+        print(s_dep)
+        print([(x.get_prop_nr(), x.value) for x in s_dep])
+        print([(x.get_references()[0]) for x in s_dep])
+        qid = item.wd_item_id
+        wd_item = wdi_core.WDItemEngine(wd_item_id=qid, domain='none', data=s_dep, fast_run=False)
+        wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
+
 
 def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
@@ -287,8 +341,20 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
         d = json.load(f)
     graph = d['graphs'][0]
     do = DOGraph(graph, login, fast_run)
-    for node in tqdm(do.nodes.values()):
-        node.create(write=write)
+    nodes = sorted(do.nodes.values(), key=lambda x:x.doid)
+    items = []
+    for n, node in tqdm(enumerate(nodes), total=len(nodes)):
+        item = node.create(write=write)
+        if item:
+            items.append(item)
+        if n>=100:
+            break
+
+    #sleep(10*60)
+    for item in items:
+        item.fast_run_container.clear()
+    for item in items:
+        remove_deprecated_statements(item, do.release, list(PROPS.values()), login)
 
 
 def download_and_obograph(url):
@@ -311,16 +377,16 @@ if __name__ == "__main__":
     Bot to add/update disease ontology to wikidata. Uses obgraphs to convert owl to json
     """
     parser = argparse.ArgumentParser(description='run wikidata disease ontology bot')
-    parser.add_argument('--json_path', help='path to obographs json file')
-    parser.add_argument('--owl_url', help='url to owl file')
+    parser.add_argument('--json', help='path to obographs json file')
+    parser.add_argument('--owl', help='url to owl file')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
     parser.set_defaults(fastrun=True)
     args = parser.parse_args()
-    if (args.json_path and args.owl_url) or not (args.json_path or args.owl_url):
-        raise ValueError("must give one of --json_path and --owl_url")
+    if (args.json and args.owl) or not (args.json or args.owl):
+        raise ValueError("must give one of --json_path and --owl")
     log_dir = args.log_dir if args.log_dir else "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     __metadata__['run_id'] = run_id
@@ -332,8 +398,8 @@ if __name__ == "__main__":
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='doid')
 
-    json_path = args.json_path
-    if args.owl_url:
-        download_and_obograph(args.owl_url)
+    json_path = args.json
+    if args.owl:
+        download_and_obograph(args.owl)
         json_path = "doid.json"
     main(json_path, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
