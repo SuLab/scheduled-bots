@@ -247,6 +247,7 @@ class DONode:
             return wd_item
         except Exception as e:
             exc_info = sys.exc_info()
+            print(self.doid)
             traceback.print_exception(*exc_info)
             msg = wdi_helpers.format_msg(self.doid, 'P699', None, str(e), msg_type=type(e))
             wdi_core.WDItemEngine.log("ERROR", msg)
@@ -298,21 +299,14 @@ def get_releases():
 
 RELEASES = get_releases()
 
-def remove_deprecated_statements(item, release_wdid, props, login):
+def remove_deprecated_statements(qid, frc, release_wdid, props, login):
     releases = set(int(x.replace("Q", "")) for x in RELEASES)
     # don't count this release
     releases.discard(int(release_wdid.replace("Q", "")))
 
-    if item.wd_item_id and item.fast_run and not item.create_new_item:
-        # in fastrun mode, make sure we have all statements we need
-        frc = item.fast_run_container
-        for prop in props:
-            frc.write_required([wdi_core.WDString("fake value", prop)])
-        orig_statements = frc.reconstruct_statements(item.wd_item_id)
-    elif item.wd_item_id and not item.fast_run and not item.create_new_item:
-        orig_statements = item.original_statements
-    else:
-        return None
+    for prop in props:
+        frc.write_required([wdi_core.WDString("fake value", prop)])
+    orig_statements = frc.reconstruct_statements(qid)
 
     s_dep = []
     for s in orig_statements:
@@ -322,12 +316,11 @@ def remove_deprecated_statements(item, release_wdid, props, login):
 
     if s_dep:
         print("-----")
-        print(item.wd_item_id)
+        print(qid)
         print(orig_statements)
         print(s_dep)
         print([(x.get_prop_nr(), x.value) for x in s_dep])
         print([(x.get_references()[0]) for x in s_dep])
-        qid = item.wd_item_id
         wd_item = wdi_core.WDItemEngine(wd_item_id=qid, domain='none', data=s_dep, fast_run=False)
         wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
 
@@ -351,10 +344,20 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
             pass
 
     sleep(10*60)
-    for item in items:
-        item.fast_run_container.clear()
-    for item in items:
-        remove_deprecated_statements(item, do.release, list(PROPS.values()), login)
+    # do this from do, not items
+    # if an item fails to be updated/created because of conflicting deprecated statements, it wont be in this list.
+    doid_wdid = id_mapper('P699')
+    frc = None
+    for c in wdi_core.WDItemEngine.fast_run_store:
+        if c.base_filter == {'P699': ''} and c.use_refs == True and c.ref_comparison_f == wdi_core.WDBaseDataType.custom_ref_equal_dates:
+            frc = c
+    if not frc:
+        print("fastrun container not found. not removing deprecated statements")
+        return None
+    frc.clear()
+    for node in tqdm(do.nodes.values(), total=len(do.nodes)):
+        if node.doid in doid_wdid:
+            remove_deprecated_statements(doid_wdid[node.doid], frc, do.release, list(PROPS.values()), login)
 
 
 def download_and_obograph(url):
