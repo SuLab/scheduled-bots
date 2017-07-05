@@ -348,9 +348,9 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
         if item:
             items.append(item)
         if n>=100:
-            break
+            pass
 
-    #sleep(10*60)
+    sleep(10*60)
     for item in items:
         item.fast_run_container.clear()
     for item in items:
