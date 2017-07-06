@@ -15,6 +15,7 @@ from wikidataintegrator import wdi_core, wdi_helpers, wdi_login, wdi_property_st
 from wikidataintegrator.wdi_helpers import id_mapper
 
 wdi_property_store.wd_properties['P492']['core_id'] = 'False'
+wdi_property_store.wd_properties['P486']['core_id'] = 'False'
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -97,7 +98,7 @@ class DOGraph:
     def parse_nodes(self, nodes):
         for node in nodes:
             tmp_node = DONode(node, self)
-            if tmp_node.namespace == self.default_namespace and not tmp_node.deprecated and tmp_node.type == "CLASS":
+            if "http://purl.obolibrary.org/obo/DOID_" in tmp_node.id and not tmp_node.deprecated and tmp_node.type == "CLASS":
                 self.nodes[tmp_node.id] = tmp_node
 
     def parse_edges(self, edges):
@@ -261,9 +262,10 @@ class DONode:
         self.s_xref = []
         self.s_xref.append(wdi_core.WDExternalID(self.doid, PROPS['Disease Ontology ID'], references=[self.reference]))
         for xref in self.xrefs:
-            prefix, code = xref.split(":", 1)
-            if prefix.upper() in DOGraph.xref_prop:
-                self.s_xref.append(wdi_core.WDExternalID(code, DOGraph.xref_prop[prefix.upper()], references=[self.reference]))
+            if ":" in xref:
+                prefix, code = xref.split(":", 1)
+                if prefix.upper() in DOGraph.xref_prop:
+                    self.s_xref.append(wdi_core.WDExternalID(code, DOGraph.xref_prop[prefix.upper()], references=[self.reference]))
 
     def create_main_statements(self):
         if not self.reference:
@@ -310,15 +312,14 @@ def remove_deprecated_statements(qid, frc, release_wdid, props, login):
 
     s_dep = []
     for s in orig_statements:
-        if any(any(x.get_prop_nr() == 'P248' and x.get_value() in releases for x in r) for r in s.get_references()):
+        if any(any(x.get_prop_nr() == 'P248' and x.get_value() in releases for x in r) and any(x.get_prop_nr() == 'P1065' for x in r) for r in s.get_references()):
             setattr(s, 'remove', '')
             s_dep.append(s)
 
     if s_dep:
         print("-----")
         print(qid)
-        print(orig_statements)
-        print(s_dep)
+        print(len(s_dep))
         print([(x.get_prop_nr(), x.value) for x in s_dep])
         print([(x.get_references()[0]) for x in s_dep])
         wd_item = wdi_core.WDItemEngine(wd_item_id=qid, domain='none', data=s_dep, fast_run=False)
@@ -340,8 +341,6 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
         item = node.create(write=write)
         if item:
             items.append(item)
-        if n>=100:
-            pass
 
     sleep(10*60)
     # do this from do, not items
@@ -349,15 +348,14 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
     doid_wdid = id_mapper('P699')
     frc = None
     for c in wdi_core.WDItemEngine.fast_run_store:
-        if c.base_filter == {'P699': ''} and c.use_refs == True and c.ref_comparison_f == wdi_core.WDBaseDataType.custom_ref_equal_dates:
+        if c.base_filter == {'P699': ''} and c.use_refs is True and c.ref_comparison_f == wdi_core.WDBaseDataType.custom_ref_equal_dates:
             frc = c
     if not frc:
         print("fastrun container not found. not removing deprecated statements")
         return None
     frc.clear()
-    for node in tqdm(do.nodes.values(), total=len(do.nodes)):
-        if node.doid in doid_wdid:
-            remove_deprecated_statements(doid_wdid[node.doid], frc, do.release, list(PROPS.values()), login)
+    for doid in tqdm(doid_wdid.values()):
+        remove_deprecated_statements(doid, frc, do.release, list(PROPS.values()), login)
 
 
 def download_and_obograph(url):
