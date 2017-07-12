@@ -13,6 +13,7 @@ import requests
 from tqdm import tqdm
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login, wdi_property_store
 from wikidataintegrator.wdi_helpers import id_mapper
+from wikidataintegrator.ref_handlers import update_retrieved_if_new
 
 wdi_property_store.wd_properties['P492']['core_id'] = 'False'
 wdi_property_store.wd_properties['P486']['core_id'] = 'False'
@@ -227,8 +228,11 @@ class DONode:
                                             append_value=[PROPS['subclass of'], PROPS['instance of']],
                                             fast_run=self.do_graph.fast_run,
                                             fast_run_base_filter={'P699': ''},
-                                            global_ref_mode='CUSTOM', fast_run_use_refs=True,
-                                            ref_comparison_f=wdi_core.WDBaseDataType.custom_ref_equal_dates)
+                                            fast_run_use_refs=True,
+                                            global_ref_mode='CUSTOM',
+                                            ref_handler=update_retrieved_if_new
+                                            )
+            wd_item.fast_run_container.debug = False
             if wd_item.get_label(lang="en") == "":
                 wd_item.set_label(self.lbl, lang="en")
             current_descr = wd_item.get_description(lang='en')
@@ -346,10 +350,7 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
     # do this from do, not items
     # if an item fails to be updated/created because of conflicting deprecated statements, it wont be in this list.
     doid_wdid = id_mapper('P699')
-    frc = None
-    for c in wdi_core.WDItemEngine.fast_run_store:
-        if c.base_filter == {'P699': ''} and c.use_refs is True and c.ref_comparison_f == wdi_core.WDBaseDataType.custom_ref_equal_dates:
-            frc = c
+    frc = items[0].fast_run_container
     if not frc:
         print("fastrun container not found. not removing deprecated statements")
         return None
