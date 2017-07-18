@@ -27,7 +27,7 @@ def validate_docs(docs, doc_type, external_id_prop):
             doc = f(doc)
         except AssertionError as e:
             exc_info = sys.exc_info()
-            traceback.print_exception(*exc_info)
+            #traceback.print_exception(*exc_info)
             wdi_core.WDItemEngine.log("WARNING",
                                       wdi_helpers.format_msg(doc['_id'], external_id_prop, None, str(e), type(e)))
             continue

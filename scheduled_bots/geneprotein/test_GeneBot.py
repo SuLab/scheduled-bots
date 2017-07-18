@@ -1,10 +1,39 @@
 """
 This actually does a write in Wikidata
 """
+from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 
-from scheduled_bots.geneprotein.GeneBot import main, wdi_core
+from scheduled_bots.geneprotein import HelperBot
+from scheduled_bots.geneprotein.GeneBot import main, Gene, PROPS
 from pymongo import MongoClient
+from scheduled_bots.local import WDUSER, WDPASS
 
+
+def test_make_gene_class():
+    coll = MongoClient().wikidata_src.mygene
+    metadata_coll = MongoClient().wikidata_src.mygene_sources
+    metadata = metadata_coll.find_one()
+    doc_filter = {'_id': '100861512'}
+    docs = coll.find(doc_filter)
+    print("total number of records: {}".format(coll.find(doc_filter).count()))
+
+    validate_type = 'eukaryotic'
+    docs = HelperBot.validate_docs(docs, validate_type, 'P351')
+    records = HelperBot.tag_mygene_docs(docs, metadata)
+    record = next(records)
+
+    organism_info = {
+        "name": "Homo sapiens",
+        "type": "mammalian",
+        "wdid": "Q15978631",
+        'taxid': 9606
+    }
+
+    login = wdi_login.WDLogin(WDUSER, WDPASS)
+
+    gene = Gene(record, organism_info, login)
+    gene.create_item(fast_run=False, write=True)
+    gene.remove_deprecated_statements()
 
 def _test_write_one_gene(qid, entrezgene, taxid):
     coll = MongoClient().wikidata_src.mygene
@@ -22,9 +51,9 @@ def _test_write_one_gene(qid, entrezgene, taxid):
 
 
 def test_write_one_human_gene():
-    qid = "Q14911732"
+    qid = "Q17915123"
     taxid = '9606'
-    entrezgene = '1017'
+    entrezgene = '7276'
     _test_write_one_gene(qid, entrezgene, taxid)
 
 
@@ -43,7 +72,25 @@ def test_write_one_yeast_gene():
 
 
 def test_write_one_mouse_gene():
-    qid = "Q18309250"
+    qid = "Q18253743"
     taxid = '10090'
-    entrezgene = '12566'
+    entrezgene = '19744'
     _test_write_one_gene(qid, entrezgene, taxid)
+
+
+def validate_all_human_genes():
+    # runs all genes through the validator
+    # and generates a log file
+
+    coll = MongoClient().wikidata_src.mygene
+    metadata_coll = MongoClient().wikidata_src.mygene_sources
+    metadata = metadata_coll.find_one()
+    doc_filter = {'taxid': 9606, 'entrezgene': {'$exists': True}}
+    docs = coll.find(doc_filter)
+    print("total number of records: {}".format(coll.find(doc_filter).count()))
+
+    validate_type = 'eukaryotic'
+    docs = HelperBot.validate_docs(docs, validate_type, 'P351')
+    records = HelperBot.tag_mygene_docs(docs, metadata)
+
+    _ = list(records)

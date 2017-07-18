@@ -31,7 +31,6 @@ class ChromosomeBot:
         self.chr_df = dict()
 
     def get_assembly_summaries(self):
-        # silly me for assuming the column names won't change
         table = request.urlopen(request.Request('ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt')).read().decode()
         names = table.split("\n")[1].replace("# ", "").split("\t")
         self.ass_sum = pd.read_csv(StringIO(table), sep="\t", comment="#", names=names, low_memory=False)
