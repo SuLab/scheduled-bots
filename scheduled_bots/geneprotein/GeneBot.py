@@ -644,8 +644,6 @@ def remove_deprecated_statements(qid, frc, releases, last_updated, props, login)
                         setattr(s, 'remove', '')
                         s_dep.append(s)
     if s_dep:
-        if len(s_dep) > 500:
-            raise ValueError("Trying to remove {} statements. I dont think this is right".format(len(s_dep)))
         print("-----")
         print(qid)
         print(len(s_dep))
@@ -725,7 +723,6 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
     time.sleep(10 * 60)
     releases = dict()
     releases_to_remove = set()
-    #TODO: need to get the previous releases for this class, not this specific release, int qid
     last_updated = dict()
     metadata = {k:v for k,v in metadata.items() if k in {'uniprot', 'ensembl', 'entrez'}}
     for k,v in parse_mygene_src_version(metadata).items():
@@ -738,6 +735,7 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
             print("{}: Removing releases: {}, keeping release: {}".format(k, ", ".join(set(releases[k]) - {v['release']}), v['release']))
         else:
             last_updated[source_items[k]] = datetime.strptime(v["timestamp"], "%Y%m%d")
+    print(last_updated)
     bot.cleanup(releases_to_remove, last_updated)
 
 if __name__ == "__main__":

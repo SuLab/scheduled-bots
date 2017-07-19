@@ -21,7 +21,7 @@ https://mygene.info/v3/gene/7150837
 
 import argparse
 import json
-import logging
+import time
 import os
 import sys
 import traceback
@@ -30,13 +30,17 @@ from datetime import datetime
 import pymongo
 from pymongo import MongoClient
 from tqdm import tqdm
+
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
+from wikidataintegrator.ref_handlers import update_retrieved_if_new
+from wikidataintegrator.wdi_fastrun import FastRunContainer
 from wikidataintegrator.wdi_helpers import id_mapper, format_msg
 
 from scheduled_bots.geneprotein import HelperBot, descriptions_by_type
 from scheduled_bots.geneprotein import organisms_info
-from scheduled_bots.geneprotein.HelperBot import make_ref_source
+from scheduled_bots.geneprotein.HelperBot import make_ref_source, parse_mygene_src_version, source_items
 from scheduled_bots.geneprotein.MicrobeBotResources import get_all_taxa, get_organism_info
+from scheduled_bots.geneprotein.GeneBot import remove_deprecated_statements
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -197,7 +201,8 @@ class Protein:
         key = 'RefSeq Protein ID'
         if key in self.external_ids:
             for id in self.external_ids[key]:
-                ref = make_ref_source(self.record['refseq']['@source'], PROPS['Entrez Gene ID'], entrez_gene, login=self.login)
+                ref = make_ref_source(self.record['refseq']['@source'], PROPS['Entrez Gene ID'], entrez_gene,
+                                      login=self.login)
                 s.append(wdi_core.WDString(id, PROPS[key], references=[ref]))
 
         ############
@@ -226,7 +231,10 @@ class Protein:
         try:
             statements = [wdi_core.WDItemID(self.protein_wdid, PROPS['encodes'], references=[uniprot_ref])]
             wd_item_gene = wdi_core.WDItemEngine(wd_item_id=self.gene_wdid, domain='genes', data=statements,
-                                                 append_value=[PROPS['encodes']])
+                                                 append_value=[PROPS['encodes']], fast_run=fast_run,
+                                                 fast_run_base_filter={PROPS['Entrez Gene ID']: '',
+                                                                       PROPS['found in taxon']: self.organism_info[
+                                                                           'wdid']})
             wdi_helpers.try_write(wd_item_gene, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
                                   write=write)
         except Exception as e:
@@ -246,11 +254,13 @@ class Protein:
 
             wd_item_protein = wdi_core.WDItemEngine(item_name=self.label, domain='proteins', data=self.statements,
                                                     append_value=[PROPS['instance of'], PROPS['encoded by']],
-                                                                  #PROPS['Ensembl Protein ID'], PROPS['RefSeq Protein ID']],
+                                                    # PROPS['Ensembl Protein ID'], PROPS['RefSeq Protein ID']],
                                                     fast_run=fast_run,
                                                     fast_run_base_filter={PROPS['UniProt ID']: '',
                                                                           PROPS['found in taxon']: self.organism_info[
-                                                                              'wdid']})
+                                                                              'wdid']},
+                                                    fast_run_use_refs=True, ref_handler=update_retrieved_if_new,
+                                                    global_ref_mode="CUSTOM")
             wd_item_protein.set_label(self.label)
             wd_item_protein.set_description(self.description, lang='en')
 
@@ -260,7 +270,34 @@ class Protein:
             if "protein" in aliases:
                 aliases.remove("protein")
             wd_item_protein.set_aliases(aliases, append=False)
+            wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
+                                  write=write)
+            self.protein_wdid = wd_item_protein.wd_item_id
+            return wd_item_protein
+        except Exception as e:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            msg = wdi_helpers.format_msg(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], None,
+                                         str(e), msg_type=type(e))
+            wdi_core.WDItemEngine.log("ERROR", msg)
+            return None
 
+    def update_item(self, qid, fast_run=True, write=True):
+        print("updating protein: {}".format(qid))
+        try:
+            self.parse_external_ids()
+            self.statements = self.create_statements()
+
+            wd_item_protein = wdi_core.WDItemEngine(wd_item_id=qid, data=self.statements,
+                                                    append_value=[PROPS['instance of'], PROPS['encoded by'],
+                                                                  PROPS['Ensembl Protein ID'],
+                                                                  PROPS['RefSeq Protein ID']],
+                                                    fast_run=fast_run,
+                                                    fast_run_base_filter={PROPS['UniProt ID']: '',
+                                                                          PROPS['found in taxon']: self.organism_info[
+                                                                              'wdid']},
+                                                    fast_run_use_refs=True, ref_handler=update_retrieved_if_new,
+                                                    global_ref_mode="CUSTOM")
             wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
                                   write=write)
             self.protein_wdid = wd_item_protein.wd_item_id
@@ -286,6 +323,7 @@ class ProteinBot:
 
     def run(self, records, total=None, fast_run=True, write=True):
         records = self.filter(records)
+        uniprot_qid = dict()
         for record in tqdm(records, mininterval=2, total=total):
             entrez_gene = str(record['entrezgene']['@value'])
             if entrez_gene not in self.gene_wdid_mapping:
@@ -294,8 +332,15 @@ class ProteinBot:
                 continue
             gene_wdid = self.gene_wdid_mapping[entrez_gene]
             protein = Protein(record, self.organism_info, gene_wdid, self.login)
-            wditem = protein.create_item(fast_run=fast_run, write=write)
+            protein.parse_external_ids()
+            uniprot = protein.external_ids['UniProt ID']
+            # some proteins are encoded by multiple genes. don't try to create it again
+            if uniprot in uniprot_qid:
+                wditem = protein.update_item(uniprot_qid[uniprot], fast_run=fast_run, write=write)
+            else:
+                wditem = protein.create_item(fast_run=fast_run, write=write)
             if wditem is not None:
+                uniprot_qid[uniprot] = wditem.wd_item_id
                 protein.make_gene_encodes(write=write)
 
     def filter(self, records):
@@ -309,6 +354,15 @@ class ProteinBot:
                 continue
             else:
                 yield record
+
+    def cleanup(self, releases, last_updated):
+        uniprot_wdid = wdi_helpers.id_mapper(PROPS['UniProt ID'],
+                                             ((PROPS['found in taxon'], self.organism_info['wdid']),))
+        filter = {PROPS['UniProt ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
+        frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter=filter, use_refs=True)
+        frc.clear()
+        for qid in tqdm(uniprot_wdid.values()):
+            remove_deprecated_statements(qid, frc, releases, last_updated, list(PROPS.values()), self.login)
 
 
 def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, doc_filter=None):
@@ -367,7 +421,9 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
     bot = ProteinBot(organism_info, gene_wdid_mapping, login)
 
     # only do certain records
-    doc_filter = doc_filter if doc_filter is not None else {'taxid': taxid, 'type_of_gene': 'protein-coding', 'uniprot': {'$exists': True}, 'entrezgene': {'$exists': True}}
+    doc_filter = doc_filter if doc_filter is not None else {'taxid': taxid, 'type_of_gene': 'protein-coding',
+                                                            'uniprot': {'$exists': True},
+                                                            'entrezgene': {'$exists': True}}
     docs = coll.find(doc_filter).batch_size(20)
     total = docs.count()
     print("total number of records: {}".format(total))
@@ -375,6 +431,26 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, fast_run=fast_run, write=write)
+
+    time.sleep(10 * 60)
+    releases = dict()
+    releases_to_remove = set()
+    last_updated = dict()
+    metadata = {k: v for k, v in metadata.items() if k in {'uniprot', 'ensembl', 'entrez'}}
+    for k, v in parse_mygene_src_version(metadata).items():
+        if "release" in v:
+            if k not in releases:
+                releases[k] = wdi_helpers.id_mapper('P393', (('P629', source_items[k]),))
+            to_remove = set(releases[k].values())
+            to_remove.discard(releases[k][v['release']])
+            releases_to_remove.update(to_remove)
+            print(
+                "{}: Removing releases: {}, keeping release: {}".format(k, ", ".join(set(releases[k]) - {v['release']}),
+                                                                        v['release']))
+        else:
+            last_updated[source_items[k]] = datetime.strptime(v["timestamp"], "%Y%m%d")
+    print(last_updated)
+    bot.cleanup(releases_to_remove, last_updated)
 
     # after the run is done, disconnect the logging handler
     # so that if we start another, it doesn't write twice
