@@ -332,8 +332,14 @@ class ProteinBot:
                 continue
             gene_wdid = self.gene_wdid_mapping[entrez_gene]
             protein = Protein(record, self.organism_info, gene_wdid, self.login)
-            protein.parse_external_ids()
-            uniprot = protein.external_ids['UniProt ID']
+            try:
+                protein.parse_external_ids()
+                uniprot = protein.external_ids['UniProt ID']
+            except Exception as e:
+                msg = wdi_helpers.format_msg(gene_wdid, None, None, str(e), msg_type=type(e))
+                wdi_core.WDItemEngine.log("ERROR", msg)
+                continue
+
             # some proteins are encoded by multiple genes. don't try to create it again
             if uniprot in uniprot_qid:
                 wditem = protein.update_item(uniprot_qid[uniprot], fast_run=fast_run, write=write)
@@ -431,6 +437,8 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, fast_run=fast_run, write=write)
+    for frc in wdi_core.WDItemEngine.fast_run_store:
+        frc.clear()
 
     time.sleep(10 * 60)
     releases = dict()
