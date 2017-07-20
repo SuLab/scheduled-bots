@@ -720,6 +720,9 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     bot.run(records, total=total, fast_run=fast_run, write=write)
+    for frc in wdi_core.WDItemEngine.fast_run_store:
+        frc.clear()
+    print("done updating, waiting 10 min")
     time.sleep(10 * 60)
     releases = dict()
     releases_to_remove = set()
