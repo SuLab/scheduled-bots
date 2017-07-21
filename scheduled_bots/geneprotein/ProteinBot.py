@@ -86,6 +86,7 @@ class Protein:
     description = None
     aliases = None
     external_ids = None
+    status = None
 
     def __init__(self, record, organism_info, gene_wdid, login):
         """
@@ -109,6 +110,7 @@ class Protein:
 
         self.statements = None
         self.protein_wdid = None
+        self.uniprot = None
 
     def create_description(self):
         if self.organism_info['type']:
@@ -149,6 +151,7 @@ class Protein:
         assert isinstance(uniprot_id, str), (entrez_gene, uniprot_id)
 
         self.external_ids['UniProt ID'] = uniprot_id
+        self.uniprot = uniprot_id
 
         ############
         # optional external IDs
@@ -270,7 +273,7 @@ class Protein:
             if "protein" in aliases:
                 aliases.remove("protein")
             wd_item_protein.set_aliases(aliases, append=False)
-            wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
+            self.status = wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
                                   write=write)
             self.protein_wdid = wd_item_protein.wd_item_id
             return wd_item_protein
@@ -280,6 +283,7 @@ class Protein:
             msg = wdi_helpers.format_msg(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], None,
                                          str(e), msg_type=type(e))
             wdi_core.WDItemEngine.log("ERROR", msg)
+            self.status = msg
             return None
 
     def update_item(self, qid, fast_run=True, write=True):
@@ -315,6 +319,7 @@ class ProteinBot:
     """
     Generic proteinbot class
     """
+    failed = []  # list of uniprot ids for those that failed
 
     def __init__(self, organism_info, gene_wdid_mapping, login):
         self.login = login
@@ -348,6 +353,8 @@ class ProteinBot:
             if wditem is not None:
                 uniprot_qid[uniprot] = wditem.wd_item_id
                 protein.make_gene_encodes(write=write)
+            if protein.status is not True:
+                self.failed.append(protein.uniprot)
 
     def filter(self, records):
         """
@@ -362,8 +369,12 @@ class ProteinBot:
                 yield record
 
     def cleanup(self, releases, last_updated):
+        print(self.failed)
         uniprot_wdid = wdi_helpers.id_mapper(PROPS['UniProt ID'],
                                              ((PROPS['found in taxon'], self.organism_info['wdid']),))
+        print(len(uniprot_wdid))
+        uniprot_wdid = {uniprot: qid for uniprot, qid in uniprot_wdid.items() if uniprot not in self.failed}
+        print(len(uniprot_wdid))
         filter = {PROPS['UniProt ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
         frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter=filter, use_refs=True)
         frc.clear()

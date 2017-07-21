@@ -126,6 +126,7 @@ class Gene:
 
         self.wd_item_gene = None
         self.statements = None
+        self.entrez = None
 
     def create_description(self):
         if self.type_of_gene is None:
@@ -171,6 +172,7 @@ class Gene:
         entrez_gene = str(self.record['entrezgene']['@value'])
         external_ids = {'Entrez Gene ID': entrez_gene}
         taxid = self.record['taxid']['@value']
+        self.entrez = self.external_ids['Entrez Gene ID']
 
         ############
         # optional external IDs
@@ -308,7 +310,7 @@ class Gene:
                                                       global_ref_mode="CUSTOM")
 
             self.wd_item_gene = self.set_label_desc_aliases(self.wd_item_gene)
-            wdi_helpers.try_write(self.wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
+            self.status = wdi_helpers.try_write(self.wd_item_gene, self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
                                   self.login, write=write)
 
         except Exception as e:
@@ -317,6 +319,7 @@ class Gene:
             msg = wdi_helpers.format_msg(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], None,
                                          str(e), msg_type=type(e))
             wdi_core.WDItemEngine.log("ERROR", msg)
+            self.status = msg
 
 class MicrobeGene(Gene):
     """
@@ -559,6 +562,7 @@ class GeneBot:
     """
     GENE_CLASS = Gene
     item = None
+    failed = []  # list of entrez ids for those that failed
 
     def __init__(self, organism_info, login):
         self.login = login
@@ -568,7 +572,9 @@ class GeneBot:
         records = self.filter(records)
         for record in tqdm(records, mininterval=2, total=total):
             gene = self.GENE_CLASS(record, self.organism_info, self.login)
-            self.item = gene.create_item(fast_run=fast_run, write=write)
+            gene.create_item(fast_run=fast_run, write=write)
+            if gene.status is not True:
+                self.failed.append(gene.entrez)
 
     def filter(self, records):
         """
@@ -583,11 +589,22 @@ class GeneBot:
                 yield record
 
     def cleanup(self, releases, last_updated):
-        entrez_wdid = wdi_helpers.id_mapper('P351', ((PROPS['found in taxon'], self.organism_info['wdid']),))
+        """
+
+        :param releases:
+        :param last_updated:
+        :param failed: list of entrez ids to skip
+        :return:
+        """
+        print(self.failed)
+        entrez_qid = wdi_helpers.id_mapper('P351', ((PROPS['found in taxon'], self.organism_info['wdid']),))
+        print(len(entrez_qid))
+        entrez_qid = {entrez: qid for entrez, qid in entrez_qid.items() if entrez not in self.failed}
+        print(len(entrez_qid))
         filter = {PROPS['Entrez Gene ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
         frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter=filter, use_refs=True)
         frc.clear()
-        for qid in tqdm(entrez_wdid.values()):
+        for qid in tqdm(entrez_qid.values()):
             remove_deprecated_statements(qid, frc, releases, last_updated, list(PROPS.values()), self.login)
 
 
@@ -604,6 +621,8 @@ class MammalianGeneBot(GeneBot):
             # print(record['entrezgene'])
             gene = self.GENE_CLASS(record, self.organism_info, self.chr_num_wdid, self.login)
             gene.create_item(fast_run=fast_run, write=write)
+            if gene.status is not True:
+                self.failed.append(gene.entrez)
 
 class HumanGeneBot(MammalianGeneBot):
     GENE_CLASS = HumanGene
