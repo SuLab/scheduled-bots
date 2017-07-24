@@ -172,7 +172,7 @@ class Gene:
         entrez_gene = str(self.record['entrezgene']['@value'])
         external_ids = {'Entrez Gene ID': entrez_gene}
         taxid = self.record['taxid']['@value']
-        self.entrez = self.external_ids['Entrez Gene ID']
+        self.entrez = external_ids['Entrez Gene ID']
 
         ############
         # optional external IDs
