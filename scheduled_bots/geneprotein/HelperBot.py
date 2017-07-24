@@ -1,37 +1,10 @@
 import sys
-import traceback
 from datetime import datetime
 
-import functools
+import copy
+from cerberus import Validator
+
 from wikidataintegrator import wdi_core, wdi_helpers
-
-# item for a database
-source_items = {'uniprot': 'Q905695',
-                'ncbi_gene': 'Q20641742',  # these two are the same?  --v
-                'entrez': 'Q20641742',
-                'ncbi_taxonomy': 'Q13711410',
-                'swiss_prot': 'Q2629752',
-                'trembl': 'Q22935315',
-                'ensembl': 'Q1344256',
-                'refseq': 'Q7307074'}
-
-
-def validate_docs(docs, doc_type, external_id_prop):
-    assert doc_type in {'eukaryotic', 'microbial'}
-    if doc_type == "microbial":
-        f = validate_doc_microbial
-    else:
-        f = validate_doc_eukaryotic
-    for doc in docs:
-        try:
-            doc = f(doc)
-        except AssertionError as e:
-            exc_info = sys.exc_info()
-            #traceback.print_exception(*exc_info)
-            wdi_core.WDItemEngine.log("WARNING",
-                                      wdi_helpers.format_msg(doc['_id'], external_id_prop, None, str(e), type(e)))
-            continue
-        yield doc
 
 
 def alwayslist(value):
@@ -44,112 +17,131 @@ def alwayslist(value):
         return [value]
 
 
-def validate_doc_microbial(d):
-    """
-    Check fields in mygene doc. and neccessary transformations
-    Remove version numbers from genomic/transcriptomic seq IDs
-    :param d:
-    :return:
-    """
-    if 'refseq' in d and 'protein' in d['refseq']:
-        d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
-    if 'ensembl' in d and 'protein' in d['ensembl']:
-        d['ensembl']['protein'] = alwayslist(d['ensembl']['protein'])
-    assert "genomic_pos" in d
-    d['genomic_pos'] = alwayslist(d['genomic_pos'])
-    assert len(d['genomic_pos']) == 1
-    assert isinstance(d['genomic_pos'][0], dict), 'genomic_pos'
-    assert "entrezgene" in d, "{} not in record".format("entrezgene")
-    assert "locus_tag" in d, "{} not in record".format("locus_tag")
-    assert "type_of_gene" in d, "{} not in record".format("type_of_gene")
-    assert "name" in d, "{} not in record".format("name")
-    assert "uniprot" in d, "{} not in record".format("uniprot")
-    assert isinstance(d['uniprot'], dict), 'uniprot is not a dict'
-    if 'uniprot' in d and 'Swiss-Prot' in d['uniprot']:
-        assert isinstance(d['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
-    if 'uniprot' in d and 'Swiss-Prot' not in d['uniprot']:
-        assert 'TrEMBL' in d['uniprot'] and isinstance(d['uniprot']['TrEMBL'], str)
+# item for a database
+source_items = {'uniprot': 'Q905695',
+                'ncbi_gene': 'Q20641742',  # these two are the same
+                'entrez': 'Q20641742',
+                'ncbi_taxonomy': 'Q13711410',
+                'swiss_prot': 'Q2629752',
+                'trembl': 'Q22935315',
+                'ensembl': 'Q1344256',
+                'refseq': 'Q7307074'}
 
-    return d
+mygene_schema = {
+    'entrezgene': {'type': 'integer', 'coerce': int, 'required': True},
+    'type_of_gene': {'type': 'string', 'required': True},
+    'name': {'type': 'string', 'required': True},
+    'symbol': {'type': 'string', 'required': True},
+    'taxid': {'type': 'integer', 'required': True, 'coerce': int},
+    'SGD': {'type': 'string', 'required': False},
+    'HGNC': {'type': 'string', 'required': False},
+    'MIM': {'type': 'string', 'required': False},
+    'MGI': {'type': 'string', 'required': False},
+    'locus_tag': {'type': 'string', 'required': False},
+    'RGD': {'type': 'string', 'required': False},
+    'FLYBASE': {'type': 'string', 'required': False},
+    'WormBase': {'type': 'string', 'required': False},
+    'ZFIN': {'type': 'string', 'required': False},
+    'ensembl': {
+        'type': 'dict',
+        'allow_unknown': True,
+        'required': False,
+        'schema': {'gene': {'type': 'string'},
+                   'protein': {'type': 'list', 'coerce': alwayslist, 'schema': {'type': 'string'}},
+                   'transcript': {'type': 'list', 'coerce': alwayslist, 'schema': {'type': 'string'}},
+                   }
+    },
+    'genomic_pos': {
+        'type': 'list', 'coerce': alwayslist, 'required': False,
+        'schema': {'type': 'dict',
+                   'schema': {'chr': {'type': 'string',
+                                      'coerce': lambda x: str(x).lower().replace("chr", ""),
+                                      'required': True},
+                              'start': {'type': 'integer', 'required': True},
+                              'end': {'type': 'integer', 'required': True},
+                              'strand': {'required': True},
+                              'ensemblgene': {'type': 'string', 'required': False}}}},
+    'genomic_pos_hg19': {
+        'type': 'list', 'coerce': alwayslist, 'required': False,
+        'schema': {'type': 'dict',
+                   'schema': {'chr': {'type': 'string',
+                                      'coerce': lambda x: str(x).lower().replace("chr", ""),
+                                      'required': True},
+                              'start': {'type': 'integer', 'required': True},
+                              'end': {'type': 'integer', 'required': True},
+                              'strand': {'required': True},
+                              'ensemblgene': {'type': 'string', 'required': False}}}},
+    'uniprot': {
+        'type': 'dict',
+        'required': False,
+        'schema': {
+            'Swiss-Prot': {'required': False, 'type': 'string'},
+            'TrEMBL': {'required': False, 'type': 'list', 'coerce': alwayslist, 'schema': {'type': 'string'}}
+        }
+    },
+    'homologene': {
+        'type': 'dict',
+        'required': False,
+        'allow_unknown': True,
+        'schema': {'id': {'required': True, 'type': 'string', 'coerce': str}}},
+    'refseq': {
+        'type': 'dict',
+        'required': False,
+        'allow_unknown': True,
+        'schema': {
+            'protein': {'type': 'list',
+                        # remove version numbers
+                        'coerce': lambda ss: [s.rsplit(".")[0] for s in alwayslist(ss)],
+                        'schema': {'type': 'string'}},
+            'rna': {'type': 'list',
+                    # remove version numbers
+                    'coerce': lambda ss: [s.rsplit(".")[0] for s in alwayslist(ss)],
+                    'schema': {'type': 'string'}},
+        }
+    },
+    'alias': {'type': 'list', 'required': False, 'coerce': alwayslist, 'schema': {'type': 'string'}},
+    'other_names': {'type': 'list', 'required': False, 'coerce': alwayslist, 'schema': {'type': 'string'}},
+
+}
+mygene_schema_microbe = copy.deepcopy(mygene_schema)
+mygene_schema_microbe['genomic_pos']['required'] = True
+mygene_schema_microbe['locus_tag']['required'] = True
+mygene_schema_microbe['uniprot']['required'] = True
+mygene_schema_microbe['genomic_pos']['maxlength'] = 1
+mygene_schema_microbe['genomic_pos']['minlength'] = 1
+
+
+def validate_docs(docs, doc_type, external_id_prop):
+    assert doc_type in {'eukaryotic', 'microbial'}
+    if doc_type == "microbial":
+        f = validate_doc_microbial
+    else:
+        f = validate_doc_eukaryotic
+    for doc in docs:
+        try:
+            doc = f(doc)
+        except ValueError as e:
+            print(e)
+            wdi_core.WDItemEngine.log("WARNING",
+                                      wdi_helpers.format_msg(doc['_id'], external_id_prop, None, str(e), type(e)))
+            continue
+        yield doc
 
 
 def validate_doc_eukaryotic(d):
-    d = format_doc_eukaryotic(d)
-
-    # required keys
-    required = {'entrezgene', 'type_of_gene', 'name', 'symbol'}
-    for key in required:
-        assert key in d, "{} not in record".format(key)
-    assert isinstance(d['entrezgene'], (int, str)), "incorrect type: doc['entrezgene']"
-    assert isinstance(d['type_of_gene'], str), "incorrect type: doc['type_of_gene']"
-    assert isinstance(d['name'], str), "incorrect type: doc['name']"
-    assert isinstance(d['symbol'], str), "incorrect type: doc['symbol']"
-
-    # check types of optional fields
-    fields = {'SGD': str, 'HGNC': str, 'MIM': str, 'MGI': str, 'locus_tag': str, 'symbol': str, 'taxid': int,
-              'type_of_gene': str, 'name': str, 'RGD': str, 'FLYBASE': str, 'WormBase': str, 'ZFIN': str}
-    for field, field_type in fields.items():
-        if field in d:
-            assert isinstance(d[field], field_type), "incorrect type: {}".format(field)
-
-    # make sure these fields are not lists
-    if 'ensembl' in d:
-        assert isinstance(d['ensembl'], dict), "incorrect type: doc['ensembl']. expecting dict"
-    if 'ensembl' in d and 'gene' in d['ensembl']:
-        assert isinstance(d['ensembl']['gene'], str), "incorrect type: doc['ensembl']['gene']"
-    if 'uniprot' in d and 'Swiss-Prot' in d['uniprot']:
-        assert isinstance(d['uniprot']['Swiss-Prot'], str), "incorrect type: doc['uniprot']['Swiss-Prot']"
-
-    if 'homologene' in d:
-        assert "id" in d['homologene'] and isinstance(d['homologene']['id'], (int, str)), "doc['homologene']['id']"
-
-    return d
+    v = Validator(mygene_schema, allow_unknown=True)
+    v.validate(d)
+    if v.errors:
+        raise ValueError(v.errors)
+    return v.document
 
 
-def format_doc_eukaryotic(d):
-    # make sure these are lists
-    if 'ensembl' in d and 'transcript' in d['ensembl']:
-        d['ensembl']['transcript'] = alwayslist(d['ensembl']['transcript'])
-    if 'refseq' in d and 'rna' in d['refseq']:
-        d['refseq']['rna'] = alwayslist(d['refseq']['rna'])
-    if 'refseq' in d and 'protein' in d['refseq']:
-        d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
-
-    # for protein
-    if 'ensembl' in d and 'protein' in d['ensembl']:
-        d['ensembl']['protein'] = alwayslist(d['ensembl']['protein'])
-    if 'refseq' in d and 'protein' in d['refseq']:
-        d['refseq']['protein'] = alwayslist(d['refseq']['protein'])
-
-    if 'alias' in d:
-        d['alias'] = alwayslist(d['alias'])
-
-    if 'other_names' in d:
-        d['other_names'] = alwayslist(d['other_names'])
-
-    if 'taxid' in d:
-        d['taxid'] = int(d['taxid'])
-
-    if 'genomic_pos' in d:
-        d['genomic_pos'] = alwayslist(d['genomic_pos'])
-        for genomic_pos in d['genomic_pos']:
-            if 'chr' in genomic_pos:
-                genomic_pos['chr'] = genomic_pos['chr'].replace("chr", "").replace("Chr", "").replace("CHR", "")
-
-    if 'genomic_pos_hg19' in d:
-        d['genomic_pos_hg19'] = alwayslist(d['genomic_pos_hg19'])
-        for genomic_pos in d['genomic_pos_hg19']:
-            if 'chr' in genomic_pos:
-                genomic_pos['chr'] = genomic_pos['chr'].replace("chr", "").replace("Chr", "").replace("CHR", "")
-
-    # remove version numbers (these are always lists, see above)
-    remove_version = lambda ss: [s.rsplit(".")[0] if "." in s else s for s in ss]
-    if 'refseq' in d and 'rna' in d['refseq']:
-        d['refseq']['rna'] = remove_version(d['refseq']['rna'])
-    if 'refseq' in d and 'protein' in d['refseq']:
-        d['refseq']['protein'] = remove_version(d['refseq']['protein'])
-
-    return d
+def validate_doc_microbial(d):
+    v = Validator(mygene_schema_microbe, allow_unknown=True)
+    v.validate(d)
+    if v.errors:
+        raise ValueError(v.errors)
+    return v.document
 
 
 def parse_mygene_src_version(d):

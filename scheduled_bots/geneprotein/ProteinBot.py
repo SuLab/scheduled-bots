@@ -144,8 +144,8 @@ class Protein:
 
         if 'Swiss-Prot' in self.record['uniprot']['@value']:
             uniprot_id = self.record['uniprot']['@value']['Swiss-Prot']
-        elif 'TrEMBL' in self.record['uniprot']['@value']:
-            uniprot_id = self.record['uniprot']['@value']['TrEMBL']
+        elif 'TrEMBL' in self.record['uniprot']['@value'] and len(self.record['uniprot']['@value']['TrEMBL']) == 1:
+            uniprot_id = self.record['uniprot']['@value']['TrEMBL'][0]
         else:
             raise ValueError("no uniprot found")
         assert isinstance(uniprot_id, str), (entrez_gene, uniprot_id)
