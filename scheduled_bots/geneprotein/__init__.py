@@ -10,7 +10,8 @@ type_of_gene_map = {'ncRNA': 'Q427087',
                     'protein-coding': 'Q7187',  # replaced 'Q20747295'(protein coding gene) with gene
                     'other': 'Q7187',
                     'unknown': 'Q7187',
-                    'miscRNA': 'Q11053'
+                    'miscRNA': 'Q11053',
+                    'scRNA': 'Q25323710',
                     }
 
 descriptions_by_type = {
@@ -24,6 +25,7 @@ descriptions_by_type = {
     'other': 'gene in the species {}',
     'unknown': 'genetic element in the species {}',
     'miscRNA': 'RNA in the species {}',
+    'scRNA': 'small conditional RNA in the species {}'
 }
 
 #########
