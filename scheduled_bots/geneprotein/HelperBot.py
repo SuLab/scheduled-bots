@@ -43,13 +43,16 @@ mygene_schema = {
     'WormBase': {'type': 'string', 'required': False},
     'ZFIN': {'type': 'string', 'required': False},
     'ensembl': {
-        'type': 'dict',
-        'allow_unknown': True,
-        'required': False,
-        'schema': {'gene': {'type': 'string'},
-                   'protein': {'type': 'list', 'coerce': alwayslist, 'schema': {'type': 'string'}},
-                   'transcript': {'type': 'list', 'coerce': alwayslist, 'schema': {'type': 'string'}},
-                   }
+        'type': 'list', 'coerce': alwayslist, 'required': False,
+        'schema': {
+            'type': 'dict',
+            'allow_unknown': True,
+            'required': False,
+            'schema': {'gene': {'type': 'string'},
+                       'protein': {'type': 'list', 'coerce': alwayslist, 'schema': {'type': 'string'}},
+                       'transcript': {'type': 'list', 'coerce': alwayslist, 'schema': {'type': 'string'}},
+                       },
+        }
     },
     'genomic_pos': {
         'type': 'list', 'coerce': alwayslist, 'required': False,

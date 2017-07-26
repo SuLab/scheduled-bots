@@ -26,6 +26,7 @@ import os
 import sys
 import traceback
 from datetime import datetime
+from itertools import chain
 
 import pymongo
 from pymongo import MongoClient
@@ -163,9 +164,9 @@ class Protein:
         ############
         # optional external IDs (can have more than one)
         ############
-        if 'ensembl' in self.record and 'protein' in self.record['ensembl']['@value']:
-            # Ensembl Protein ID
-            self.external_ids['Ensembl Protein ID'] = self.record['ensembl']['@value']['protein']
+        if 'ensembl' in self.record:
+            ensembl_protein = set(chain(*[x['protein'] for x in self.record['ensembl']['@value']]))
+            self.external_ids['Ensembl Protein ID'] = ensembl_protein
 
         if 'refseq' in self.record and 'protein' in self.record['refseq']['@value']:
             # RefSeq Protein ID
