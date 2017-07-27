@@ -8,7 +8,7 @@ from dateutil.parser import parse as date_parse
 from scheduled_bots.interpro import ItemsBot, get_all_taxa
 from scheduled_bots.interpro import ProteinBot
 
-from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
+from wikidataintegrator import wdi_login, wdi_helpers, wdi_core
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -75,5 +75,7 @@ if __name__ == "__main__":
                 print("running protein ipr bot on taxon: {}".format(taxon))
                 ProteinBot.main(login, release_wdid, taxon=taxon, mongo_db=mongo_db, mongo_uri=mongo_uri,
                                 log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
+                for frc in wdi_core.WDItemEngine.fast_run_store:
+                    frc.clear()
 
     print("DONE")
