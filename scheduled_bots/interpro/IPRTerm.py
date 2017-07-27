@@ -1,6 +1,7 @@
 from json import JSONDecodeError
 
 from wikidataintegrator import wdi_core, wdi_helpers
+from wikidataintegrator.ref_handlers import update_retrieved_if_new
 from wikidataintegrator.wdi_helpers import format_msg
 
 INTERPRO = "P2926"
@@ -109,7 +110,7 @@ class IPRTerm:
                                             append_value=["P279", "P31"],
                                             fast_run=fast_run, fast_run_base_filter=IPRTerm.fast_run_base_filter,
                                             global_ref_mode='CUSTOM', fast_run_use_refs=True,
-                                            ref_comparison_f=wdi_core.WDBaseDataType.custom_ref_equal_dates)
+                                            ref_handler=update_retrieved_if_new)
         except JSONDecodeError as e:
             wdi_core.WDItemEngine.log("ERROR",
                                       wdi_helpers.format_msg(self.id, INTERPRO, None, str(e), msg_type=type(e)))
@@ -151,7 +152,7 @@ class IPRTerm:
                                         append_value=['P279', 'P527', 'P361'],
                                         fast_run=True, fast_run_base_filter=IPRTerm.fast_run_base_filter,
                                         global_ref_mode='CUSTOM', fast_run_use_refs=True,
-                                        ref_comparison_f=wdi_core.WDBaseDataType.custom_ref_equal_dates)
+                                        ref_handler=update_retrieved_if_new)
 
         wdi_helpers.try_write(wd_item, self.id, INTERPRO, login, edit_summary="create/update subclass/has part/part of",
                               write=write)

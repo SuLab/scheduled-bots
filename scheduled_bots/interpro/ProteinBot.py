@@ -8,6 +8,7 @@ from wikidataintegrator import wdi_core, wdi_helpers
 
 from scheduled_bots.interpro import remove_deprecated_statements
 from scheduled_bots.interpro.IPRTerm import IPRTerm
+from wikidataintegrator.ref_handlers import update_retrieved_if_new
 
 __metadata__ = {'name': 'InterproBot_Proteins',
                 'maintainer': 'GSS',
@@ -53,7 +54,7 @@ def create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_f
                                         fast_run=True, fast_run_base_filter=fast_run_base_filter,
                                         append_value=["P279", "P527"],
                                         global_ref_mode='CUSTOM', fast_run_use_refs=True,
-                                        ref_comparison_f=wdi_core.WDBaseDataType.custom_ref_equal_dates)
+                                        ref_handler=update_retrieved_if_new)
     except Exception as e:
         wdi_core.WDItemEngine.log("ERROR",
                                   wdi_helpers.format_msg(uniprot_id, UNIPROT, uniprot2wd[uniprot_id], str(e),
