@@ -1,8 +1,8 @@
-import sys
-#sys.path.insert(0, "/home/gstupp/projects/WikidataIntegrator")
+import gc
 import argparse
-import glob
 import os
+
+import gc
 from dateutil.parser import parse as date_parse
 
 from scheduled_bots.interpro import ItemsBot, get_all_taxa
@@ -63,19 +63,18 @@ if __name__ == "__main__":
     if args.protein:
         print("protein ipr bot")
         if args.taxon:
-            # only do this one taxon
-            taxon = args.taxon
+            taxa = args.taxon.split(",")
+        else:
+            taxa = get_all_taxa()
+
+        for taxon in taxa:
             print("running protein ipr bot on taxon: {}".format(taxon))
             ProteinBot.main(login, release_wdid, taxon=taxon, mongo_db=mongo_db, mongo_uri=mongo_uri,
                             log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
-        else:
-            # can't do all at once... too big. Run each taxon individually
-            taxa = get_all_taxa()
-            for taxon in taxa:
-                print("running protein ipr bot on taxon: {}".format(taxon))
-                ProteinBot.main(login, release_wdid, taxon=taxon, mongo_db=mongo_db, mongo_uri=mongo_uri,
-                                log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
-                for frc in wdi_core.WDItemEngine.fast_run_store:
-                    frc.clear()
+            for frc in wdi_core.WDItemEngine.fast_run_store:
+                frc.clear()
+            wdi_core.WDItemEngine.fast_run_store = []
+            gc.collect()
+
 
     print("DONE")
