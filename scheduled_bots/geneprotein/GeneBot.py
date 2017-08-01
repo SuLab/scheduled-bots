@@ -451,7 +451,6 @@ class EukaryoticGene(Gene):
             genomic_pos_ref = self.ensembl_ref
         else:
             raise ValueError()
-
         all_chr = set([self.chr_num_wdid[x['chr']] for x in genomic_pos_values])
         all_strand = set(['Q22809680' if x['strand'] == 1 else 'Q22809711' for x in genomic_pos_values])
 
@@ -776,6 +775,7 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
         # make sure all chromosome items are found in wikidata
         cb = ChromosomeBot()
         chr_num_wdid = cb.get_or_create(organism_info, login=login)
+        chr_num_wdid = {k.upper():v for k,v in chr_num_wdid.items()}
         if int(organism_info['taxid']) == 9606:
             bot = HumanGeneBot(organism_info, chr_num_wdid, login)
         else:
