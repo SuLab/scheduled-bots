@@ -41,3 +41,25 @@ def pd_to_table(df):
         out += '|'.join(['|{}'.format(x) for x in record[1:]])
     out += "\n|}"
     return out
+
+def execute_sparql_query(query, prefix=None, endpoint='https://query.wikidata.org/sparql',
+                         user_agent='wikidatasparqlexamples: https://github.com/SuLab/wikidatasparqlexamples'):
+    wd_standard_prefix = '''
+        PREFIX wd: <http://www.wikidata.org/entity/>
+        PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+        PREFIX wikibase: <http://wikiba.se/ontology#>
+        PREFIX p: <http://www.wikidata.org/prop/>
+        PREFIX v: <http://www.wikidata.org/prop/statement/>
+        PREFIX q: <http://www.wikidata.org/prop/qualifier/>
+        PREFIX ps: <http://www.wikidata.org/prop/statement/>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    '''
+    if not prefix:
+        prefix = wd_standard_prefix
+    params = {'query': prefix + '\n' + query,
+              'format': 'json'}
+    headers = {'Accept': 'application/sparql-results+json',
+               'User-Agent': user_agent}
+    response = requests.get(endpoint, params=params, headers=headers)
+    response.raise_for_status()
+    return response.json()
