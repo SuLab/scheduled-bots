@@ -1,10 +1,15 @@
-import os
-from collections import defaultdict
-from datetime import datetime, time
+from time import mktime
+import time
+from datetime import datetime
 from itertools import chain
 
 import itertools
 import json
+
+import pickle
+
+import copy
+import pandas as pd
 from cachetools import cached, TTLCache
 from pymongo.errors import DuplicateKeyError
 from tqdm import tqdm
@@ -35,7 +40,7 @@ def chunks(iterable, size):
 def getConceptLabels(qids):
     qids = "|".join({qid.replace("wd:", "") if qid.startswith("wd:") else qid for qid in qids})
     wd = site.api('wbgetentities', **{'ids': qids, 'languages': 'en', 'format': 'json', 'props': 'labels'})['entities']
-    return {k: v['labels']['en']['value'] if 'en' in v['labels'] else '' for k, v in wd.items()}
+    return {k: v['labels']['en']['value'] if 'labels' in v and 'en' in v['labels'] else '' for k, v in wd.items()}
 
 
 def isint(x):
@@ -47,7 +52,8 @@ def isint(x):
 
 
 class Change:
-    def __init__(self, change_type, qid='', pid='', value='', value_label='', user='', timestamp=''):
+    def __init__(self, change_type, qid='', pid='', value='', value_label='', user='', timestamp='', reference=list(),
+                 revid=None, comment=''):
         self.change_type = change_type
         self.qid = qid
         self.qid_label = ''
@@ -59,19 +65,36 @@ class Change:
         self.timestamp = timestamp
         self.count = 0
         self.metadata = dict()
+        self.reference = reference
+        self.ref_list = []
+        self.revid = revid
+        self.comment=comment
 
     def __repr__(self):
-        return " | ".join(
-            [self.change_type, self.qid, self.qid_label, self.pid, self.pid_label, self.value, self.value_label,
-             self.user])
+        return " | ".join(map(str, [self.change_type, self.qid, self.qid_label, self.pid, self.pid_label, self.value,
+                                    self.value_label, self.user]))
+
+    def to_dict(self):
+        d = copy.deepcopy(self.__dict__)
+        d['has_ref'] = bool(d['reference'])
+        del d['reference']
+        d['ref_str'] = ",".join(
+            "{} ({}):{} ({})".format(x['prop_label'], x['prop'], x['value_label'], x['value']) for x in d['ref_list'])
+        del d['ref_list']
+        d['merge'] = True if 'merge' in d['comment'] else False
+        return d
 
     @staticmethod
     def lookupLabels(changes):
         pids = set(s.pid for s in changes)
         qids = set(s.qid for s in changes)
         values = set(s.value for s in changes if s.value and s.value.startswith("Q") and isint(s.value[1:]))
+        ref_qids = set(chain(*[
+            [s['value'] for s in change.ref_list if s['value'] and s['value'].startswith("Q") and isint(s['value'][1:])]
+            for change in changes]))
+        ref_pids = set(chain(*[[s['prop'] for s in change.ref_list] for change in changes]))
         labels = dict()
-        x = pids | qids | values
+        x = pids | qids | values | ref_qids | ref_pids
         for chunk in tqdm(chunks(x, 500), total=len(x) / 500):
             l = getConceptLabels(tuple(chunk))
             labels.update(l)
@@ -83,10 +106,34 @@ class Change:
                 c.qid_label = labels[c.qid]
             if c.value and c.value in labels:
                 c.value_label = labels[c.value]
+            for ref in c.ref_list:
+                ref['value_label'] = labels.get(ref['value'], '')
+                ref['prop_label'] = labels.get(ref['prop'], '')
+
+    def pretty_refs(self):
+        """
+        refs = [{'hash': '6a25eeddbaf5d49fc4cbb053c46c837c2ae40581',
+       'snaks': {'P248': [{'datavalue': {'type': 'wikibase-entityid',
+           'value': {'entity-type': 'item',
+            'id': 'Q9049250',
+            'numeric-id': 9049250}},
+          'hash': 'c452e8fc259131192625f0201037bd6577681ccb',
+          'property': 'P248',
+          'snaktype': 'value'}]},
+       'snaks-order': ['P248']}]
+        """
+        # "stated in (P248): WikiSkripta (Q9049250)|other prop (P1234): '123'"
+        ref_list = []
+        for ref in self.reference:
+            for snak in chain(*ref['snaks'].values()):
+                value = get_claim_value(snak)
+                prop = snak['property']
+                ref_list.append({'value': value, 'prop': prop, 'value_label': '', 'prop_label': ''})
+        self.ref_list = ref_list
 
 
 def get_claim_value(claim):
-    mainsnak = claim['mainsnak']
+    mainsnak = claim
     if 'datavalue' not in mainsnak:
         print("no datavalue: {}".format(mainsnak))
         return None
@@ -132,19 +179,21 @@ def detect_claim_change(claimsx, claimsy):
     props_missing_y = set(claimsx.keys()) - set(claimsy.keys())
     for prop in props_missing_y:
         for claim in claimsx[prop]:
-            s.append(Change("REMOVE", pid=prop, value=get_claim_value(claim)))
+            s.append(Change("REMOVE", pid=prop, value=get_claim_value(claim['mainsnak']),
+                            reference=claim.get('references', [])))
 
     # props in y but not in x
     props_missing_x = set(claimsy.keys()) - set(claimsx.keys())
     for prop in props_missing_x:
         for claim in claimsy[prop]:
-            s.append(Change("ADD", pid=prop, value=get_claim_value(claim)))
+            s.append(Change("ADD", pid=prop, value=get_claim_value(claim['mainsnak']),
+                            reference=claim.get('references', [])))
 
     # for props in both, get the values
     props_in_both = set(claimsx.keys()) & set(claimsy.keys())
     for prop in props_in_both:
-        values_x = set(get_claim_value(claim) for claim in claimsx[prop])
-        values_y = set(get_claim_value(claim) for claim in claimsy[prop])
+        values_x = set(get_claim_value(claim['mainsnak']) for claim in claimsx[prop])
+        values_y = set(get_claim_value(claim['mainsnak']) for claim in claimsy[prop])
         # values in x but not in y
         missing_y = values_x - values_y
         # values in y but not in x
@@ -152,10 +201,12 @@ def detect_claim_change(claimsx, claimsy):
         for m in missing_y:
             s.append(Change("REMOVE", pid=prop, value=m))
         for m in missing_x:
-            s.append(Change("ADD", pid=prop, value=m))
+            ref = [x.get('references', []) for x in claimsy[prop] if m == get_claim_value(x['mainsnak'])][0]
+            s.append(Change("ADD", pid=prop, value=m, reference=ref))
     return s
 
 
+"""
 def get_revisions(qid, start):
     raise DeprecationWarning("dont use")
     starts = start.strftime('%Y-%m-%dT00:00:00Z')
@@ -176,6 +227,7 @@ def get_new_revisions(qid, start, existing_revids):
     print("{}: {}".format(qid, need_revids))
     revisions = site.revisions(list(need_revids), prop='content|timestamp')
     return list(revisions)
+"""
 
 
 def detect_changes(revisions, qid):
@@ -191,6 +243,8 @@ def detect_changes(revisions, qid):
             change.user = revisions[idx]['user']
             change.timestamp = revisions[idx]['timestamp']
             change.metadata = revisions[0]['metadata'] if 'metadata' in revisions[0] else dict()
+            change.revid = revisions[idx]['revid']
+            change.comment = revisions[idx]['comment']
         if changes:
             c.append(changes)
     return list(chain(*c))
@@ -219,7 +273,10 @@ def store_revision(coll, rev, metadata):
     d.update(rev)
     d['_id'] = d['revid']
     d['metadata'] = metadata if metadata else dict()
-    d['timestamp'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', d['timestamp'])
+    if isinstance(d['timestamp'], time.struct_time):
+        d['timestamp'] = datetime.fromtimestamp(mktime(d['timestamp']))
+    elif not isinstance(d['timestamp'], str):
+        d['timestamp'] = time.strftime(d['timestamp'], '%Y-%m-%dT%H:%M:%SZ')
     try:
         coll.insert_one(d)
     except DuplicateKeyError:
@@ -227,52 +284,67 @@ def store_revision(coll, rev, metadata):
 
 
 ### get the revisions from the past year for all diseases
-pid = "P699"
-doid_qid = id_mapper(pid)
-qid_doid = {v: k for k, v in doid_qid.items()}
-qids = '"' + '","'.join(doid_qid.values()) + '"'
-query = '''select rev_id, rev_page, rev_timestamp, page_id, page_namespace, page_title, page_touched FROM revision
-               inner join page on revision.rev_page = page.page_id WHERE
-               rev_timestamp > DATE_FORMAT(DATE_SUB(NOW(),INTERVAL 1 MONTH ),'%Y%m%d%H%i%s') AND
-               page_content_model = "wikibase-item" AND
-               page.page_title IN({});
-        '''.format(qids)
-%time revision_df = query_wikidata_mysql(query)
+def get_revision_ids(coll, qids, weeks=1):
+    revisions = set()
+    qids_str = '"' + '","'.join(qids) + '"'
+    for week in tqdm(range(weeks)):
+        query = '''select rev_id, rev_page, rev_timestamp, page_id, page_namespace, page_title, page_touched FROM revision
+                       inner join page on revision.rev_page = page.page_id WHERE
+                       rev_timestamp > DATE_FORMAT(DATE_SUB(DATE_SUB(NOW(),INTERVAL {week} WEEK), INTERVAL 1 WEEK),'%Y%m%d%H%i%s') AND
+                       rev_timestamp < DATE_FORMAT(DATE_SUB(NOW(), INTERVAL {week} WEEK),'%Y%m%d%H%i%s') AND
+                       page_content_model = "wikibase-item" AND
+                       page.page_title IN({qids});
+                '''.format(qids=qids_str, week=week)
+        revision_df = query_wikidata_mysql(query)
+        print(len(revision_df))
+        print(revision_df.head(2))
+        print(revision_df.tail(2))
+        revisions.update(set(revision_df.rev_id))
+        with open("revisions.pkl", "wb") as f:
+            pickle.dump(revisions, f)
 
-# get the content of these revisions, excluding the ones we already have
-coll = MongoClient().wikidata.revisions
-have_revisions = set([x['_id'] for x in coll.find({}, {'id': True})])
-print(len(have_revisions))
-need_revisions = set(revision_df.rev_id) - have_revisions
-print(len(need_revisions))
+    # excluding the ones we already have
+    have_revisions = set([x['_id'] for x in coll.find({}, {'id': True})])
+    print(len(have_revisions))
+    need_revisions = revisions - have_revisions
+    print(len(need_revisions))
+    return need_revisions
 
-for chunk in tqdm(chunks(need_revisions, 100), total=len(need_revisions) / 100):
-    revs = site.revisions(chunk, prop='ids|timestamp|flags|comment|user|content')
-    for rev in revs:
-        qid = rev['pagetitle']
-        if rev['contentmodel'] != "wikibase-item":
-            continue
-        store_revision(coll, rev, {pid: qid_doid.get(qid, '')})
 
-# process the changes for each qid
-qids = set(x['id'] if 'id' in x else '' for x in coll.find({}, {'id': True}))
-changes = []
-for qid in tqdm(qids):
-    revisions = sorted(coll.find({'id': qid}), key=lambda x: x['timestamp'], reverse=True)
-    c = detect_changes(revisions, qid)
-    c = process_changes(c)
-    c = [x for x in c if x.user not in {"ProteinBoxBot"}]
-    changes.extend(c)
+def get_revisions(coll, revision_ids, pid, qid_extid_map):
+    for chunk in tqdm(chunks(revision_ids, 100), total=len(revision_ids) / 100):
+        revs = site.revisions(chunk, prop='ids|timestamp|flags|comment|user|content')
+        for rev in revs:
+            qid = rev['pagetitle']
+            if rev.get('contentmodel', 'fake') != "wikibase-item":
+                continue
+            store_revision(coll, rev, {pid: qid_extid_map.get(qid, '')})
 
-Change.lookupLabels(changes)
-import pandas as pd
 
-pd.DataFrame([x.__dict__ for x in changes if x.qid == "Q7758678"])
-pd.DataFrame([x.__dict__ for x in changes]).to_csv("tmp.csv")
+def process_revisions(coll):
+    # process the changes for each qid
+    qids = set(x['id'] if 'id' in x else '' for x in coll.find({}, {'id': True}))
+    changes = []
+    for qid in tqdm(list(qids)[:]):
+        revisions = sorted(coll.find({'id': qid}), key=lambda x: x['timestamp'], reverse=True)
+        c = detect_changes(revisions, qid)
+        c = process_changes(c)
+        c = [x for x in c if x.user not in {"ProteinBoxBot"}]
+        changes.extend(c)
+    return changes
 
-"""
-for d in tqdm(coll.find(), total=coll.count()):
-    doid = [k for k,v in doid_qid.items() if v == d['id']]
-    if doid:
-        coll.update_one({'id': d['id']}, {'$set': {'metadata': {'P699': doid[0]}}})
-"""
+
+if __name__ == "__main__":
+    coll = MongoClient().wikidata.revisions2
+    pid = "P699"
+    doid_qid = id_mapper(pid)
+    qid_doid = {v: k for k, v in doid_qid.items()}
+    qids = doid_qid.values()
+    # need_revisions = get_revision_ids(coll, qids, weeks=52)
+    # get_revisions(coll, need_revisions, pid, qid_doid)
+    changes = process_revisions(coll)
+    for change in changes:
+        change.pretty_refs()
+    Change.lookupLabels(changes)
+    df = pd.DataFrame([x.to_dict() for x in changes])
+    df.to_csv("doid_ref.csv")
