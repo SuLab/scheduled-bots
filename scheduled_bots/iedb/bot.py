@@ -84,11 +84,8 @@ if __name__ == "__main__":
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='gene-disease')
 
-    path = args.path
-    if args.url:
-        df = pd.read_csv(requests.get(args.url).text, names=['chebi', 'iedb'], sep="|")
-    else:
-        df = pd.read_csv(path, names=['chebi', 'iedb'], sep="|")
+    path = args.url if args.url else args.path
+    df = pd.read_csv(path, names=['chebi', 'iedb'], sep="|")
     chebi_iedb_map = dict(zip(df.chebi, df.iedb))
     chebi_iedb_map = {k.replace("CHEBI:", ""): v.replace("http://www.iedb.org/epitope/", "") for k, v in
                       chebi_iedb_map.items()}
