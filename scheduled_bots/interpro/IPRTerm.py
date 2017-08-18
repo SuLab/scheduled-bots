@@ -111,7 +111,7 @@ class IPRTerm:
                                             fast_run=fast_run, fast_run_base_filter=IPRTerm.fast_run_base_filter,
                                             global_ref_mode='CUSTOM', fast_run_use_refs=True,
                                             ref_handler=update_retrieved_if_new)
-        except JSONDecodeError as e:
+        except Exception as e:
             wdi_core.WDItemEngine.log("ERROR",
                                       wdi_helpers.format_msg(self.id, INTERPRO, None, str(e), msg_type=type(e)))
             return None
