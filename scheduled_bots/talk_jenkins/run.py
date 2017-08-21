@@ -24,7 +24,7 @@ except ImportError:
         raise ValueError("WDUSER and WDPASS and JENKINS_PASS must be specified in local.py or as environment variables")
 
 # jenkins url
-HOST = "http://52.15.200.208:8080"
+HOST = "http://jenkins.sulab.org"
 
 
 server = jenkins.Jenkins(HOST, username='admin', password=JENKINS_PASS)
