@@ -40,7 +40,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
     # create/update all interpro items
     terms = []
     cursor = interpro_coll.find().batch_size(20)
-    for n, doc in tqdm(enumerate(cursor), total=cursor.count(), mininterval=1.0):
+    for n, doc in tqdm(enumerate(cursor), total=cursor.count(), mininterval=2.0):
         doc['release_wdid'] = release_wdid
         term = IPRTerm(**doc)
         term.create_item(login, write=write)
@@ -54,7 +54,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
 
     # create/update interpro item relationships
     IPRTerm.refresh_ipr_wd()
-    for term in tqdm(terms, mininterval=1.0):
+    for term in tqdm(terms, mininterval=2.0):
         term.create_relationships(login, write=write)
 
     time.sleep(10 * 60)  # sleep for 10 min so (hopefully) the wd sparql endpoint updates
@@ -64,7 +64,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
     for term in terms:
         term.wd_item.fast_run_container.clear()
 
-    for term in tqdm(terms, mininterval=1.0):
+    for term in tqdm(terms, mininterval=2.0):
         remove_deprecated_statements(term.wd_item, release_wdid, ["P279", "P2926", 'P527', 'P361'], login)
 
     return os.path.join(log_dir, log_name)

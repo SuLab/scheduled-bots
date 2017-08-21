@@ -78,7 +78,7 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
 
     cursor = collection.find({'_id': {'$in': list(uniprot2wd.keys())}}).batch_size(20)
     items = []
-    for n, doc in tqdm(enumerate(cursor), total=cursor.count(), mininterval=1.0):
+    for n, doc in tqdm(enumerate(cursor), total=cursor.count(), mininterval=10.0):
         wd_item = create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_filter, write=write)
         if wd_item:
             items.append(wd_item)
