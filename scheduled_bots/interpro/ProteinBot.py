@@ -63,9 +63,9 @@ def create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_f
 
     wdi_helpers.try_write(wd_item, uniprot_id, INTERPRO, login, write=write,
                           edit_summary="add/update family and/or domains")
-
+    wd_item.wd_json_representation = dict()
+    wd_item.statements = []
     return wd_item
-
 
 def create_uniprot_relationships(login, release_wdid, collection, taxon=None, write=True):
     # only do uniprot proteins that are already in wikidata
@@ -82,9 +82,6 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
         wd_item = create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_filter, write=write)
         if wd_item:
             items.append(wd_item)
-
-        if n>=100:
-            pass
     return items
 
 
