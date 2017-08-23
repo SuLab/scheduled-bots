@@ -398,13 +398,14 @@ def main(pid, weeks, idfilter, force_update, filter_user):
     weeks_to_dl = weeks
     if not force_update:
         timestamps = set(x['timestamp'] for x in coll.find({'id': {'$in': list(qids)}}, {'timestamp': True}))
-        if datetime.date.today() == max(timestamps).date():
-            print("most recent revision is today, skipping")
-            weeks_to_dl = 0
-        else:
-            weeks_to_dl = math.ceil(abs((max(timestamps) - datetime.datetime.now()).days / 7)) + 1
-            print("Most recent revision stored: {}".format(max(timestamps)))
-            print("Getting revisions from the past {} weeks".format(weeks_to_dl))
+        if timestamps:
+            if datetime.date.today() == max(timestamps).date():
+                print("most recent revision is today, skipping")
+                weeks_to_dl = 0
+            else:
+                weeks_to_dl = math.ceil(abs((max(timestamps) - datetime.datetime.now()).days / 7)) + 1
+                print("Most recent revision stored: {}".format(max(timestamps)))
+    print("Getting revisions from the past {} weeks".format(weeks_to_dl))
 
     need_revisions = get_revision_ids_needed(coll, qids, weeks=weeks_to_dl)
     download_revisions(coll, need_revisions, pid, qid_extid)
