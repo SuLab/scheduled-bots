@@ -1,6 +1,9 @@
+import math
+
+import click
 from time import mktime
 import time
-from datetime import datetime
+import datetime
 from itertools import chain
 
 import itertools
@@ -68,7 +71,7 @@ class Change:
         self.reference = reference
         self.ref_list = []
         self.revid = revid
-        self.comment=comment
+        self.comment = comment
 
     def __repr__(self):
         return " | ".join(map(str, [self.change_type, self.qid, self.qid_label, self.pid, self.pid_label, self.value,
@@ -95,6 +98,7 @@ class Change:
         ref_pids = set(chain(*[[s['prop'] for s in change.ref_list] for change in changes]))
         labels = dict()
         x = pids | qids | values | ref_qids | ref_pids
+        x = set(y for y in x if y)
         for chunk in tqdm(chunks(x, 500), total=len(x) / 500):
             l = getConceptLabels(tuple(chunk))
             labels.update(l)
@@ -156,19 +160,6 @@ def get_claim_value(claim):
         print(mainsnak)
 
 
-def detect_label_change(x, y):
-    """
-    {'en': {'language': 'en',
-            'value': 'this is a label'}}
-    """
-    if x['labels']['en']['value'] != y['labels']['en']['value']:
-        return [("CHANGE", x['labels']['en']['value'], y['labels']['en']['value'])]
-
-
-def detect_aliases_change(x, y):
-    pass
-
-
 def detect_claim_change(claimsx, claimsy):
     s = []
     if len(claimsx) == 0:
@@ -206,30 +197,6 @@ def detect_claim_change(claimsx, claimsy):
     return s
 
 
-"""
-def get_revisions(qid, start):
-    raise DeprecationWarning("dont use")
-    starts = start.strftime('%Y-%m-%dT00:00:00Z')
-    # gets up to the last 50 revisions from `start_date` to `end_date`
-    # qid = "Q18557952"
-    page = site.pages[qid]
-    revisions = page.revisions(start=starts, dir='newer', prop='content|ids|timestamp|user|comment')
-    return list(revisions)
-
-
-def get_new_revisions(qid, start, existing_revids):
-    raise DeprecationWarning("dont use")
-    # two step process, fetch the revision ids, then only get the content for the new ones
-    starts = start.strftime('%Y-%m-%dT00:00:00Z')
-    page = site.pages[qid]
-    revids = set([x['revid'] for x in page.revisions(start=starts, dir='newer')])
-    need_revids = revids - set(existing_revids)
-    print("{}: {}".format(qid, need_revids))
-    revisions = site.revisions(list(need_revids), prop='content|timestamp')
-    return list(revisions)
-"""
-
-
 def detect_changes(revisions, qid):
     c = []
     for idx in range(len(revisions) - 1):
@@ -238,6 +205,7 @@ def detect_changes(revisions, qid):
         claimsx = x['claims']
         claimsy = y['claims']
         changes = detect_claim_change(claimsx, claimsy)
+        changes = [x for x in changes if x]
         for change in changes:
             change.qid = qid
             change.user = revisions[idx]['user']
@@ -253,7 +221,7 @@ def detect_changes(revisions, qid):
 def process_changes(changes):
     # if a user adds a value to a prop, and then another user removes it, cancel out both revisions
     # example: https://www.wikidata.org/w/index.php?title=Q27869338&action=history
-    sorted(changes, key=lambda x: x.timestamp)
+    changes = sorted(changes, key=lambda x: x.timestamp)
     for c in changes:
         for other in changes:
             if (c != other) and (c.qid == other.qid) and (c.pid == other.pid) and (c.value == other.value):
@@ -262,11 +230,27 @@ def process_changes(changes):
     return changes
 
 
+def process_ld_changes(changes):
+    # only show the label changes if the first and last values are different
+    changes = sorted(changes, key=lambda x: x.timestamp)
+    if changes[0].value != changes[-1].value:
+        return [changes[0], changes[-1]]
+    else:
+        return []
+
+
+def process_alias_changes(changes):
+    # only show the label changes if the first and last values are different
+    changes = sorted(changes, key=lambda x: x.timestamp)
+    if changes[0].value != changes[-1].value:
+        return [changes[0], changes[-1]]
+    else:
+        return []
+
+
 def store_revision(coll, rev, metadata):
     if '*' not in rev:
-        # todo: handle reverted revisions
-        # {'comment': 'Reverted edits by [[Special:Contributions/2600:1017:B02C:BB37:7C27:4C06:B6D4:C066|2600:1017:B02C:BB37:7C27:4C06:B6D4:C066]] ([[User talk:2600:1017:B02C:BB37:7C27:4C06:B6D4:C066|talk]]) to last revision by [[User:205.197.242.154|205.197.242.154]]',
-        # 'parentid': 458175156, 'revid': 458238438, 'texthidden': '', 'timestamp': '2017-02-28T18:03:45Z', 'user': 'ValterVB'}
+        # this revision was deleted
         return None
     d = json.loads(rev['*'])
     del rev['*']
@@ -274,7 +258,7 @@ def store_revision(coll, rev, metadata):
     d['_id'] = d['revid']
     d['metadata'] = metadata if metadata else dict()
     if isinstance(d['timestamp'], time.struct_time):
-        d['timestamp'] = datetime.fromtimestamp(mktime(d['timestamp']))
+        d['timestamp'] = datetime.datetime.fromtimestamp(mktime(d['timestamp']))
     elif not isinstance(d['timestamp'], str):
         d['timestamp'] = time.strftime(d['timestamp'], '%Y-%m-%dT%H:%M:%SZ')
     try:
@@ -283,27 +267,36 @@ def store_revision(coll, rev, metadata):
         pass
 
 
-### get the revisions from the past year for all diseases
-def get_revision_ids(coll, qids, weeks=1):
+def get_revisions_past_weeks(qids, weeks):
+    """
+    Get the revision IDs for revisions on `qids` items in the past `weeks` weeks
+    :param qids: set of qids
+    :param weeks: int
+    :return:
+    """
     revisions = set()
     qids_str = '"' + '","'.join(qids) + '"'
     for week in tqdm(range(weeks)):
         query = '''select rev_id, rev_page, rev_timestamp, page_id, page_namespace, page_title, page_touched FROM revision
-                       inner join page on revision.rev_page = page.page_id WHERE
-                       rev_timestamp > DATE_FORMAT(DATE_SUB(DATE_SUB(NOW(),INTERVAL {week} WEEK), INTERVAL 1 WEEK),'%Y%m%d%H%i%s') AND
-                       rev_timestamp < DATE_FORMAT(DATE_SUB(NOW(), INTERVAL {week} WEEK),'%Y%m%d%H%i%s') AND
-                       page_content_model = "wikibase-item" AND
-                       page.page_title IN({qids});
-                '''.format(qids=qids_str, week=week)
+                           inner join page on revision.rev_page = page.page_id WHERE
+                           rev_timestamp > DATE_FORMAT(DATE_SUB(DATE_SUB(NOW(),INTERVAL {week} WEEK), INTERVAL 1 WEEK),'%Y%m%d%H%i%s') AND
+                           rev_timestamp < DATE_FORMAT(DATE_SUB(NOW(), INTERVAL {week} WEEK),'%Y%m%d%H%i%s') AND
+                           page_content_model = "wikibase-item" AND
+                           page.page_title IN({qids});
+                    '''.format(qids=qids_str, week=week)
         revision_df = query_wikidata_mysql(query)
         print(len(revision_df))
         print(revision_df.head(2))
         print(revision_df.tail(2))
         revisions.update(set(revision_df.rev_id))
-        with open("revisions.pkl", "wb") as f:
-            pickle.dump(revisions, f)
+    return revisions
 
-    # excluding the ones we already have
+
+def get_revision_ids_needed(coll, qids, weeks=1):
+    # Get the revision IDs for revisions on `qids` items in the past `weeks` weeks
+    # # excluding the ones we already have in `coll`
+
+    revisions = get_revisions_past_weeks(qids, weeks)
     have_revisions = set([x['_id'] for x in coll.find({}, {'id': True})])
     print(len(have_revisions))
     need_revisions = revisions - have_revisions
@@ -311,40 +304,131 @@ def get_revision_ids(coll, qids, weeks=1):
     return need_revisions
 
 
-def get_revisions(coll, revision_ids, pid, qid_extid_map):
+def download_revisions(coll, revision_ids, pid, qid_extid_map):
     for chunk in tqdm(chunks(revision_ids, 100), total=len(revision_ids) / 100):
         revs = site.revisions(chunk, prop='ids|timestamp|flags|comment|user|content')
         for rev in revs:
             qid = rev['pagetitle']
-            if rev.get('contentmodel', 'fake') != "wikibase-item":
+            if rev.get('contentmodel') != "wikibase-item":
                 continue
             store_revision(coll, rev, {pid: qid_extid_map.get(qid, '')})
 
 
-def process_revisions(coll):
+def process_revisions(coll, weeks):
     # process the changes for each qid
+    last_updated = datetime.datetime.now() - datetime.timedelta(weeks=weeks)
     qids = set(x['id'] if 'id' in x else '' for x in coll.find({}, {'id': True}))
     changes = []
     for qid in tqdm(list(qids)[:]):
         revisions = sorted(coll.find({'id': qid}), key=lambda x: x['timestamp'], reverse=True)
+        revisions = [r for r in revisions if r['timestamp'] > last_updated]
         c = detect_changes(revisions, qid)
         c = process_changes(c)
-        c = [x for x in c if x.user not in {"ProteinBoxBot"}]
         changes.extend(c)
     return changes
 
 
-if __name__ == "__main__":
-    coll = MongoClient().wikidata.revisions2
-    pid = "P699"
-    doid_qid = id_mapper(pid)
-    qid_doid = {v: k for k, v in doid_qid.items()}
-    qids = doid_qid.values()
-    # need_revisions = get_revision_ids(coll, qids, weeks=52)
-    # get_revisions(coll, need_revisions, pid, qid_doid)
-    changes = process_revisions(coll)
+def process_lda_revisions(coll, weeks):
+    # we only care about what happened between the first and last revision
+    # not capturing intermediate changes
+    last_updated = datetime.datetime.now() - datetime.timedelta(weeks=weeks)
+    qids = set(x['id'] if 'id' in x else '' for x in coll.find({}, {'id': True}))
+    changes = []
+    for qid in tqdm(list(qids)[:]):
+        revisions = sorted(coll.find({'id': qid}), key=lambda x: x['timestamp'], reverse=True)
+        revisions = [r for r in revisions if r['timestamp'] > last_updated]
+        if not revisions:
+            continue
+        x = revisions[0]
+        y = revisions[-1]
+
+        user = x['user']
+        timestamp = x['timestamp']
+        revid = x['revid']
+        comment = x['comment']
+
+        xl = x['labels']['en']['value'] if 'en' in x['labels'] else ''
+        yl = y['labels']['en']['value'] if 'en' in y['labels'] else ''
+        if xl != yl:
+            changes.append(Change(change_type="labels", value=xl, qid=qid,
+                                  user=user, timestamp=timestamp, revid=revid, comment=comment))
+        xd = x['descriptions']['en']['value'] if 'en' in x['descriptions'] else ''
+        yd = y['descriptions']['en']['value'] if 'en' in y['descriptions'] else ''
+        if xd != yd:
+            changes.append(Change(change_type="descriptions", value=xd, qid=qid,
+                                  user=user, timestamp=timestamp, revid=revid, comment=comment))
+        x_aliases = set(a['value'] for a in x['aliases']['en']) if 'en' in x['aliases'] else set()
+        y_aliases = set(a['value'] for a in y['aliases']['en']) if 'en' in y['aliases'] else set()
+        for change in y_aliases - x_aliases:
+            changes.append(Change("remove_alias", value=change, qid=qid,
+                                  user=user, timestamp=timestamp, revid=revid, comment=comment))
+        for change in x_aliases - y_aliases:
+            changes.append(Change("add_alias", value=change, qid=qid,
+                                  user=user, timestamp=timestamp, revid=revid, comment=comment))
+    return changes
+
+
+@click.command()
+@click.option('--pid', default="P699", help='property filter')
+@click.option('--idfilter', default='', help='additional filter. example "P703:Q15978631;P1057:Q847102"')
+@click.option('--weeks', default=2, help='number of weeks ago')
+@click.option('--force_update', default=False, help='skip checking for existing revision')
+@click.option('--filter-user', default="ProteinBoxBot", help='filter out changes by this user')
+def main(pid, weeks, idfilter, force_update, filter_user):
+    """
+    from tracker import *
+    pid="P699"
+    idfilter=""
+    weeks=52
+    force_update=False
+    filter_user="ProteinBoxBot"
+    """
+    coll_name = pid + "_" + idfilter if idfilter else pid
+    save_name = coll_name + "_" + str(datetime.date.today()) + "_{}weeks".format(weeks) + ".xls"
+    coll = MongoClient().wikidata[coll_name]
+    coll.create_index("id")
+    idfilter = [(k.split(":")[0], k.split(":")[1]) for k in idfilter.split(";")] if idfilter else []
+    extid_qid = id_mapper(pid, idfilter)
+    qid_extid = {v: k for k, v in extid_qid.items()}
+    qids = extid_qid.values()
+
+    # what are the date extents of these items?
+    # get the most recent timestamp and figure out how many weeks ago it was
+    # warning, only checks the most recent timestamp!
+    # as in, if you request one week, and then one year, it won't get anything before one week ago
+    # unless force_update=True
+    weeks_to_dl = weeks
+    if not force_update:
+        timestamps = set(x['timestamp'] for x in coll.find({'id': {'$in': list(qids)}}, {'timestamp': True}))
+        if datetime.date.today() == max(timestamps).date():
+            print("most recent revision is today, skipping")
+            weeks_to_dl = 0
+        else:
+            weeks_to_dl = math.ceil(abs((max(timestamps) - datetime.datetime.now()).days / 7)) + 1
+            print("Most recent revision stored: {}".format(max(timestamps)))
+            print("Getting revisions from the past {} weeks".format(weeks_to_dl))
+
+    need_revisions = get_revision_ids_needed(coll, qids, weeks=weeks_to_dl)
+    download_revisions(coll, need_revisions, pid, qid_extid)
+
+    print("Processing changes in the past {} weeks".format(weeks))
+    changes = process_revisions(coll, weeks)
+    if filter_user:
+        changes = [c for c in changes if c.user != filter_user]
     for change in changes:
         change.pretty_refs()
     Change.lookupLabels(changes)
     df = pd.DataFrame([x.to_dict() for x in changes])
-    df.to_csv("doid_ref.csv")
+    writer = pd.ExcelWriter(save_name)
+    df.to_excel(writer, sheet_name="changes")
+
+    print("Processing label changes in the past {} weeks".format(weeks))
+    lda_changes = process_lda_revisions(coll, weeks)
+    Change.lookupLabels(lda_changes)
+    lda_df = pd.DataFrame([x.to_dict() for x in lda_changes])
+    lda_df.to_excel(writer, sheet_name="labels")
+    writer.save()
+
+
+if __name__ == "__main__":
+    main()
