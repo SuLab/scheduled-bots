@@ -314,10 +314,9 @@ def download_revisions(coll, revision_ids, pid, qid_extid_map):
             store_revision(coll, rev, {pid: qid_extid_map.get(qid, '')})
 
 
-def process_revisions(coll, weeks):
+def process_revisions(coll, qids, weeks):
     # process the changes for each qid
     last_updated = datetime.datetime.now() - datetime.timedelta(weeks=weeks)
-    qids = set(x['id'] if 'id' in x else '' for x in coll.find({}, {'id': True}))
     changes = []
     for qid in tqdm(list(qids)[:]):
         revisions = sorted(coll.find({'id': qid}), key=lambda x: x['timestamp'], reverse=True)
@@ -328,11 +327,10 @@ def process_revisions(coll, weeks):
     return changes
 
 
-def process_lda_revisions(coll, weeks):
+def process_lda_revisions(coll, qids, weeks):
     # we only care about what happened between the first and last revision
     # not capturing intermediate changes
     last_updated = datetime.datetime.now() - datetime.timedelta(weeks=weeks)
-    qids = set(x['id'] if 'id' in x else '' for x in coll.find({}, {'id': True}))
     changes = []
     for qid in tqdm(list(qids)[:]):
         revisions = sorted(coll.find({'id': qid}), key=lambda x: x['timestamp'], reverse=True)
@@ -412,9 +410,7 @@ def main(pid, weeks, idfilter, force_update, filter_user):
     download_revisions(coll, need_revisions, pid, qid_extid)
 
     print("Processing changes in the past {} weeks".format(weeks))
-    changes = process_revisions(coll, weeks)
-    if filter_user:
-        changes = [c for c in changes if c.user != filter_user]
+    changes = process_revisions(coll, qids, weeks)
     for change in changes:
         change.pretty_refs()
     Change.lookupLabels(changes)
@@ -422,8 +418,13 @@ def main(pid, weeks, idfilter, force_update, filter_user):
     writer = pd.ExcelWriter(save_name)
     df.to_excel(writer, sheet_name="changes")
 
+    if filter_user:
+        df = df.query("user != @filter_user")
+    df = df.query("user != 'KrBot'")
+    df.to_excel(writer, sheet_name="changes_filtered")
+
     print("Processing label changes in the past {} weeks".format(weeks))
-    lda_changes = process_lda_revisions(coll, weeks)
+    lda_changes = process_lda_revisions(coll, qids, weeks)
     Change.lookupLabels(lda_changes)
     lda_df = pd.DataFrame([x.to_dict() for x in lda_changes])
     lda_df.to_excel(writer, sheet_name="labels")
