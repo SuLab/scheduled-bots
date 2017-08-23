@@ -7,3 +7,4 @@ requests
 tqdm
 python-jenkins
 mwparserfromhell
+click==6.7

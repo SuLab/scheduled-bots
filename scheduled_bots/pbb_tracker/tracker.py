@@ -1,16 +1,10 @@
 import math
-
 import click
 from time import mktime
 import time
 import datetime
-from itertools import chain
-
-import itertools
+from itertools import chain, islice
 import json
-
-import pickle
-
 import copy
 import pandas as pd
 from cachetools import cached, TTLCache
@@ -21,11 +15,10 @@ from scheduled_bots.pbb_tracker.connect_mysql import query_wikidata_mysql
 from wikidataintegrator.wdi_helpers import id_mapper
 from scheduled_bots.local import WDUSER, WDPASS
 from pymongo import MongoClient
+from mwclient import Site
 
 CACHE_SIZE = 99999
 CACHE_TIMEOUT_SEC = 300  # 5 min
-
-from mwclient import Site
 
 site = Site(('https', 'www.wikidata.org'))
 site.login(WDUSER, WDPASS)
@@ -33,10 +26,10 @@ site.login(WDUSER, WDPASS)
 
 def chunks(iterable, size):
     it = iter(iterable)
-    item = list(itertools.islice(it, size))
+    item = list(islice(it, size))
     while item:
         yield item
-        item = list(itertools.islice(it, size))
+        item = list(islice(it, size))
 
 
 @cached(TTLCache(CACHE_SIZE, CACHE_TIMEOUT_SEC))
