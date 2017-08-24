@@ -1,8 +1,9 @@
 import math
+import os
 import click
-from time import mktime
 import time
 import datetime
+from time import mktime
 from itertools import chain, islice
 import json
 import copy
@@ -10,12 +11,20 @@ import pandas as pd
 from cachetools import cached, TTLCache
 from pymongo.errors import DuplicateKeyError
 from tqdm import tqdm
+from mwclient import Site
+from pymongo import MongoClient
 
 from scheduled_bots.pbb_tracker.connect_mysql import query_wikidata_mysql
 from wikidataintegrator.wdi_helpers import id_mapper
-from scheduled_bots.local import WDUSER, WDPASS
-from pymongo import MongoClient
-from mwclient import Site
+
+try:
+    from scheduled_bots.local import WDUSER, WDPASS
+except ImportError:
+    if "WDUSER" in os.environ and "WDPASS" in os.environ:
+        WDUSER = os.environ['WDUSER']
+        WDPASS = os.environ['WDPASS']
+    else:
+        raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
 CACHE_SIZE = 99999
 CACHE_TIMEOUT_SEC = 300  # 5 min

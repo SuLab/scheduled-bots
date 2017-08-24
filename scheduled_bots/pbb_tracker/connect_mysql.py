@@ -16,12 +16,6 @@ ssh_user = 'gstupp'
 ssh_port = 22
 sql_port = 3306
 
-"""
-query = '''select rev_id, rev_page, rev_timestamp, page_id, page_namespace, page_title, page_touched FROM revision
-               inner join page on revision.rev_page = page.page_id WHERE
-               rev_timestamp > DATE_FORMAT(DATE_SUB(NOW(),INTERVAL 1 DAY),'%Y%m%d%H%i%s')
-               AND rev_user = 282770;'''
-"""
 
 def query_wikidata_mysql(query):
     with SSHTunnelForwarder((ssh_host, ssh_port), ssh_username=ssh_user, ssh_pkey=mypkey,
