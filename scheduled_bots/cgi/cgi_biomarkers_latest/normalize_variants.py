@@ -6,6 +6,10 @@ from tqdm import tqdm
 
 from wikidataintegrator.wdi_helpers import id_mapper
 from wikidataintegrator.wdi_core import WDItemEngine
+from wikidataintegrator import wdi_core, wdi_helpers
+
+PROPS = {'CIViC variant ID': 'P3329',
+         'HGVS nomenclature': 'P3331'}
 
 df = pd.read_csv("cgi_biomarkers_per_variant.tsv", sep='\t')
 
@@ -16,10 +20,6 @@ df_clin = df[df['Evidence level'].isin(clinical_evidence)]
 # MUT only
 gDNA = set(df_clin.dropna(subset=['gDNA']).gDNA)
 
-# get hgvs to civic IDs
-url = "http://myvariant.info/v1/query?q=_exists_:civic&fields=civic&size=1000"
-hgvs_civic_map = {x['_id']: x['civic']['variant_id'] for x in requests.get(url).json()['hits']}
-url = "http://myvariant.info/v1/query?q=_exists_:civic&fields=civic&size=1000&from=1000"
-hgvs_civic_map.update({x['_id']: x['civic']['variant_id'] for x in requests.get(url).json()['hits']})
+hgvs_qid = id_mapper(PROPS['HGVS nomenclature'])
 
-{k:hgvs_civic_map.get(k) for k in gDNA}
+{x:hgvs_qid[x] for x in gDNA if x in hgvs_qid}

@@ -83,17 +83,46 @@ manual = {'4ohtestosterone': 'Q4637157',
           }
 name_qid.update(manual)
 
+# print out results so far
+#name_qid.update({k: '' for k in all_drugs if k not in name_qid})
+pubchem_qid = id_mapper("P662")
+qid_pubchem = {v: k for k, v in pubchem_qid.items()}
+
+s = "\n".join(["|".join([k, "[{}](https://www.wikidata.org/wiki/{})".format(v, v),
+                     "[{}](https://pubchem.ncbi.nlm.nih.gov/compound/{})".format(qid_pubchem.get(v, ''),
+                                                                                 qid_pubchem.get(v, ''))]) for k, v in
+           sorted(name_qid.items())])
+print(s)
+
 # combination drugs
 # example: https://www.wikidata.org/wiki/Q7697766
 combo = set(df[(df.Drug.str.count(";") > 0)].Drug)
-combo = set([x for x in combo if all(y.lower() in name_qid for y in x.split(";"))])
+combo_parts_qid = {k: frozenset(name_qid.get(kk.lower()) for kk in k.split(";")) for k in combo}
+#qid_combo_parts = {v:k for k,v in combo_parts_qid.items()}
+# combo = set([x for x in combo if all(y.lower() in name_qid for y in x.split(";"))])  # some have families
 # will have to make these combinations in wikidata
+
+# get existing combinations:
+query_str = """SELECT ?item ?itemLabel (GROUP_CONCAT(?part; separator=";") as ?f) WHERE {
+  ?item wdt:P527 ?part .
+  ?part wdt:P31 wd:Q11173 .
+  ?item wdt:P31 wd:Q169336
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+} GROUP BY ?item ?itemLabel"""
+results = WDItemEngine.execute_sparql_query(query_str)['results']['bindings']
+combo_qid = {x['item']['value'].replace("http://www.wikidata.org/entity/", ""): frozenset([y.replace("http://www.wikidata.org/entity/", "") for y in x['f']['value'].split(";")]) for x in results}
+qid_combo = {v:k for k,v in combo_qid.items()}
+assert len(combo_qid) == len(qid_combo)
+
+for combo, qids in combo_parts_qid.items():
+    print(combo, qids)
+    print(qid_combo.get(qids))
 
 # multiple drugs listed
 multi = set(df[(df.Drug.str.startswith("[")) & (df.Drug.str.len() > 2)].Drug)
 multi_map = {m.lower(): {name_qid.get(x.lower()) for x in m[1:-1].split(",")} for m in multi}
-multi_map = {k:v for k,v in multi_map.items() if all(x is not None for x in v)}
-multi_map = {k: ";".join(v) for k,v in multi_map.items()}
+multi_map = {k: v for k, v in multi_map.items() if all(x is not None for x in v)}
+multi_map = {k: ";".join(v) for k, v in multi_map.items()}
 name_qid.update(multi_map)
 # why are some in brackets but only one drug is listed?? (e.g.: [Crizotinib])
 
