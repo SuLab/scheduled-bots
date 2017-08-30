@@ -10,7 +10,7 @@ import requests
 from tqdm import tqdm
 import myvariant
 
-from wikidataintegrator import wdi_core, wdi_helpers, wdi_login, ref_handlers
+from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
 from wikidataintegrator.wdi_core import WDItemEngine
 from wikidataintegrator.wdi_helpers import id_mapper
 from scheduled_bots.geneprotein import human_chromosome_map
@@ -87,6 +87,66 @@ __metadata__ = {'name': 'CGI Variant Bot', 'tags': ['variant'], 'properties': li
 
 hgnc_qid = {k.upper(): v for k, v in id_mapper(PROPS['HGNC gene symbol']).items()}
 
+def update_retrieved_if_new_multiple_refs(olditem, newitem, days=180):
+    """
+    # modifies olditem in place
+    # any ref that does not exactly match the new proposed reference (not including retrieved) is kept
+    """
+
+    def is_equal_not_retrieved(oldref, newref):
+        """
+        Return True if the oldref == newref, NOT including any "retrieved" statements
+        :param oldref:
+        :param newref:
+        :return:
+        """
+        if len(oldref) != len(newref):
+            return False
+        oldref_minus_retrieved = [x for x in oldref if x.get_prop_nr() != 'P813']
+        newref_minus_retrieved = [x for x in newref if x.get_prop_nr() != 'P813']
+        if not all(x in oldref_minus_retrieved for x in newref_minus_retrieved):
+            return False
+        oldref_retrieved = [x for x in oldref if x.get_prop_nr() == 'P813']
+        newref_retrieved = [x for x in newref if x.get_prop_nr() == 'P813']
+        if (len(newref_retrieved) != len(oldref_retrieved)):
+            return False
+        return True
+
+    def ref_overwrite(oldref, newref, days):
+        """
+        If the newref is the same as the oldref except the retrieved date is `days` newer, return True
+                                                       the retrieved date is NOT `days` newer, return False
+        the refs are different, return True
+        """
+        if len(oldref) != len(newref):
+            return True
+        oldref_minus_retrieved = [x for x in oldref if x.get_prop_nr() != 'P813']
+        newref_minus_retrieved = [x for x in newref if x.get_prop_nr() != 'P813']
+        if not all(x in oldref_minus_retrieved for x in newref_minus_retrieved):
+            return True
+        oldref_retrieved = [x for x in oldref if x.get_prop_nr() == 'P813']
+        newref_retrieved = [x for x in newref if x.get_prop_nr() == 'P813']
+        if (len(newref_retrieved) != len(oldref_retrieved)) or not (
+                        len(newref_retrieved) == len(oldref_retrieved) == 1):
+            return True
+        datefmt = '+%Y-%m-%dT%H:%M:%SZ'
+        retold = list([datetime.strptime(r.get_value()[0], datefmt) for r in oldref if r.get_prop_nr() == 'P813'])[0]
+        retnew = list([datetime.strptime(r.get_value()[0], datefmt) for r in newref if r.get_prop_nr() == 'P813'])[0]
+        return (retnew - retold).days >= days
+
+    newrefs = newitem.references
+    oldrefs = olditem.references
+
+    found_mate = [False]*len(newrefs)
+    for new_n, newref in enumerate(newrefs):
+        for old_n, oldref in enumerate(oldrefs):
+            if is_equal_not_retrieved(oldref, newref):
+                found_mate[new_n] = True
+                if ref_overwrite(oldref, newref, days):
+                    oldrefs[old_n] = newref
+    for f_idx, f in enumerate(found_mate):
+        if not f:
+            oldrefs.append(newrefs[f_idx])
 
 def create_missense_variant_item(hgvs, label, login, fast_run=True):
     print(hgvs)
@@ -114,7 +174,7 @@ def create_missense_variant_item(hgvs, label, login, fast_run=True):
 
     item = wdi_core.WDItemEngine(item_name=label, data=s, domain="variant", fast_run=fast_run,
                                  fast_run_base_filter={PROPS['HGVS nomenclature']: ''}, fast_run_use_refs=True,
-                                 ref_handler=ref_handlers.update_retrieved_if_new)
+                                 ref_handler=update_retrieved_if_new_multiple_refs)
     item.set_label(label)
     item.set_description("genetic variant")
     wdi_helpers.try_write(item, hgvs, PROPS['HGVS nomenclature'], login)
@@ -150,13 +210,14 @@ def create_variant_annotation(variant_qid, association, drug_qid, prim_tt_qid, s
                 print("unknown source: {}".format(source))
         return reference
 
-    s = wdi_core.WDItemID(drug_qid, association_map[association],
+    s = wdi_core.WDItemID(drug_qid, association,
                           qualifiers=[wdi_core.WDItemID(prim_tt_qid, PROPS['medical condition treated'], is_qualifier=True)],
                           references=[create_reference(source, evidence_level, login)])
     item = wdi_core.WDItemEngine(data=[s], wd_item_id=variant_qid, domain='variant',
-                                 append_value=list(association_map.values()), #global_ref_mode="STRICT_KEEP_APPEND",
-                                 fast_run=False, fast_run_use_refs=True,
-                                 ref_handler=ref_handlers.update_retrieved_if_new)
+                                 append_value=list(association_map.values()),
+                                 fast_run=True, fast_run_use_refs=True,
+                                 fast_run_base_filter={PROPS['HGVS nomenclature']: ''}, global_ref_mode='CUSTOM',
+                                 ref_handler=update_retrieved_if_new_multiple_refs)
     wdi_helpers.try_write(item, variant_qid, '', login)
     return item
 
@@ -181,16 +242,19 @@ def main(df, log_dir="./logs", fast_run=False):
                 continue
             hgvs_qid[row.gDNA] = item.wd_item_id
 
-    for _,row in df.iterrows():
+    for _,row in tqdm(df.iterrows(), total=len(df)):
+        if row.gDNA not in hgvs_qid:
+            continue
+        if row.Association not in association_map:
+            continue
         qid = hgvs_qid[row.gDNA]
-        association = row.Association
+        association = association_map[row.Association]
         drug_qid = row.Drug_qid
         prim_tt_qid = row.prim_tt_qid
         source = row.Source
         evidence_level = row['Evidence level']
 
         item = create_variant_annotation(qid, association, drug_qid, prim_tt_qid, source, evidence_level, login)
-        print(item.wd_item_id)
 
 
 def filter_df_clinical_missense(df):
@@ -204,6 +268,8 @@ def filter_df_clinical_missense(df):
 
     # get rid of those where we don't know the drug
     df = df.dropna(subset=['Drug_qid'])
+    # get rid of those where we don't know the disease
+    df = df.dropna(subset=['prim_tt_qid'])
 
     return df
 
