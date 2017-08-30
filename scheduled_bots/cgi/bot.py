@@ -11,6 +11,7 @@ from tqdm import tqdm
 import myvariant
 
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login, ref_handlers
+from wikidataintegrator.wdi_core import WDItemEngine
 from wikidataintegrator.wdi_helpers import id_mapper
 from scheduled_bots.geneprotein import human_chromosome_map
 
@@ -40,6 +41,7 @@ PROPS = {
     'curator': 'P1640',
     'determination method': 'P459',
     'medical condition treated': 'P2175',
+    'has part': 'P527'
 }
 
 ITEMS = {
@@ -52,7 +54,8 @@ ITEMS = {
     'CGI Evidence Clinical Trials III-IV': 'Q38145539',
     'CGI Evidence Clinical Trials I-II': 'Q38145727',
     'CGI Evidence Case Reports': 'Q38145865',
-    'CGI Evidence Pre-Clinical Data': 'Q38145925'
+    'CGI Evidence Pre-Clinical Data': 'Q38145925',
+    'combination therapy': 'Q1304270'
 }
 
 # map association column
@@ -151,7 +154,7 @@ def create_variant_annotation(variant_qid, association, drug_qid, prim_tt_qid, s
                           qualifiers=[wdi_core.WDItemID(prim_tt_qid, PROPS['medical condition treated'], is_qualifier=True)],
                           references=[create_reference(source, evidence_level, login)])
     item = wdi_core.WDItemEngine(data=[s], wd_item_id=variant_qid, domain='variant',
-                                 append_value=list(association_map.values()), global_ref_mode="STRICT_KEEP_APPEND",
+                                 append_value=list(association_map.values()), #global_ref_mode="STRICT_KEEP_APPEND",
                                  fast_run=False, fast_run_use_refs=True,
                                  ref_handler=ref_handlers.update_retrieved_if_new)
     wdi_helpers.try_write(item, variant_qid, '', login)
@@ -178,16 +181,16 @@ def main(df, log_dir="./logs", fast_run=False):
                 continue
             hgvs_qid[row.gDNA] = item.wd_item_id
 
-    row = df.iloc[1]
-    qid = hgvs_qid[row.gDNA]
-    association = row.Association
-    drug_qid = row.Drug_qid
-    prim_tt_qid = row.prim_tt_qid
-    source = row.Source
-    evidence_level = row['Evidence level']
+    for _,row in df.iterrows():
+        qid = hgvs_qid[row.gDNA]
+        association = row.Association
+        drug_qid = row.Drug_qid
+        prim_tt_qid = row.prim_tt_qid
+        source = row.Source
+        evidence_level = row['Evidence level']
 
-    item = create_variant_annotation(qid, association, drug_qid, prim_tt_qid, source, evidence_level, login)
-    print(item.wd_item_id)
+        item = create_variant_annotation(qid, association, drug_qid, prim_tt_qid, source, evidence_level, login)
+        print(item.wd_item_id)
 
 
 def filter_df_clinical_missense(df):
@@ -198,6 +201,9 @@ def filter_df_clinical_missense(df):
 
     # MUT only, with a HGVS ID
     df = df.dropna(subset=['gDNA'])
+
+    # get rid of those where we don't know the drug
+    df = df.dropna(subset=['Drug_qid'])
 
     return df
 
