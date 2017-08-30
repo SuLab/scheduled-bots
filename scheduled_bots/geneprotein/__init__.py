@@ -28,6 +28,33 @@ descriptions_by_type = {
     'scRNA': 'small conditional RNA in the species {}'
 }
 
+human_chromosome_map = {
+    '1': 'Q430258',
+    '10': 'Q840737',
+    '11': 'Q847096',
+    '12': 'Q847102',
+    '13': 'Q840734',
+    '14': 'Q138955',
+    '15': 'Q765245',
+    '16': 'Q742870',
+    '17': 'Q220677',
+    '18': 'Q780468',
+    '19': 'Q510786',
+    '2': 'Q638893',
+    '20': 'Q666752',
+    '21': 'Q753218',
+    '22': 'Q753805',
+    '3': 'Q668633',
+    '4': 'Q836605',
+    '5': 'Q840741',
+    '6': 'Q540857',
+    '7': 'Q657319',
+    '8': 'Q572848',
+    '9': 'Q840604',
+    'MT': 'Q27973632',
+    'X': 'Q29867336',
+    'Y': 'Q29867344'}
+
 #########
 # Mappings for GO
 #########
@@ -136,8 +163,7 @@ curators_wdids = {'AgBase': 'Q4690901',
 # These are for reference external IDs to use for GO annotations curators
 curator_ref = {'SGD': 'Saccharomyces Genome Database ID',
                'MGI': 'Mouse Genome Informatics ID',
-               'UniProt': 'UniProt ID',}
-
+               'UniProt': 'UniProt ID', }
 
 #########
 # Organism Info
@@ -192,7 +218,7 @@ organisms_info = {
         'taxid': 6239
     },
     7955: {
-        "name": "Danio rerio", # zebrafish
+        "name": "Danio rerio",  # zebrafish
         "type": None,
         "wdid": "Q169444",
         'taxid': 7955
