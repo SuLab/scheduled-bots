@@ -3,8 +3,18 @@ from itertools import chain
 import pandas as pd
 from tqdm import tqdm
 
+from wikidataintegrator import wdi_core
 from wikidataintegrator.wdi_helpers import id_mapper
 from wikidataintegrator.wdi_core import WDItemEngine
+from wikidataintegrator.wdi_login import WDLogin
+
+PROPS = {
+    'instance of': 'P31',
+    'has part': 'P527'
+}
+ITEMS = {
+    'combination therapy': 'Q1304270'
+}
 
 df = pd.read_csv("cgi_biomarkers_per_variant.tsv", sep='\t')
 
@@ -102,11 +112,11 @@ combo_parts_qid = {k: frozenset(name_qid.get(kk.lower()) for kk in k.split(";"))
 # combo = set([x for x in combo if all(y.lower() in name_qid for y in x.split(";"))])  # some have families
 # will have to make these combinations in wikidata
 
+
 # get existing combinations:
 query_str = """SELECT ?item ?itemLabel (GROUP_CONCAT(?part; separator=";") as ?f) WHERE {
   ?item wdt:P527 ?part .
-  ?part wdt:P31 wd:Q11173 .
-  ?item wdt:P31 wd:Q169336
+  ?item wdt:P31 wd:Q1304270 .
   SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
 } GROUP BY ?item ?itemLabel"""
 results = WDItemEngine.execute_sparql_query(query_str)['results']['bindings']
@@ -114,9 +124,34 @@ combo_qid = {x['item']['value'].replace("http://www.wikidata.org/entity/", ""): 
 qid_combo = {v:k for k,v in combo_qid.items()}
 assert len(combo_qid) == len(qid_combo)
 
-for combo, qids in combo_parts_qid.items():
-    print(combo, qids)
-    print(qid_combo.get(qids))
+# ---------------- Create combination treatment items
+login = WDLogin("Gstupp", "sulab.org")
+for name_str, items in combo_parts_qid.items():
+    if not all(x for x in items):
+        continue
+    # check if exists
+    if items in qid_combo:
+        name_qid[name_str.lower()] = qid_combo[items]
+        continue
+    name = " / ".join(name_str.split(";")) + " combination therapy"
+    description = "combination therapy"
+
+    # has part
+    s = [wdi_core.WDItemID(x, PROPS['has part']) for x in items]
+    # instance of
+    s.append(wdi_core.WDItemID(ITEMS['combination therapy'], PROPS['instance of']))
+
+    item = wdi_core.WDItemEngine(item_name=name, data=s, domain="asdf")
+    item.set_label(name)
+    item.set_description(description)
+    item.write(login)
+    name_qid[name_str.lower()] = item.wd_item_id
+#-----------------
+
+for combo, items in combo_parts_qid.items():
+    if items not in qid_combo:
+        print(combo, items)
+
 
 # multiple drugs listed
 multi = set(df[(df.Drug.str.startswith("[")) & (df.Drug.str.len() > 2)].Drug)
