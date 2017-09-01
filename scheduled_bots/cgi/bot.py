@@ -83,7 +83,7 @@ source_map = {
     'EMA': 'Q130146',
     'NCCN': 'Q6971741'
 }
-__metadata__ = {'name': 'CGI Variant Bot', 'tags': ['variant'], 'properties': list(PROPS.values())}
+__metadata__ = {'name': 'CGI_Variant_Bot', 'tags': ['variant'], 'properties': list(PROPS.values())}
 
 hgnc_qid = {k.upper(): v for k, v in id_mapper(PROPS['HGNC gene symbol']).items()}
 
@@ -239,13 +239,17 @@ def main(df, log_dir="./logs", fast_run=False):
                 item = create_missense_variant_item(row.gDNA, label, login, fast_run=fast_run)
             except Exception as e:
                 print(e)
+                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(row.gDNA, None, None, "Failed creating variant item: {}".format(e)))
                 continue
             hgvs_qid[row.gDNA] = item.wd_item_id
 
     for _,row in tqdm(df.iterrows(), total=len(df)):
         if row.gDNA not in hgvs_qid:
+            wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(row.gDNA, None, None, "variant not found: {}".format(row.gDNA)))
             continue
         if row.Association not in association_map:
+            wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(row.gDNA, None, None,
+                                                                      "Association not found: {}".format(row.Association)))
             continue
         qid = hgvs_qid[row.gDNA]
         association = association_map[row.Association]
@@ -264,12 +268,30 @@ def filter_df_clinical_missense(df):
     df = df[df['Evidence level'].isin(clinical_evidence)]
 
     # MUT only, with a HGVS ID
-    df = df.dropna(subset=['gDNA'])
+    drop = df[df.gDNA.isnull()]
+    df = df[df.gDNA.notnull()]
+    for _,row in drop.iterrows():
+        wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.Alteration, None, None, "no HGVS ID"))
 
     # get rid of those where we don't know the drug
-    df = df.dropna(subset=['Drug_qid'])
+    drop = df[df.Drug_qid.isnull()]
+    df = df[df.Drug_qid.notnull()]
+    for _,row in drop.iterrows():
+        wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.Alteration, None, None,
+                                                                    "unknown drug: {}".format(row.Drug)))
+    # get rid of the multiple drug ("or") items
+    drop = df[df.Drug_qid.str.count(";")!=0]
+    df = df[df.Drug_qid.str.count(";") == 0]
+    for _, row in drop.iterrows():
+        wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.Alteration, None, None,
+                                                                    "unknown drug: {}".format(row.Drug)))
+
     # get rid of those where we don't know the disease
-    df = df.dropna(subset=['prim_tt_qid'])
+    drop = df[df.prim_tt_qid.isnull()]
+    df = df[df.prim_tt_qid.notnull()]
+    for _, row in drop.iterrows():
+        wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.Alteration, None, None,
+                                                                    "unknown disease: {}".format(row['Primary Tumor type'])))
 
     return df
 
