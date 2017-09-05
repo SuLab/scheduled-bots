@@ -74,7 +74,10 @@ class Change:
         self.ref_list = []
         self.revid = revid
         self.comment = comment
-        self.url = "https://www.wikidata.org/w/index.php?diff=prev&oldid={}".format(self.revid)
+
+    @property
+    def url(self):
+        return "https://www.wikidata.org/w/index.php?diff=prev&oldid={}".format(self.revid)
 
     def __repr__(self):
         return " | ".join(map(str, [self.change_type, self.qid, self.qid_label, self.pid, self.pid_label, self.value,
@@ -88,6 +91,7 @@ class Change:
             "{} ({}):{} ({})".format(x['prop_label'], x['prop'], x['value_label'], x['value']) for x in d['ref_list'])
         del d['ref_list']
         d['merge'] = True if 'merge' in d['comment'] else False
+        d['url'] = self.url
         return d
 
     @staticmethod
