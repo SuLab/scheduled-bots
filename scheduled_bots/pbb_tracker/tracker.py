@@ -424,22 +424,25 @@ def main(pid, weeks, idfilter, force_update, filter_user):
     Change.lookupLabels(changes)
     df = pd.DataFrame([x.to_dict() for x in changes])
     # reorder columns
-    df = df[["revid", "url", "timestamp", "user", "change_type", "comment", "has_ref", "merge",
-             "metadata", "qid", "qid_label", "pid", "pid_label", "value", "value_label", "ref_str"]]
+    if not df.empty:
+        df = df[["revid", "url", "timestamp", "user", "change_type", "comment", "has_ref", "merge",
+                 "metadata", "qid", "qid_label", "pid", "pid_label", "value", "value_label", "ref_str"]]
     writer = pd.ExcelWriter(save_name)
     df.to_excel(writer, sheet_name="changes")
 
-    if filter_user:
+    if not df.empty and filter_user:
         df = df.query("user != @filter_user")
-    df = df.query("user != 'KrBot'")
+    if not df.empty:
+        df = df.query("user != 'KrBot'")
     df.to_excel(writer, sheet_name="changes_filtered")
 
     print("Processing label changes in the past {} weeks".format(weeks))
     lda_changes = process_lda_revisions(coll, qids, weeks)
     Change.lookupLabels(lda_changes)
     lda_df = pd.DataFrame([x.to_dict() for x in lda_changes])
-    lda_df = lda_df[
-        ["revid", "url", "timestamp", "user", "change_type", "comment", "merge", "qid", "qid_label", "value"]]
+    if not lda_df.empty:
+        lda_df = lda_df[["revid", "url", "timestamp", "user", "change_type", "comment",
+                         "merge", "qid", "qid_label", "value"]]
     lda_df.to_excel(writer, sheet_name="labels")
     writer.save()
 
