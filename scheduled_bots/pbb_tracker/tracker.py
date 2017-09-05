@@ -74,6 +74,7 @@ class Change:
         self.ref_list = []
         self.revid = revid
         self.comment = comment
+        self.url = "https://www.wikidata.org/w/index.php?diff=prev&oldid={}".format(self.revid)
 
     def __repr__(self):
         return " | ".join(map(str, [self.change_type, self.qid, self.qid_label, self.pid, self.pid_label, self.value,
@@ -418,6 +419,9 @@ def main(pid, weeks, idfilter, force_update, filter_user):
         change.pretty_refs()
     Change.lookupLabels(changes)
     df = pd.DataFrame([x.to_dict() for x in changes])
+    # reorder columns
+    df = df[["revid", "url", "timestamp", "user", "change_type", "comment", "has_ref", "merge",
+             "metadata", "qid", "qid_label", "pid", "pid_label", "value", "value_label", "ref_str"]]
     writer = pd.ExcelWriter(save_name)
     df.to_excel(writer, sheet_name="changes")
 
@@ -430,6 +434,8 @@ def main(pid, weeks, idfilter, force_update, filter_user):
     lda_changes = process_lda_revisions(coll, qids, weeks)
     Change.lookupLabels(lda_changes)
     lda_df = pd.DataFrame([x.to_dict() for x in lda_changes])
+    lda_df = lda_df[
+        ["revid", "url", "timestamp", "user", "change_type", "comment", "merge", "qid", "qid_label", "value"]]
     lda_df.to_excel(writer, sheet_name="labels")
     writer.save()
 
