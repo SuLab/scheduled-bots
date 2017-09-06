@@ -1,0 +1,34 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{name}}</title>
+    <link rel="stylesheet" type="text/css" href="style.css"/>
+
+</head>
+<body>
+<h1>{{name}}</h1>
+<h3>{{ run_id }}</h3>
+
+<h3>Summary</h3>
+{{level_counts | safe}}
+
+<h3>Types of Actions Taken</h3>
+{{info_counts | safe}}
+
+<h3>Warning Types</h3>
+{{warning_counts | safe}}
+
+<h3>Error Types</h3>
+{{error_counts | safe}}
+
+<h3>Warnings</h3>
+{{warnings_df | safe}}
+
+<h3>Errors</h3>
+{{errors_df | safe}}
+
+<h3>Info</h3>
+{{info_df | safe}}
+
+</body>
+</html>
