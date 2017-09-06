@@ -1,6 +1,8 @@
+import sys
 import argparse
 import json
 import os
+import traceback
 from datetime import datetime
 from time import gmtime, strftime
 from urllib.parse import quote
@@ -87,6 +89,7 @@ __metadata__ = {'name': 'CGI_Variant_Bot', 'tags': ['variant'], 'properties': li
 
 hgnc_qid = {k.upper(): v for k, v in id_mapper(PROPS['HGNC gene symbol']).items()}
 
+
 def update_retrieved_if_new_multiple_refs(olditem, newitem, days=180):
     """
     # modifies olditem in place
@@ -137,7 +140,7 @@ def update_retrieved_if_new_multiple_refs(olditem, newitem, days=180):
     newrefs = newitem.references
     oldrefs = olditem.references
 
-    found_mate = [False]*len(newrefs)
+    found_mate = [False] * len(newrefs)
     for new_n, newref in enumerate(newrefs):
         for old_n, oldref in enumerate(oldrefs):
             if is_equal_not_retrieved(oldref, newref):
@@ -148,11 +151,14 @@ def update_retrieved_if_new_multiple_refs(olditem, newitem, days=180):
         if not f:
             oldrefs.append(newrefs[f_idx])
 
+
 def create_missense_variant_item(hgvs, label, login, fast_run=True):
     print(hgvs)
     mv = myvariant.MyVariantInfo()
     vd = mv.getvariant(hgvs)
     chrom = human_chromosome_map[vd['chrom'].upper()]
+    if 'hg19' not in vd or 'dbnsfp' not in vd:
+        raise ValueError("Metadata not found in MyVariant, unable to create item")
     start = str(vd['hg19']['start'])
     end = str(vd['hg19']['end'])
     gene = hgnc_qid[vd['dbnsfp']['genename'].upper()]
@@ -211,7 +217,8 @@ def create_variant_annotation(variant_qid, association, drug_qid, prim_tt_qid, s
         return reference
 
     s = wdi_core.WDItemID(drug_qid, association,
-                          qualifiers=[wdi_core.WDItemID(prim_tt_qid, PROPS['medical condition treated'], is_qualifier=True)],
+                          qualifiers=[
+                              wdi_core.WDItemID(prim_tt_qid, PROPS['medical condition treated'], is_qualifier=True)],
                           references=[create_reference(source, evidence_level, login)])
     item = wdi_core.WDItemEngine(data=[s], wd_item_id=variant_qid, domain='variant',
                                  append_value=list(association_map.values()),
@@ -226,8 +233,6 @@ def main(df, log_dir="./logs", fast_run=False):
     df = filter_df_clinical_missense(df)
 
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
-    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, logger_name='WD_logger', log_name=log_name,
-                                        header=json.dumps(__metadata__))
 
     # make sure we have all the variant items we need
     hgvs_qid = id_mapper(PROPS['HGVS nomenclature'])
@@ -239,17 +244,21 @@ def main(df, log_dir="./logs", fast_run=False):
                 item = create_missense_variant_item(row.gDNA, label, login, fast_run=fast_run)
             except Exception as e:
                 print(e)
-                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(row.gDNA, None, None, "Failed creating variant item: {}".format(e)))
+                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(row.gDNA, "gDNA", None, str(e), type(e)))
                 continue
             hgvs_qid[row.gDNA] = item.wd_item_id
 
-    for _,row in tqdm(df.iterrows(), total=len(df)):
+    for _, row in tqdm(df.iterrows(), total=len(df)):
         if row.gDNA not in hgvs_qid:
-            wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(row.gDNA, None, None, "variant not found: {}".format(row.gDNA)))
+            wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.gDNA, "gDNA", None,
+                                                                        "variant not found: {}".format(row.gDNA),
+                                                                        "variant not found"))
             continue
         if row.Association not in association_map:
-            wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(row.gDNA, None, None,
-                                                                      "Association not found: {}".format(row.Association)))
+            wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.gDNA, "gDNA", None,
+                                                                        "Association not found: {}".format(
+                                                                            row.Association),
+                                                                        "association not found"))
             continue
         qid = hgvs_qid[row.gDNA]
         association = association_map[row.Association]
@@ -270,28 +279,33 @@ def filter_df_clinical_missense(df):
     # MUT only, with a HGVS ID
     drop = df[df.gDNA.isnull()]
     df = df[df.gDNA.notnull()]
-    for _,row in drop.iterrows():
-        wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.Alteration, None, None, "no HGVS ID"))
+    for _, row in drop.iterrows():
+        wdi_core.WDItemEngine.log("WARNING",
+                                  wdi_helpers.format_msg(row.Alteration, "alteration", None, '', "no HGVS ID"))
 
     # get rid of those where we don't know the drug
     drop = df[df.Drug_qid.isnull()]
     df = df[df.Drug_qid.notnull()]
-    for _,row in drop.iterrows():
-        wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.Alteration, None, None,
-                                                                    "unknown drug: {}".format(row.Drug)))
+    for _, row in drop.iterrows():
+        wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.Alteration, "alteration", None,
+                                                                    "unknown drug: {}".format(row.Drug),
+                                                                    "unknown drug"))
     # get rid of the multiple drug ("or") items
-    drop = df[df.Drug_qid.str.count(";")!=0]
+    drop = df[df.Drug_qid.str.count(";") != 0]
     df = df[df.Drug_qid.str.count(";") == 0]
     for _, row in drop.iterrows():
-        wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.Alteration, None, None,
-                                                                    "unknown drug: {}".format(row.Drug)))
+        wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.Alteration, "alteration", None,
+                                                                    "unknown drug: {}".format(row.Drug),
+                                                                    "unknown drug"))
 
     # get rid of those where we don't know the disease
     drop = df[df.prim_tt_qid.isnull()]
     df = df[df.prim_tt_qid.notnull()]
     for _, row in drop.iterrows():
-        wdi_core.WDItemEngine.log("WARNING", wdi_helpers.format_msg(row.Alteration, None, None,
-                                                                    "unknown disease: {}".format(row['Primary Tumor type'])))
+        wdi_core.WDItemEngine.log("WARNING",
+                                  wdi_helpers.format_msg(row.Alteration, "alteration", None,
+                                                         "unknown disease: {}".format(row['Primary Tumor type']),
+                                                         "unknown disease"))
 
     return df
 
