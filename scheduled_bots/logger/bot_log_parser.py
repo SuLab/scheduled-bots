@@ -1,3 +1,5 @@
+import glob
+import os
 import webbrowser
 
 import click
@@ -91,6 +93,17 @@ def url_qid(df, col):
 @click.argument('log-path')
 @click.option('--show-browser', default=False, is_flag=True, help='show log in browser')
 def main(log_path, show_browser=False):
+    if os.path.isdir(log_path):
+        # run on all files in dir (that don't end in html), and ignore show_browser
+        files = [x for x in glob.glob(os.path.join(log_path, "*")) if not x.endswith(".html")]
+        print(files)
+        for file in files:
+            _main(file)
+    else:
+        _main(log_path, show_browser)
+
+
+def _main(log_path, show_browser=False):
     print(log_path)
     df, metadata = process_log(log_path)
     level_counts, info_counts, warning_counts, error_counts = generate_summary(df)
@@ -99,7 +112,7 @@ def main(log_path, show_browser=False):
     info_df = df.query("Level == 'INFO'")
     info_df = url_qid(info_df, "QID")
 
-    template = Template(open("template.html").read())
+    template = Template(open(os.path.join(sys.path[0], "template.html")).read())
     s = template.render(name=metadata['name'], run_id=metadata['run_id'],
                         level_counts=level_counts.to_frame().to_html(),
                         info_counts=info_counts.to_frame().to_html(),
