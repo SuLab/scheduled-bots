@@ -78,7 +78,7 @@ mygene_schema = {
         'type': 'dict',
         'required': False,
         'schema': {
-            'Swiss-Prot': {'required': False, 'type': 'string'},
+            'Swiss-Prot': {'required': False, 'type': 'list', 'coerce': alwayslist, 'schema': {'type': 'string'}},
             'TrEMBL': {'required': False, 'type': 'list', 'coerce': alwayslist, 'schema': {'type': 'string'}}
         }
     },

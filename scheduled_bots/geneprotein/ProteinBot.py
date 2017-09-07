@@ -149,6 +149,7 @@ class Protein:
             uniprot_id = self.record['uniprot']['@value']['TrEMBL'][0]
         else:
             raise ValueError("no uniprot found")
+        # TODO: Swiss-Prot may be a list. In this case, we need to make two protein items
         assert isinstance(uniprot_id, str), (entrez_gene, uniprot_id)
 
         self.external_ids['UniProt ID'] = uniprot_id
