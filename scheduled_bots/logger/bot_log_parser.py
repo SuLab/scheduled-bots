@@ -54,9 +54,9 @@ def process_log(file_path):
 
 def generate_summary(df):
     level_counts = df.Level.value_counts().to_dict()
-    zlist = list(zip(*[('Items Processed Succesfully', level_counts.get('INFO', 0)),
-                       ('Items Skipped Due to Missing Annotations ("Warning")', level_counts.get('WARNING', 0)),
-                       ('Items Skipped Due to an Error', level_counts.get('ERROR', 0))]))
+    zlist = list(zip(*[('<a href="#info">Items Processed Succesfully</a>', level_counts.get('INFO', 0)),
+                       ('<a href="#warning">Items Skipped Due to a Warning</a>', level_counts.get('WARNING', 0)),
+                       ('<a href="#error">Items Skipped Due to an Error</a>', level_counts.get('ERROR', 0))]))
     level_counts = pd.Series(zlist[1], index=zlist[0])
     level_counts.name = "Count"
 
@@ -89,37 +89,66 @@ def url_qid(df, col):
     df.loc[:, col] = df[col].apply(f)
     return df
 
+
 @click.command()
 @click.argument('log-path')
 @click.option('--show-browser', default=False, is_flag=True, help='show log in browser')
 def main(log_path, show_browser=False):
     if os.path.isdir(log_path):
         # run on all files in dir (that don't end in html), and ignore show_browser
-        files = [x for x in glob.glob(os.path.join(log_path, "*")) if not x.endswith(".html")]
-        print(files)
+        files = [x for x in glob.glob(os.path.join(log_path, "*")) if
+                 not x.endswith(".html") and os.stat(x).st_size != 0]
         for file in files:
-            _main(file)
+            try:
+                _main(file)
+            except Exception as e:
+                print("Parsing log failed: {}".format(file))
     else:
         _main(log_path, show_browser)
+
+
+def escape_html_chars(s):
+    return s.replace("&", r'&amp;').replace("<", r'&lt;').replace(">", r'&gt;')
+
+
+def try_json(s):
+    try:
+        d = json.loads(s.replace("'", '"'))
+    except Exception:
+        return s
+    return d
 
 
 def _main(log_path, show_browser=False):
     print(log_path)
     df, metadata = process_log(log_path)
+    df['Msg Type'] = df['Msg Type'].apply(escape_html_chars)
+    df['Message'] = df['Message'].apply(escape_html_chars)
+    df['Message'] = df['Message'].apply(try_json)
+
     level_counts, info_counts, warning_counts, error_counts = generate_summary(df)
     warnings_df = df.query("Level == 'WARNING'")
     errors_df = df.query("Level == 'ERROR'")
     info_df = df.query("Level == 'INFO'")
     info_df = url_qid(info_df, "QID")
 
+    with pd.option_context('display.max_colwidth', -1):
+        level_counts = level_counts.to_frame().to_html(escape=False)
+        info_counts = info_counts.to_frame().to_html(escape=False)
+        warning_counts = warning_counts.to_frame().to_html(escape=False)
+        error_counts = error_counts.to_frame().to_html(escape=False)
+        info_df = info_df.to_html(escape=False)
+        warnings_df = warnings_df.to_html(escape=False)
+        errors_df = errors_df.to_html(escape=False)
+
     template = Template(open(os.path.join(sys.path[0], "template.html")).read())
+
     s = template.render(name=metadata['name'], run_id=metadata['run_id'],
-                        level_counts=level_counts.to_frame().to_html(),
-                        info_counts=info_counts.to_frame().to_html(),
-                        warning_counts=warning_counts.to_frame().to_html(),
-                        error_counts=error_counts.to_frame().to_html(),
-                        warnings_df=warnings_df.to_html(), errors_df=errors_df.to_html(),
-                        info_df=info_df.to_html(escape=False))
+                        level_counts=level_counts,
+                        info_counts=info_counts,
+                        warning_counts=warning_counts,
+                        error_counts=error_counts,
+                        warnings_df=warnings_df, errors_df=errors_df, info_df=info_df)
     out_path = log_path.rsplit(".", 1)[0] + ".html"
     with open(out_path, 'w') as f:
         f.write(s)
@@ -127,7 +156,6 @@ def _main(log_path, show_browser=False):
     if show_browser:
         webbrowser.open(out_path)
 
+
 if __name__ == "__main__":
     main()
-
-

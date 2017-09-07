@@ -21,14 +21,14 @@
 <h3>Error Types</h3>
 {{error_counts | safe}}
 
-<h3>Warnings</h3>
+<a name="info"><h3>Items Processed Succesfully</h3></a>
+{{info_df | safe}}
+
+<a name="warning"><h3>Items Skipped Due to a Warning</h3></a>
 {{warnings_df | safe}}
 
-<h3>Errors</h3>
+<a name="error"><h3>Items Skipped Due to an Error</h3></a>
 {{errors_df | safe}}
-
-<h3>Info</h3>
-{{info_df | safe}}
 
 </body>
 </html>
