@@ -15,7 +15,7 @@ mwclient==0.8.6
 mwparserfromhell==0.5
 myvariant==0.3.1
 numpy==1.13.1
-oauthlib==2.0.2
+oauthlib
 pandas==0.20.3
 paramiko==2.2.1
 pbr==3.1.1
