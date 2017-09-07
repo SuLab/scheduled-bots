@@ -26,7 +26,6 @@ except ImportError:
 # jenkins url
 HOST = "http://jenkins.sulab.org"
 
-
 server = jenkins.Jenkins(HOST, username='admin', password=JENKINS_PASS)
 data = []
 jobs = server.get_jobs(view_name="Running")
@@ -69,18 +68,33 @@ for job in jobs:
     last_build_success = build_info['result']
     timestamp_int = build_info['timestamp']
     timestamp = datetime.fromtimestamp(int(timestamp_int) / 1000).strftime('%Y-%m-%d %H:%M:%S')
-    log_path = (HOST + "/job/{job_name}/{job_num}/artifact/".format(job_name=job_name, job_num=last_build)
-                + build_info['artifacts'][0]['relativePath']) if len(build_info['artifacts']) else None
+    log_paths = []
+    if len(build_info['artifacts']):
+        for artifact in build_info['artifacts']:
+            log_paths.append(HOST + "/job/{job_name}/{job_num}/artifact/".format(job_name=job_name, job_num=last_build)
+                             + artifact['relativePath'])
 
     data.append({'Job Name': job_name, 'Description': job_descr, 'Last Run Status': last_build_success,
-                 'Log Path': log_path, 'Last Run': timestamp, 'Code URL': code_url, 'Bot Account': wduser})
+                 'Log Path': log_paths, 'Last Run': timestamp, 'Code URL': code_url, 'Bot Account': wduser,
+                 'Job Path': HOST + "/job/{job_name}/{job_num}/".format(job_name=job_name, job_num=last_build)})
+
+
+def make_links(lst):
+    # if there are more than 10 links, don't show all of the names
+    if len(lst) < 10:
+        s = "; ".join(["[{} {}]".format(x.replace(" ", "%20"), x.split("/")[-1]) for x in lst])
+    else:
+        s = "; ".join(["[{} {}]".format(x.replace(" ", "%20"), n) for n, x in enumerate(lst)])
+    return s
 
 
 df = pd.DataFrame(data)
-df = df[['Job Name', 'Description', 'Last Run Status', 'Last Run', 'Log Path', 'Code URL', 'Bot Account']]
-df['Log Path'] = df['Log Path'].apply(lambda x: "[{} Log]".format(x) if x else '')
+df['Job Name'] = df.apply(lambda x: "[{} {}]".format(x['Job Path'].replace(" ", "%20"), x['Job Name']), axis=1)
+df['Log Path'] = df['Log Path'].apply(lambda lst: make_links(lst) if lst else '')
 df['Code URL'] = df['Code URL'].apply(lambda x: "[{} Link]".format(x) if x else '')
-df['Bot Account'] = df['Bot Account'].apply(lambda x: "[https://www.wikidata.org/wiki/User:{} {}]".format(x, x) if x else '')
+df['Bot Account'] = df['Bot Account'].apply(
+    lambda x: "[https://www.wikidata.org/wiki/User:{} {}]".format(x, x) if x else '')
+df = df[['Job Name', 'Description', 'Last Run Status', 'Last Run', 'Log Path', 'Code URL', 'Bot Account']]
 print(df)
 mwtable = pd_to_table(df)
 print(mwtable)
