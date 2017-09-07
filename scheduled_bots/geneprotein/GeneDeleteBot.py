@@ -125,6 +125,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     qids = get_deprecated_genes()
+    print("|".join(qids))
+    print(len(qids))
     if len(qids) > 200 and not args.force:
         raise ValueError("Trying to delete {} genes. If you really want to do this, re run with --force".format(len(qids)))
     if len(qids) > 0:
