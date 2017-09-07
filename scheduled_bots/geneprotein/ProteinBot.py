@@ -28,7 +28,6 @@ import traceback
 from datetime import datetime
 from itertools import chain
 
-import pymongo
 from pymongo import MongoClient
 from tqdm import tqdm
 
@@ -52,30 +51,33 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-PROPS = {'found in taxon': 'P703',
-         'instance of': 'P31',
-         'encoded by': 'P702',
-         'RefSeq Protein ID': 'P637',
-         'UniProt ID': 'P352',
-         'Ensembl Protein ID': 'P705',
-         'OMIM ID': 'P492',
-         'Entrez Gene ID': 'P351',
-         'encodes': 'P688',
+PROPS = {
+    'found in taxon': 'P703',
+    'instance of': 'P31',
+    'encoded by': 'P702',
+    'RefSeq Protein ID': 'P637',
+    'UniProt ID': 'P352',
+    'Ensembl Protein ID': 'P705',
+    'OMIM ID': 'P492',
+    'Entrez Gene ID': 'P351',
+    'encodes': 'P688',
+    'Saccharomyces Genome Database ID': 'P3406',
+    'Mouse Genome Informatics ID': 'P671',
+}
 
-         'Saccharomyces Genome Database ID': 'P3406',
-         'Mouse Genome Informatics ID': 'P671',
-         }
-
-__metadata__ = {'name': 'ProteinBot',
-                'maintainer': 'GSS',
-                'tags': ['protein'],
-                'properties': list(PROPS.values())
-                }
+__metadata__ = {
+    'name': 'ProteinBot',
+    'maintainer': 'GSS',
+    'tags': ['protein'],
+    'properties': list(PROPS.values())
+}
 
 # If the source is "entrez", the reference identifier to be used is "Ensembl Gene ID" (P594)
-source_ref_id = {'ensembl': "Ensembl Protein ID",
-                 'entrez': 'Entrez Gene ID',
-                 'uniprot': 'UniProt ID'}
+source_ref_id = {
+    'ensembl': "Ensembl Protein ID",
+    'entrez': 'Entrez Gene ID',
+    'uniprot': 'UniProt ID'
+}
 
 
 class Protein:
@@ -149,8 +151,6 @@ class Protein:
             uniprot_id = self.record['uniprot']['@value']['TrEMBL'][0]
         else:
             raise ValueError("no uniprot found")
-        # TODO: Swiss-Prot may be a list. In this case, we need to make two protein items
-        assert isinstance(uniprot_id, str), (entrez_gene, uniprot_id)
 
         self.external_ids['UniProt ID'] = uniprot_id
         self.uniprot = uniprot_id
@@ -239,7 +239,8 @@ class Protein:
                                                  append_value=[PROPS['encodes']], fast_run=fast_run,
                                                  fast_run_base_filter={PROPS['Entrez Gene ID']: '',
                                                                        PROPS['found in taxon']: self.organism_info[
-                                                                           'wdid']})
+                                                                           'wdid']},
+                                                 global_ref_mode="CUSTOM", ref_handler=update_retrieved_if_new)
             wdi_helpers.try_write(wd_item_gene, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
                                   write=write)
         except Exception as e:
@@ -275,8 +276,9 @@ class Protein:
             if "protein" in aliases:
                 aliases.remove("protein")
             wd_item_protein.set_aliases(aliases, append=False)
-            self.status = wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
-                                  write=write)
+            self.status = wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'],
+                                                self.login,
+                                                write=write)
             self.protein_wdid = wd_item_protein.wd_item_id
             return wd_item_protein
         except Exception as e:
@@ -327,10 +329,10 @@ class ProteinBot:
         self.login = login
         self.organism_info = organism_info
         self.gene_wdid_mapping = gene_wdid_mapping
+        self.uniprot_qid = dict()
 
     def run(self, records, total=None, fast_run=True, write=True):
         records = self.filter(records)
-        uniprot_qid = dict()
         for record in tqdm(records, mininterval=2, total=total):
             entrez_gene = str(record['entrezgene']['@value'])
             if entrez_gene not in self.gene_wdid_mapping:
@@ -338,25 +340,37 @@ class ProteinBot:
                                                                 "Gene item not found during protein creation", None))
                 continue
             gene_wdid = self.gene_wdid_mapping[entrez_gene]
-            protein = Protein(record, self.organism_info, gene_wdid, self.login)
-            try:
-                protein.parse_external_ids()
-                uniprot = protein.external_ids['UniProt ID']
-            except Exception as e:
-                msg = wdi_helpers.format_msg(gene_wdid, None, None, str(e), msg_type=type(e))
-                wdi_core.WDItemEngine.log("ERROR", msg)
-                continue
 
-            # some proteins are encoded by multiple genes. don't try to create it again
-            if uniprot in uniprot_qid:
-                wditem = protein.update_item(uniprot_qid[uniprot], fast_run=fast_run, write=write)
+            # handle multiple protiens
+            if 'uniprot' in record and 'Swiss-Prot' in record['uniprot']['@value']:
+                uniprots = record['uniprot']['@value']['Swiss-Prot']
+                for uniprot in uniprots:
+                    record['uniprot']['@value']['Swiss-Prot'] = uniprot
+                    self.run_one(record, gene_wdid, write)
             else:
-                wditem = protein.create_item(fast_run=fast_run, write=write)
-            if wditem is not None:
-                uniprot_qid[uniprot] = wditem.wd_item_id
-                protein.make_gene_encodes(write=write)
-            if protein.status is not True:
-                self.failed.append(protein.uniprot)
+                self.run_one(record, gene_wdid, write)
+
+    def run_one(self, record, gene_wdid, write):
+        protein = Protein(record, self.organism_info, gene_wdid, self.login)
+        try:
+            protein.parse_external_ids()
+            uniprot = protein.external_ids['UniProt ID']
+        except Exception as e:
+            msg = wdi_helpers.format_msg(gene_wdid, None, None, str(e), msg_type=type(e))
+            wdi_core.WDItemEngine.log("ERROR", msg)
+            return
+
+        # some proteins are encoded by multiple genes. don't try to create it again
+        if uniprot in self.uniprot_qid:
+            qid = self.uniprot_qid[uniprot]
+            wditem = protein.update_item(qid, fast_run=fast_run, write=write)
+        else:
+            wditem = protein.create_item(fast_run=fast_run, write=write)
+        if wditem is not None:
+            self.uniprot_qid[uniprot] = wditem.wd_item_id
+            protein.make_gene_encodes(write=write)
+        if protein.status is not True:
+            self.failed.append(protein.uniprot)
 
     def filter(self, records):
         """
@@ -440,9 +454,10 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
     bot = ProteinBot(organism_info, gene_wdid_mapping, login)
 
     # only do certain records
-    doc_filter = doc_filter if doc_filter is not None else {'taxid': taxid, 'type_of_gene': 'protein-coding',
-                                                            'uniprot': {'$exists': True},
-                                                            'entrezgene': {'$exists': True}}
+    doc_filter_default = {'taxid': taxid, 'entrezgene': {'$exists': True}, 'type_of_gene': 'protein-coding',
+                          'uniprot': {'$exists': True}}
+    doc_filter = doc_filter if doc_filter is not None else doc_filter_default
+
     docs = coll.find(doc_filter).batch_size(20)
     total = docs.count()
     print("total number of records: {}".format(total))
@@ -493,6 +508,7 @@ if __name__ == "__main__":
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
+    parser.add_argument('--entrez', help="Run only this one protein (specified by entrez gene ID)")
     parser.set_defaults(fastrun=True)
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
@@ -513,6 +529,11 @@ if __name__ == "__main__":
         wdi_core.WDItemEngine.logger.handles = []
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='protein{}'.format(taxon))
+
+    if args.entrez:
+        main(coll, taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
+             write=not args.dummy, doc_filter={'_id': args.entrez})
+        sys.exit(0)
 
     if "microbe" in taxon:
         microbe_taxa = get_all_taxa()
