@@ -319,6 +319,7 @@ class Gene:
                                             PROPS['Entrez Gene ID'],
                                             self.login, write=write)
 
+
 class MicrobeGene(Gene):
     """
     Microbes
@@ -775,7 +776,7 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
         # make sure all chromosome items are found in wikidata
         cb = ChromosomeBot()
         chr_num_wdid = cb.get_or_create(organism_info, login=login)
-        chr_num_wdid = {k.upper():v for k,v in chr_num_wdid.items()}
+        chr_num_wdid = {k.upper(): v for k, v in chr_num_wdid.items()}
         if int(organism_info['taxid']) == 9606:
             bot = HumanGeneBot(organism_info, chr_num_wdid, login)
         else:
@@ -835,6 +836,7 @@ if __name__ == "__main__":
     parser.add_argument('--mongo-db', type=str, default="wikidata_src")
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
+    parser.add_argument('--entrez', help="Run only this one gene")
     parser.set_defaults(fastrun=True)
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
@@ -850,8 +852,10 @@ if __name__ == "__main__":
     assert metadata_coll.count() == 1
     metadata = metadata_coll.find_one()
 
-    #print("delete mEe~!!!")
-    #main(coll, taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy, doc_filter={'_id':"51284"})
+    if args.entrez:
+        main(coll, taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
+             write=not args.dummy, doc_filter={'_id': args.entrez})
+        sys.exit(0)
 
     if "microbe" in taxon:
         microbe_taxa = get_all_taxa()
