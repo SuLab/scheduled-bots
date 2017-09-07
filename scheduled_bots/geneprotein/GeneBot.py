@@ -22,33 +22,28 @@ Restructuring this: https://bitbucket.org/sulab/wikidatabots/src/226614eeda5f258
 # TODO: Gene on two chromosomes
 # https://www.wikidata.org/wiki/Q20787772
 
-import argparse
-import json
 import os
 import sys
-import traceback
-from datetime import datetime
+import json
 import time
-from functools import partial
-from itertools import chain
-
-from pymongo import MongoClient
+import argparse
+import traceback
 from tqdm import tqdm
-import sys
+from itertools import chain
+from datetime import datetime
+from functools import partial
+from pymongo import MongoClient
 
-sys.path.insert(0, '/home/gstupp/projects/WikidataIntegrator')
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
-
 from wikidataintegrator.wdi_fastrun import FastRunContainer
-
-DAYS = 120
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
 
+DAYS = 120
 update_retrieved_if_new = partial(update_retrieved_if_new, days=DAYS)
 
 from scheduled_bots.geneprotein import HelperBot, organisms_info, type_of_gene_map, descriptions_by_type
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
-from scheduled_bots.geneprotein.HelperBot import make_ref_source, alwayslist, parse_mygene_src_version, source_items
+from scheduled_bots.geneprotein.HelperBot import make_ref_source, parse_mygene_src_version, source_items
 from scheduled_bots.geneprotein.MicrobeBotResources import get_organism_info, get_all_taxa
 
 try:
@@ -60,40 +55,44 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-PROPS = {'found in taxon': 'P703',
-         'instance of': 'P31',
-         'strand orientation': 'P2548',
-         'Entrez Gene ID': 'P351',
-         'NCBI Locus tag': 'P2393',
-         'Ensembl Gene ID': 'P594',
-         'Ensembl Transcript ID': 'P704',
-         'genomic assembly': 'P659',
-         'genomic start': 'P644',
-         'genomic end': 'P645',
-         'chromosome': 'P1057',
-         'HGNC ID': 'P354',
-         'HGNC Gene Symbol': 'P353',
-         'RefSeq RNA ID': 'P639',
-         'HomoloGene ID': 'P593',
-         'Saccharomyces Genome Database ID': 'P3406',
-         'Mouse Genome Informatics ID': 'P671',
-         'MGI Gene Symbol': 'P2394',
-         'Wormbase Gene ID': 'P3860',
-         'FlyBase Gene ID': 'P3852',
-         'ZFIN Gene ID': 'P3870',
-         'Rat Genome Database ID': 'P3853',
-         'encodes': 'P688'
-         }
+PROPS = {
+    'found in taxon': 'P703',
+    'instance of': 'P31',
+    'strand orientation': 'P2548',
+    'Entrez Gene ID': 'P351',
+    'NCBI Locus tag': 'P2393',
+    'Ensembl Gene ID': 'P594',
+    'Ensembl Transcript ID': 'P704',
+    'genomic assembly': 'P659',
+    'genomic start': 'P644',
+    'genomic end': 'P645',
+    'chromosome': 'P1057',
+    'HGNC ID': 'P354',
+    'HGNC Gene Symbol': 'P353',
+    'RefSeq RNA ID': 'P639',
+    'HomoloGene ID': 'P593',
+    'Saccharomyces Genome Database ID': 'P3406',
+    'Mouse Genome Informatics ID': 'P671',
+    'MGI Gene Symbol': 'P2394',
+    'Wormbase Gene ID': 'P3860',
+    'FlyBase Gene ID': 'P3852',
+    'ZFIN Gene ID': 'P3870',
+    'Rat Genome Database ID': 'P3853',
+    'encodes': 'P688'
+}
 
-__metadata__ = {'name': 'GeneBot',
-                'maintainer': 'GSS',
-                'tags': ['gene'],
-                'properties': list(PROPS.values())
-                }
+__metadata__ = {
+    'name': 'GeneBot',
+    'maintainer': 'GSS',
+    'tags': ['gene'],
+    'properties': list(PROPS.values())
+}
 
 # If the source is "entrez", the reference identifier to be used is "Ensembl Gene ID" (P594)
-source_ref_id = {'ensembl': "Ensembl Gene ID",
-                 'entrez': 'Entrez Gene ID'}
+source_ref_id = {
+    'ensembl': "Ensembl Gene ID",
+    'entrez': 'Entrez Gene ID'
+}
 
 
 class Gene:
@@ -790,7 +789,8 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
         validate_type = "microbial"
 
     # only do certain records
-    doc_filter = doc_filter if doc_filter is not None else {'taxid': taxid, 'entrezgene': {'$exists': True}}
+    doc_filter_default = {'taxid': taxid, 'entrezgene': {'$exists': True}, 'type_of_gene': {'$ne': "biological-region"}}
+    doc_filter = doc_filter if doc_filter is not None else doc_filter_default
     docs = coll.find(doc_filter).batch_size(20)
     total = docs.count()
     print("total number of records: {}".format(total))
