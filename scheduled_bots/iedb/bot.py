@@ -45,7 +45,7 @@ def main(chebi_iedb_map, log_dir="./logs", fast_run=False, write=True):
 
     for chebi, iedb in tqdm(chebi_iedb_map.items()):
         if chebi not in chebi_qid_map:
-            msg = wdi_helpers.format_msg(iedb, PROPS['IEDB Epitope ID'], None, "ChEBI:{} not found".format(chebi))
+            msg = wdi_helpers.format_msg(iedb, PROPS['IEDB Epitope ID'], None, "ChEBI:{} not found".format(chebi), "ChEBI not found")
             print(msg)
             wdi_core.WDItemEngine.log("WARNING", msg)
             continue
