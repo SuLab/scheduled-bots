@@ -34,9 +34,11 @@ from datetime import datetime
 from functools import partial
 from pymongo import MongoClient
 
-from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
+from wikidataintegrator import wdi_login, wdi_core, wdi_helpers, wdi_property_store
 from wikidataintegrator.wdi_fastrun import FastRunContainer
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
+#wdi_property_store.wd_properties['P704']['core_id'] = False
+#wdi_property_store.wd_properties['P639']['core_id'] = False
 
 DAYS = 120
 update_retrieved_if_new = partial(update_retrieved_if_new, days=DAYS)
@@ -78,7 +80,8 @@ PROPS = {
     'FlyBase Gene ID': 'P3852',
     'ZFIN Gene ID': 'P3870',
     'Rat Genome Database ID': 'P3853',
-    'encodes': 'P688'
+    'encodes': 'P688',
+    'cytogenetic location': 'P4196',
 }
 
 __metadata__ = {
@@ -218,6 +221,9 @@ class Gene:
         if 'homologene' in self.record:
             self.external_ids['HomoloGene ID'] = str(self.record['homologene']['@value']['id'])
 
+        if 'map_location' in self.record:
+            self.external_ids['cytogenetic location'] = self.record['map_location']['@value']
+
         ############
         # optional external IDs (can have more than one)
         ############
@@ -272,7 +278,7 @@ class Gene:
 
         for key in ['NCBI Locus tag', 'Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID',
                     'MGI Gene Symbol', 'HomoloGene ID', 'Rat Genome Database ID', 'FlyBase Gene ID',
-                    'Wormbase Gene ID', 'ZFIN Gene ID']:
+                    'Wormbase Gene ID', 'ZFIN Gene ID', 'cytogenetic location']:
             if key in self.external_ids:
                 s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=[self.entrez_ref]))
 

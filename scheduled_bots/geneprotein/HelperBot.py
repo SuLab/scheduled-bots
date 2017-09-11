@@ -104,6 +104,7 @@ mygene_schema = {
     },
     'alias': {'type': 'list', 'required': False, 'coerce': alwayslist, 'schema': {'type': 'string'}},
     'other_names': {'type': 'list', 'required': False, 'coerce': alwayslist, 'schema': {'type': 'string'}},
+    'map_location': {'type': 'string', 'required': False}
 
 }
 mygene_schema_microbe = copy.deepcopy(mygene_schema)
@@ -195,7 +196,8 @@ def tag_mygene_docs(docs, metadata):
                   'uniprot': 'uniprot',
                   'homologene': 'entrez',
                   'other_names': 'entrez',
-                  'alias': 'entrez'
+                  'alias': 'entrez',
+                  'map_location': 'entrez',
                   }
     # todo: automate getting this list of ensembl taxids
     # http://uswest.ensembl.org/info/about/species.html
