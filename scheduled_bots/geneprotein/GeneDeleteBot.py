@@ -35,6 +35,35 @@ from scheduled_bots.utils import login_to_wikidata
 # df = get_ref_microbe_taxids()
 # ref_taxids = list(map(str, df['taxid'].tolist()))
 
+def get_deprecated_genes_rank():
+    """
+    Query for those where entrez statement is deprecated rank
+    Just ran this once, to get rid of these which were leftover from previous GeneBot implementations
+    """
+    s = """SELECT ?entrez ?item WHERE {
+      ?item p:P703 ?s .
+      ?s wikibase:rank wikibase:DeprecatedRank .
+      ?s ps:P703 wd:Q5 .
+      ?item p:P351 ?s2 .
+      ?s2 wikibase:rank wikibase:DeprecatedRank .
+      ?s2 ps:P351 ?entrez .
+      FILTER NOT EXISTS {?article schema:about ?item}
+      OPTIONAL {?item wdt:P688 ?prot}
+      FILTER NOT EXISTS {?something ?prop ?item }
+    }"""
+    bindings = wdi_core.WDItemEngine.execute_sparql_query(s)['results']['bindings']
+    entrez_qid = {x['entrez']['value']: x['item']['value'].rsplit("/")[-1] for x in bindings}
+
+    print("{} wikidata".format(len(entrez_qid)))
+    wd = set(entrez_qid.keys())
+    coll = MongoClient().wikidata_src.mygene
+    mygene = set([str(x['entrezgene']) for x in coll.find({'entrezgene': {'$exists': True}})])
+    print("{} mygene".format(len(mygene)))
+    missing = wd - mygene
+    print("{} deprecated".format(len(missing)))
+    qids = {entrez_qid[x] for x in missing}
+
+    return qids
 
 def get_deprecated_genes(taxids=None):
     if taxids is None:
