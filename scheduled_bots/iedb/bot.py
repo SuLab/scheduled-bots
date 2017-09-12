@@ -52,7 +52,7 @@ def main(chebi_iedb_map, log_dir="./logs", fast_run=False, write=True):
         s = [wdi_core.WDExternalID(iedb, PROPS['IEDB Epitope ID'], references=create_references(iedb))]
         item = wdi_core.WDItemEngine(wd_item_id=chebi_qid_map[chebi], data=s, domain="drugs", fast_run=fast_run,
                                      fast_run_base_filter={PROPS['ChEBI-ID']: ''}, fast_run_use_refs=True,
-                                     ref_handler=ref_handlers.update_retrieved_if_new)
+                                     ref_handler=ref_handlers.update_retrieved_if_new, global_ref_mode="CUSTOM")
         wdi_helpers.try_write(item, iedb, PROPS['IEDB Epitope ID'], login, edit_summary="Add IEDB Epitope ID",
                               write=write)
 
