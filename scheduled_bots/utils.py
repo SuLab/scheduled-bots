@@ -1,4 +1,6 @@
 import requests
+
+
 def login_to_wikidata(USER, PASS):
     baseurl = 'https://www.wikidata.org/w/'
     # Login request
@@ -16,6 +18,7 @@ def login_to_wikidata(USER, PASS):
     edit_cookie = r2.cookies.copy()
     edit_cookie.update(r3.cookies)
     return edit_token, edit_cookie
+
 
 def pd_to_table(df):
     # quick n dirty pandas DataFrame to mediawikitable converter
@@ -41,6 +44,7 @@ def pd_to_table(df):
         out += '|'.join(['|{}'.format(x) for x in record[1:]])
     out += "\n|}"
     return out
+
 
 def execute_sparql_query(query, prefix=None, endpoint='https://query.wikidata.org/sparql',
                          user_agent='wikidatasparqlexamples: https://github.com/SuLab/wikidatasparqlexamples'):

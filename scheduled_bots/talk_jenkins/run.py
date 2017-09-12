@@ -2,7 +2,7 @@
 Hit jenkins API to get the status of all jobs. 
 Creates a table at: https://www.wikidata.org/w/index.php?title=User:ProteinBoxBot/Bot_Status
 
-api example: http://52.15.200.208:8080/job/Gene_Ontology/7/api/python?pretty=true
+api example: http://jenkins.sulab.org/job/Gene_Ontology/7/api/python?pretty=true
 
 """
 import os
@@ -69,14 +69,20 @@ for job in jobs:
     timestamp_int = build_info['timestamp']
     timestamp = datetime.fromtimestamp(int(timestamp_int) / 1000).strftime('%Y-%m-%d %H:%M:%S')
     log_paths = []
+    log_reports = []
     if len(build_info['artifacts']):
         for artifact in build_info['artifacts']:
-            log_paths.append(HOST + "/job/{job_name}/{job_num}/artifact/".format(job_name=job_name, job_num=last_build)
-                             + artifact['relativePath'])
+            log_path = HOST + "/job/{job_name}/{job_num}/artifact/".format(job_name=job_name, job_num=last_build) + \
+                       artifact['relativePath']
+            if log_path.endswith(".html"):
+                log_reports.append(log_path)
+            else:
+                log_paths.append(log_path)
 
     data.append({'Job Name': job_name, 'Description': job_descr, 'Last Run Status': last_build_success,
                  'Log Path': log_paths, 'Last Run': timestamp, 'Code URL': code_url, 'Bot Account': wduser,
-                 'Job Path': HOST + "/job/{job_name}/{job_num}/".format(job_name=job_name, job_num=last_build)})
+                 'Job Path': HOST + "/job/{job_name}/{job_num}/".format(job_name=job_name, job_num=last_build),
+                 'Log Report': log_reports})
 
 
 def make_links(lst):
@@ -91,10 +97,11 @@ def make_links(lst):
 df = pd.DataFrame(data)
 df['Job Name'] = df.apply(lambda x: "[{} {}]".format(x['Job Path'].replace(" ", "%20"), x['Job Name']), axis=1)
 df['Log Path'] = df['Log Path'].apply(lambda lst: make_links(lst) if lst else '')
+df['Log Report'] = df['Log Report'].apply(lambda lst: make_links(lst) if lst else '')
 df['Code URL'] = df['Code URL'].apply(lambda x: "[{} Link]".format(x) if x else '')
 df['Bot Account'] = df['Bot Account'].apply(
     lambda x: "[https://www.wikidata.org/wiki/User:{} {}]".format(x, x) if x else '')
-df = df[['Job Name', 'Description', 'Last Run Status', 'Last Run', 'Log Path', 'Code URL', 'Bot Account']]
+df = df[['Job Name', 'Description', 'Last Run Status', 'Last Run', 'Log Report', 'Log Path', 'Code URL', 'Bot Account']]
 print(df)
 mwtable = pd_to_table(df)
 print(mwtable)
