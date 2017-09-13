@@ -4,6 +4,19 @@
     <title>{{name}}</title>
     <link rel="stylesheet" type="text/css" href="style.css"/>
 
+    <script lang="javascript">
+        function toggleShow(elmnt) {
+            var x = document.getElementById(elmnt);
+            if (x.style.display === 'none') {
+                x.style.display = 'table';
+            } else {
+                x.style.display = 'none';
+            }
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+            toggleShow("info_df");
+        }, false);
+    </script>
 </head>
 <body>
 <h1>{{name}}</h1>
@@ -21,13 +34,19 @@
 <h3>Error Types</h3>
 {{error_counts | safe}}
 
-<a name="info"><h3>Items Processed Succesfully</h3></a>
+<a name="info"></a>
+<h3>Items Processed Succesfully</h3>
+<h4><a onclick="toggleShow('info_df');" href="#"> Show/Hide</a></h4>
 {{info_df | safe}}
 
-<a name="warning"><h3>Items Skipped Due to a Warning</h3></a>
+<a name="warning"></a>
+<h3>Items Skipped Due to a Warning</h3>
+<h4><a onclick="toggleShow('warning_df');" href="#"> Show/Hide</a></h4>
 {{warnings_df | safe}}
 
-<a name="error"><h3>Items Skipped Due to an Error</h3></a>
+<a name="error"></a>
+<h3>Items Skipped Due to an Error</h3>
+<h4><a onclick="toggleShow('error_df');" href="#"> Show/Hide</a></h4>
 {{errors_df | safe}}
 
 </body>

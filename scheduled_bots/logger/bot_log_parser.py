@@ -1,15 +1,29 @@
 import glob
 import os
 import webbrowser
+from functools import lru_cache
 
 import click
 import pandas as pd
 import json
 import sys
+
+import requests
 from dateutil.parser import parse as dateutil_parse
 from jinja2 import Template
 
 pd.options.display.max_colwidth = 100
+
+
+@lru_cache()
+def get_prop_formatter(pid):
+    if not (pid.startswith("P") and isint(pid[1:])):
+        return None
+    try:
+        d = requests.get("https://www.wikidata.org/wiki/Special:EntityData/{}.json".format(pid)).json()
+        return d['entities'][pid]['claims']['P1630'][0]['mainsnak']['datavalue']['value']
+    except Exception:
+        return None
 
 
 def parse_log(file_path):
@@ -17,9 +31,26 @@ def parse_log(file_path):
                      names=['Level', 'Timestamp', 'External ID', 'Prop', 'QID', 'Message', 'Msg Type'],
                      dtype={'External ID': str}, comment='#', quotechar='"', skipinitialspace=True, delimiter=';')
     df.fillna('', inplace=True)
+    df.replace("None", "", inplace=True)
     df = df.apply(lambda x: x.str.strip())
     df.Timestamp = pd.to_datetime(df.Timestamp, format='%m/%d/%Y %H:%M:%S')
     return df
+
+
+def gen_ext_id_links(df: pd.DataFrame):
+    # given the columns "Prop" and "External ID", if prop is a wikidata property, get the formatter URL
+    # and create links to the external ID
+    df['External ID'] = df.apply(lambda row: get_ext_id_link(row['Prop'], row['External ID']), axis=1)
+    return df
+
+
+def get_ext_id_link(pid, ext_id):
+    formatter = get_prop_formatter(pid)
+    if formatter:
+        url = formatter.replace("$1", ext_id)
+        return '<a href="{}">{}</a>'.format(url, ext_id)
+    else:
+        return ext_id
 
 
 def process_log(file_path):
@@ -85,7 +116,7 @@ def isint(s):
 def url_qid(df, col):
     href = "<a href=https://www.wikidata.org/wiki/{}>{}</a>"
     f = lambda x: href.format(x, x) if x.startswith("Q") and isint(x[1:]) else x
-    df.is_copy = False
+    # df.is_copy = False
     df.loc[:, col] = df[col].apply(f)
     return df
 
@@ -122,24 +153,42 @@ def try_json(s):
 def _main(log_path, show_browser=False):
     print(log_path)
     df, metadata = process_log(log_path)
+    del df['Timestamp']
     df['Msg Type'] = df['Msg Type'].apply(escape_html_chars)
     df['Message'] = df['Message'].apply(escape_html_chars)
     df['Message'] = df['Message'].apply(try_json)
 
     level_counts, info_counts, warning_counts, error_counts = generate_summary(df)
+
     warnings_df = df.query("Level == 'WARNING'")
+    warnings_df.is_copy = False
+    warnings_df = gen_ext_id_links(warnings_df)
+    warnings_df = url_qid(warnings_df, "QID")
+    del warnings_df['Level']
+
     errors_df = df.query("Level == 'ERROR'")
+    errors_df.is_copy = False
+    errors_df = gen_ext_id_links(errors_df)
+    errors_df = url_qid(errors_df, "QID")
+    #errors_df['Message'] = errors_df['Message'].apply(try_format_error)
+    del errors_df['Level']
+
     info_df = df.query("Level == 'INFO'")
+    info_df.is_copy = False
+    info_df = gen_ext_id_links(info_df)
     info_df = url_qid(info_df, "QID")
+    info_df.Message = info_df.Message.str.replace("SKIP", "No Action")
+    del info_df['Level']
 
     with pd.option_context('display.max_colwidth', -1):
+        # this class nonsense is an ugly hack: https://stackoverflow.com/questions/15079118/js-datatables-from-pandas/41536906
         level_counts = level_counts.to_frame().to_html(escape=False)
         info_counts = info_counts.to_frame().to_html(escape=False)
         warning_counts = warning_counts.to_frame().to_html(escape=False)
         error_counts = error_counts.to_frame().to_html(escape=False)
-        info_df = info_df.to_html(escape=False)
-        warnings_df = warnings_df.to_html(escape=False)
-        errors_df = errors_df.to_html(escape=False)
+        info_df = info_df.to_html(escape=False, classes='df" id = "info_df')
+        warnings_df = warnings_df.to_html(escape=False, classes='df" id = "warning_df')
+        errors_df = errors_df.to_html(escape=False, classes='df" id = "error_df')
 
     template = Template(open(os.path.join(sys.path[0], "template.html")).read())
 
