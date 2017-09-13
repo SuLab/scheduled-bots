@@ -73,7 +73,8 @@ def make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, pmid=
         raise ValueError("curator not found: {}".format(curator))
 
     # reference URL
-    ref_url = "http://www.ebi.ac.uk/QuickGO/GAnnotation?protein={}".format(uniprot_id)
+    #ref_url = "http://www.ebi.ac.uk/QuickGO/GAnnotation?protein={}".format(uniprot_id)
+    ref_url = "http://www.ebi.ac.uk/QuickGO/annotations?protein={}&geneProductId=UniProtKB:{}".format(uniprot_id, uniprot_id)
     reference.append(wdi_core.WDString(ref_url, 'P854', is_reference=True))
 
     # ref determination method
