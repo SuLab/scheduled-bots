@@ -367,8 +367,8 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
     items = []
     for n, node in tqdm(enumerate(nodes), total=len(nodes)):
         item = node.create(write=write)
-        if n>100:
-            sys.exit(0)
+        #if n>100:
+        #    sys.exit(0)
         if item:
             items.append(item)
 
