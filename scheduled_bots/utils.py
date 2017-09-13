@@ -1,5 +1,18 @@
 import requests
 
+def get_values(pid, values):
+    # todo: integrate this into wdi_helpers
+    value_quotes = '"' + '" "'.join(map(str, values)) + '"'
+    s = """select * where {
+          values ?x {**value_quotes**}
+          ?item wdt:**pid** ?x
+        }""".replace("**value_quotes**", value_quotes).replace("**pid**", pid)
+    params = {'query': s, 'format': 'json'}
+    request = requests.post('https://query.wikidata.org/sparql', data=params)
+    request.raise_for_status()
+    results = request.json()['results']['bindings']
+    dl = [{k: v['value'] for k, v in item.items()} for item in results]
+    return {x['x']: x['item'].replace("http://www.wikidata.org/entity/", "") for x in dl}
 
 def login_to_wikidata(USER, PASS):
     baseurl = 'https://www.wikidata.org/w/'

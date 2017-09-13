@@ -1,22 +1,19 @@
 import argparse
 import json
 import os
-import sys
-import traceback
-import urllib.request
-from collections import defaultdict, Counter
+from collections import defaultdict
 from datetime import datetime
 from functools import partial
-from itertools import chain
 from time import gmtime, strftime
 
 import requests
+from scheduled_bots.utils import get_values
 from tqdm import tqdm
 from wikidataintegrator import ref_handlers
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
 from wikidataintegrator.wdi_helpers import id_mapper
 
-DAYS = 6*30
+DAYS = 6 * 30
 update_retrieved_if_new = partial(ref_handlers.update_retrieved_if_new, days=DAYS)
 
 try:
@@ -43,21 +40,6 @@ __metadata__ = {'name': 'GeneDiseaseBot',
                 'tags': ['gene', 'disease'],
                 'properties': list(PROPS.values())
                 }
-
-
-def get_values(pid, values):
-    # todo: integrate this into wdi_helpers
-    value_quotes = '"' + '" "'.join(map(str, values)) + '"'
-    s = """select * where {
-          values ?x {**value_quotes**}
-          ?item wdt:**pid** ?x
-        }""".replace("**value_quotes**", value_quotes).replace("**pid**", pid)
-    params = {'query': s, 'format': 'json'}
-    request = requests.post('https://query.wikidata.org/sparql', data=params)
-    request.raise_for_status()
-    results = request.json()['results']['bindings']
-    dl = [{k: v['value'] for k, v in item.items()} for item in results]
-    return {x['x']: x['item'].replace("http://www.wikidata.org/entity/", "") for x in dl}
 
 
 class GWASCatalog(object):
@@ -191,7 +173,8 @@ class GeneDiseaseBot(object):
             except Exception as e:
                 print(e)
                 wdi_core.WDItemEngine.log("ERROR",
-                                          wdi_helpers.format_msg(gdr.ncbi, PROPS['Entrez Gene ID'], None, str(e), type(e)))
+                                          wdi_helpers.format_msg(gdr.ncbi, PROPS['Entrez Gene ID'], None, str(e),
+                                                                 type(e)))
                 continue
 
             gdr.gene_wditem = items['gene_item']
