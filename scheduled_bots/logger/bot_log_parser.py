@@ -162,23 +162,26 @@ def _main(log_path, show_browser=False):
 
     warnings_df = df.query("Level == 'WARNING'")
     warnings_df.is_copy = False
-    warnings_df = gen_ext_id_links(warnings_df)
-    warnings_df = url_qid(warnings_df, "QID")
     del warnings_df['Level']
+    if not warnings_df.empty:
+        warnings_df = gen_ext_id_links(warnings_df)
+        warnings_df = url_qid(warnings_df, "QID")
 
     errors_df = df.query("Level == 'ERROR'")
     errors_df.is_copy = False
-    errors_df = gen_ext_id_links(errors_df)
-    errors_df = url_qid(errors_df, "QID")
-    #errors_df['Message'] = errors_df['Message'].apply(try_format_error)
     del errors_df['Level']
+    if not errors_df.empty:
+        errors_df = gen_ext_id_links(errors_df)
+        errors_df = url_qid(errors_df, "QID")
+        #errors_df['Message'] = errors_df['Message'].apply(try_format_error)
 
     info_df = df.query("Level == 'INFO'")
     info_df.is_copy = False
-    info_df = gen_ext_id_links(info_df)
-    info_df = url_qid(info_df, "QID")
-    info_df.Message = info_df.Message.str.replace("SKIP", "No Action")
     del info_df['Level']
+    if not info_df.empty:
+        info_df = gen_ext_id_links(info_df)
+        info_df = url_qid(info_df, "QID")
+        info_df.Message = info_df.Message.str.replace("SKIP", "No Action")
 
     with pd.option_context('display.max_colwidth', -1):
         # this class nonsense is an ugly hack: https://stackoverflow.com/questions/15079118/js-datatables-from-pandas/41536906
