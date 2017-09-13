@@ -267,7 +267,7 @@ def get_all_taxa():
                 """
     response = wdi_core.WDItemEngine.execute_sparql_query(query=query)
     taxids = [x['taxid']['value'] for x in response['results']['bindings'] if int(x['count']['value'])>=10]
-    return ",".join(taxids)
+    return ",".join(sorted(taxids))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata GO bot')
