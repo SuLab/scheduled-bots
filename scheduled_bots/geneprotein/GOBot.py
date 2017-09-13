@@ -12,6 +12,7 @@ import json
 import os
 from collections import defaultdict
 from datetime import datetime
+from functools import partial
 from typing import Dict, Set
 
 import pandas as pd
@@ -20,6 +21,11 @@ from pymongo import MongoClient
 from scheduled_bots.geneprotein import go_props, go_evidence_codes, curators_wdids, curator_ref, PROPS
 from tqdm import tqdm
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
+from scheduled_bots.utils import get_values
+from wikidataintegrator import ref_handlers
+
+DAYS = 6 * 30
+update_retrieved_if_new = partial(ref_handlers.update_retrieved_if_new, days=DAYS)
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -202,8 +208,9 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
 
     # get all pmids and make items for them
     pmids = set([x[5:] for x in df['Reference'] if x.startswith("PMID:")])
-    pmid_map = wdi_helpers.id_mapper("P698")
-    print("Total number of pmids: {}".format(len(pmids)))
+    print("Need {} pmids".format(len(pmids)))
+    pmid_map = get_values("P698", pmids)
+    print("Found {} pmids".format(len(pmid_map)))
     pmids_todo = pmids - set(pmid_map.keys())
     print("Creating {} pmid items".format(len(pmids_todo)))
     new_pmids = create_articles(pmids_todo, login, write)
@@ -227,18 +234,22 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
     # iterate through all proteins & write
     failed_items = []
     for uniprot_id, item_wdid in tqdm(prot_wdid_mapping.items()):
-        #if uniprot_id != "P28005":
+        # if uniprot_id != "Q9RJK2":
         #    continue
         if uniprot_id not in go_annotations:
             continue
         this_go = go_annotations[uniprot_id]
         external_id = external_ids[item_wdid]
+        #print(this_go)
         try:
             statements = make_go_statements(item_wdid, uniprot_id, this_go, retrieved, go_map, pmid_map, external_id,
                                             login)
             wditem = wdi_core.WDItemEngine(wd_item_id=item_wdid, domain='protein', data=statements, fast_run=fast_run,
-                                           fast_run_base_filter={UNIPROT: "", "P703": organism_wdid})
-            # good_refs=[{'P248': None}], keep_good_ref_statements=True)
+                                           fast_run_base_filter={UNIPROT: "", "P703": organism_wdid},
+                                           fast_run_use_refs=True,
+                                           ref_handler=update_retrieved_if_new,
+                                           global_ref_mode="CUSTOM"
+                                           )
             wdi_helpers.try_write(wditem, record_id=uniprot_id, record_prop=UNIPROT, edit_summary="update GO terms",
                                   login=login, write=write)
         except Exception as e:
@@ -251,6 +262,7 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
     print("{} items failed: {}".format(len(failed_items), failed_items))
     if wdi_core.WDItemEngine.logger is not None:
         wdi_core.WDItemEngine.logger.handles = []
+
 
 def get_all_taxa():
     """
@@ -266,8 +278,9 @@ def get_all_taxa():
                 } group by ?taxid order by ?count
                 """
     response = wdi_core.WDItemEngine.execute_sparql_query(query=query)
-    taxids = [x['taxid']['value'] for x in response['results']['bindings'] if int(x['count']['value'])>=10]
+    taxids = [x['taxid']['value'] for x in response['results']['bindings'] if int(x['count']['value']) >= 10]
     return ",".join(sorted(taxids))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata GO bot')
