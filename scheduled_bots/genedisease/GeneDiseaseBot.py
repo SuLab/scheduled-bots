@@ -6,13 +6,18 @@ import traceback
 import urllib.request
 from collections import defaultdict, Counter
 from datetime import datetime
+from functools import partial
 from itertools import chain
 from time import gmtime, strftime
 
 import requests
 from tqdm import tqdm
+from wikidataintegrator import ref_handlers
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
 from wikidataintegrator.wdi_helpers import id_mapper
+
+DAYS = 6*30
+update_retrieved_if_new = partial(ref_handlers.update_retrieved_if_new, days=DAYS)
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -40,8 +45,22 @@ __metadata__ = {'name': 'GeneDiseaseBot',
                 }
 
 
-class GWASCatalog(object):
+def get_values(pid, values):
+    # todo: integrate this into wdi_helpers
+    value_quotes = '"' + '" "'.join(map(str, values)) + '"'
+    s = """select * where {
+          values ?x {**value_quotes**}
+          ?item wdt:**pid** ?x
+        }""".replace("**value_quotes**", value_quotes).replace("**pid**", pid)
+    params = {'query': s, 'format': 'json'}
+    request = requests.post('https://query.wikidata.org/sparql', data=params)
+    request.raise_for_status()
+    results = request.json()['results']['bindings']
+    dl = [{k: v['value'] for k, v in item.items()} for item in results]
+    return {x['x']: x['item'].replace("http://www.wikidata.org/entity/", "") for x in dl}
 
+
+class GWASCatalog(object):
     def __init__(self, catalog_tsv_path='GWAS_Catalog.tsv'):
         self.data = set()
         self.header = None
@@ -84,7 +103,6 @@ class GWASCatalog(object):
 
 
 class GeneDiseaseRelationship:
-
     phenocarta_ref_source = 'http://chibi.ubc.ca/Gemma/phenotypes.html?phenotypeUrlId=DOID_{doid}&ncbiId={ncbi}'
 
     def __init__(self, ncbi, symbol, taxon, relationship, doid, phenotype, pmid, link):
@@ -106,11 +124,10 @@ class GeneDiseaseRelationship:
         return (self.ncbi, self.doid) == (other.ncbi, other.doid)
 
     def __ne__(self, other):
-        return not(self == other)
+        return not (self == other)
 
 
 class GeneDiseaseBot(object):
-
     def __init__(self, catalog_tsv_path='GWAS_Catalog.tsv', login=None, fast_run=False, write=True):
         self.gwas_catalog = GWASCatalog(catalog_tsv_path=catalog_tsv_path)
 
@@ -127,8 +144,8 @@ class GeneDiseaseBot(object):
         self.gene_wdid_map = id_mapper(PROPS['Entrez Gene ID'], filters=[(PROPS['found in taxon'], 'Q15978631')])
 
         # Load pmid -> wdid mapper
-        self.pmid_wdid_map = id_mapper(PROPS['PubMed ID'])
-        print(len(self.pmid_wdid_map))
+        # No! this eats up like 8gb of RAM!!!!
+        # self.pmid_wdid_map = id_mapper(PROPS['PubMed ID'])
 
         self.wd_items = []
 
@@ -137,6 +154,15 @@ class GeneDiseaseBot(object):
         wd_genes = defaultdict(list)
         wd_diseases = defaultdict(list)
         gdrs = list(self.gwas_catalog.data)
+
+        print("Get or create references")
+        pmids = set([x.pmid for x in gdrs])
+        print("Need {} pmids".format(len(pmids)))
+        self.pmid_qid_map = get_values("P698", pmids)
+        print("Found {} pmids".format(len(self.pmid_qid_map)))
+        for pmid in pmids - set(self.pmid_qid_map.keys()):
+            self.pmid_qid_map[pmid] = wdi_helpers.PubmedItem(pmid).get_or_create(self.login)
+
         print("Building relationships & references")
         for gdr in tqdm(gdrs):
             try:
@@ -145,7 +171,9 @@ class GeneDiseaseBot(object):
             except KeyError as e:
                 msg = "Missing DOID Disease WD Item; skipping {}".format(gdr.doid)
                 print(msg)
-                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(gdr.doid, PROPS['Disease Ontology ID'], None, msg, type(e)))
+                wdi_core.WDItemEngine.log("ERROR",
+                                          wdi_helpers.format_msg(gdr.doid, PROPS['Disease Ontology ID'], None, msg,
+                                                                 type(e)))
                 continue
 
             try:
@@ -154,10 +182,17 @@ class GeneDiseaseBot(object):
             except KeyError as e:
                 msg = "Missing NCBI Gene WD Item; skipping {}".format(gdr.ncbi)
                 print(msg)
-                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(gdr.ncbi, PROPS['Entrez Gene ID'], None, msg, type(e)))
+                wdi_core.WDItemEngine.log("ERROR",
+                                          wdi_helpers.format_msg(gdr.ncbi, PROPS['Entrez Gene ID'], None, msg, type(e)))
                 continue
 
-            items = self.process_relationship(gene_wdid, doid_wdid, gdr)
+            try:
+                items = self.process_relationship(gene_wdid, doid_wdid, gdr)
+            except Exception as e:
+                print(e)
+                wdi_core.WDItemEngine.log("ERROR",
+                                          wdi_helpers.format_msg(gdr.ncbi, PROPS['Entrez Gene ID'], None, str(e), type(e)))
+                continue
 
             gdr.gene_wditem = items['gene_item']
             gdr.disease_wditem = items['disease_item']
@@ -177,12 +212,16 @@ class GeneDiseaseBot(object):
                                                      domain="genes",
                                                      append_value=[PROPS["genetic association"]],
                                                      fast_run=self.fast_run,
-                                                     fast_run_base_filter=self.fast_run_base_gene_filter)
+                                                     fast_run_base_filter=self.fast_run_base_gene_filter,
+                                                     fast_run_use_refs=True,
+                                                     ref_handler=update_retrieved_if_new,
+                                                     global_ref_mode="CUSTOM")
                 wd_item = {'item': gene_wd_item, 'record_id': gdrs[0].ncbi, 'record_prop': PROPS['Entrez Gene ID']}
                 self.write_item(wd_item)
             except Exception as e:
                 msg = "Problem Creating Gene WDItem; skipping {}".format(gdr.ncbi)
-                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(gdr.ncbi, PROPS['Entrez Gene ID'], wdid, msg, type(e)))
+                wdi_core.WDItemEngine.log("ERROR",
+                                          wdi_helpers.format_msg(gdr.ncbi, PROPS['Entrez Gene ID'], wdid, msg, type(e)))
 
         print("Begin creating Wikidata Disease items with new relationships")
         for wdid, gdrs in tqdm(wd_diseases.items()):
@@ -193,23 +232,26 @@ class GeneDiseaseBot(object):
                                                         domain="diseases",
                                                         append_value=[PROPS["genetic association"]],
                                                         fast_run=self.fast_run,
-                                                        fast_run_base_filter=self.fast_run_base_disease_filter)
-                wd_item = {'item': disease_wd_item, 'record_id': "DOID:{}".format(gdrs[0].doid), 'record_prop': PROPS['Disease Ontology ID']}
+                                                        fast_run_base_filter=self.fast_run_base_disease_filter,
+                                                        fast_run_use_refs=True,
+                                                        ref_handler=update_retrieved_if_new,
+                                                        global_ref_mode="CUSTOM")
+                wd_item = {'item': disease_wd_item, 'record_id': "DOID:{}".format(gdrs[0].doid),
+                           'record_prop': PROPS['Disease Ontology ID']}
                 self.write_item(wd_item)
             except Exception as e:
                 msg = "Problem Creating Disease WDItem; skipping {}".format(gdr.doid)
-                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(gdr.doid, PROPS['Disease Ontology ID'], wdid, msg, type(e)))
+                wdi_core.WDItemEngine.log("ERROR",
+                                          wdi_helpers.format_msg(gdr.doid, PROPS['Disease Ontology ID'], wdid, msg,
+                                                                 type(e)))
 
         if self.write:
             wdi_core.WDItemEngine.log("INFO", "All Items Written")
 
     def write_item(self, wd_item):
-        if self.write:
-            try:
-                wdi_helpers.try_write(wd_item['item'], record_id=wd_item['record_id'], record_prop=wd_item['record_prop'], edit_summary='edit genetic association', login=self.login, write=self.write)
-            except Exception as e:
-                print(e)
-                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(wd_item['record_id'], wd_item['record_prop'], wd_item['item'].wd_item_id, str(e), type(e)))
+        wdi_helpers.try_write(wd_item['item'], record_id=wd_item['record_id'],
+                              record_prop=wd_item['record_prop'], edit_summary='edit genetic association',
+                              login=self.login, write=self.write)
 
     def process_relationship(self, gene_wdid, doid_wdid, gdr):
         """
@@ -222,7 +264,9 @@ class GeneDiseaseBot(object):
         qualifiers = self.create_qualifiers(gdr)
 
         # Attach the created genetic association references to this disease phenotype
-        disease_item = wdi_core.WDItemID(value=doid_wdid, prop_nr=PROPS["genetic association"], references=[genetic_assoc_ref], qualifiers=qualifiers, check_qualifier_equality=False)
+        disease_item = wdi_core.WDItemID(value=doid_wdid, prop_nr=PROPS["genetic association"],
+                                         references=[genetic_assoc_ref], qualifiers=qualifiers,
+                                         check_qualifier_equality=False)
 
         # Repeat for attaching updated gene information to disease
 
@@ -231,7 +275,9 @@ class GeneDiseaseBot(object):
         qualifiers = self.create_qualifiers(gdr)
 
         # Attach the created genetic association references to this disease phenotype
-        gene_item = wdi_core.WDItemID(value=gene_wdid, prop_nr=PROPS["genetic association"], references=[genetic_assoc_ref], qualifiers=qualifiers, check_qualifier_equality=False)
+        gene_item = wdi_core.WDItemID(value=gene_wdid, prop_nr=PROPS["genetic association"],
+                                      references=[genetic_assoc_ref], qualifiers=qualifiers,
+                                      check_qualifier_equality=False)
 
         return {'disease_item': disease_item, 'gene_item': gene_item}
 
@@ -249,10 +295,12 @@ class GeneDiseaseBot(object):
         references.append(wdi_core.WDItemID(value='Q22330995', prop_nr=PROPS['stated in'], is_reference=True))
 
         # Stated in PubMed
-        references.append(wdi_core.WDItemID(value=self.get_or_create_article(gdr.pmid), prop_nr=PROPS['stated in'], is_reference=True))
+        references.append(wdi_core.WDItemID(value=self.pmid_qid_map[gdr.pmid], prop_nr=PROPS['stated in'],
+                                            is_reference=True))
 
         # Date retrieved
-        references.append(wdi_core.WDTime(strftime("+%Y-%m-%dT00:00:00Z", gmtime()), prop_nr=PROPS['retrieved'], is_reference=True))
+        references.append(
+            wdi_core.WDTime(strftime("+%Y-%m-%dT00:00:00Z", gmtime()), prop_nr=PROPS['retrieved'], is_reference=True))
 
         return references
 
@@ -264,24 +312,10 @@ class GeneDiseaseBot(object):
         qualifiers.append(wdi_core.WDItemID(value='Q1098876', prop_nr=PROPS['determination method'], is_qualifier=True))
 
         # TAS (Q23190853)
-        qualifiers.append(wdi_core.WDItemID(value='Q23190853', prop_nr=PROPS['determination method'], is_qualifier=True))
+        qualifiers.append(
+            wdi_core.WDItemID(value='Q23190853', prop_nr=PROPS['determination method'], is_qualifier=True))
 
         return qualifiers
-
-    def get_or_create_article(self, pmid):
-        # check if exists in wikidata
-        if pmid in self.pmid_wdid_map:
-            return self.pmid_wdid_map[pmid]
-        else:
-            p = wdi_helpers.PubmedItem(pmid)
-            if self.write:
-                wdid = p.get_or_create(self.login)
-            else:
-                wdid = 'Q1'  # Dummy ID
-                wdi_core.WDItemEngine.log("INFO", wdi_helpers.format_msg(pmid, PROPS['PubMed ID'], wdid, "CREATE"))
-            self.pmid_wdid_map[pmid] = wdid
-
-        return wdid
 
 
 def main(gwas_path='GWAS_Catalog.tsv', log_dir="./logs", fast_run=False, write=True):
@@ -303,6 +337,7 @@ def download_gwas(url):
     with open('GWAS_Catalog.tsv', 'wb') as handle:
         for block in r.iter_content(1024):
             handle.write(block)
+
 
 if __name__ == "__main__":
     """
