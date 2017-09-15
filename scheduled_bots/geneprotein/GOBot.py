@@ -10,6 +10,7 @@ Data source: Quickgo mongo
 import argparse
 import json
 import os
+import traceback
 from collections import defaultdict
 from datetime import datetime
 from functools import partial
@@ -202,10 +203,12 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
     go_map = wdi_helpers.id_mapper("P686")
 
     # Get GO terms from our local store for this taxon
-    df = pd.DataFrame(list(coll.find({'Taxon': int(taxon)})))
+    df = pd.DataFrame(list(coll.find({'Taxon': "taxon:" + str(taxon)})))
     if len(df) == 0:
         print("No GO annotations found for taxid: {}".format(taxon))
         return None
+    else:
+        print("Found {} GO annotations".format(len(df)))
 
     # get all pmids and make items for them
     pmids = set([x[5:] for x in df['Reference'] if x.startswith("PMID:")])
@@ -255,6 +258,7 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
                                   login=login, write=write)
         except Exception as e:
             print(e)
+            traceback.print_exc()
             failed_items.append(uniprot_id)
             wdi_core.WDItemEngine.log("ERROR",
                                       wdi_helpers.format_msg(uniprot_id, UNIPROT, item_wdid, str(e),

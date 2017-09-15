@@ -61,9 +61,12 @@ human_chromosome_map = {
 
 go_props = {'MF': 'P680',
             'Function': 'P680',
+            'F': 'P680',
             'CC': 'P681',
+            'C': 'P681',
             'Component': 'P681',
             'BP': 'P682',
+            'P': 'P682',
             'Process': 'P682'}
 
 go_evidence_codes = {
