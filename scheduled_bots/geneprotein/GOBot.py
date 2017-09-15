@@ -26,7 +26,7 @@ from scheduled_bots.utils import get_values
 from wikidataintegrator import ref_handlers
 
 DAYS = 6 * 30
-update_retrieved_if_new = partial(ref_handlers.update_retrieved_if_new, days=DAYS)
+update_retrieved_if_new = partial(ref_handlers.update_retrieved_if_new_multiple_refs, days=DAYS)
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
