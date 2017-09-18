@@ -1,6 +1,7 @@
 import glob
 import os
 import webbrowser
+from ast import literal_eval
 from functools import lru_cache
 
 import click
@@ -8,6 +9,7 @@ import pandas as pd
 import json
 import sys
 
+import re
 import requests
 from dateutil.parser import parse as dateutil_parse
 from jinja2 import Template
@@ -121,6 +123,63 @@ def url_qid(df, col):
     return df
 
 
+def escape_html_chars(s):
+    return s.replace("&", r'&amp;').replace("<", r'&lt;').replace(">", r'&gt;')
+
+
+def try_json(s):
+    try:
+        d = json.loads(s.replace("'", '"'))
+        return d
+    except Exception:
+        return s
+
+
+
+def wiki_links_to_html(s):
+    # in a string, convert things like "[[Q27826279|Q27826279]]" into
+    # '<a href="https://www.wikidata.org/wiki/Q27826279>Q27826279</a>'
+    for match in re.findall('\[\[(Q\d{1,12})\|Q\d{1,12}\]\]', s):
+        s = s.replace("[[{}|{}]]".format(match, match),
+                      '<a href="https://www.wikidata.org/wiki/{}">{}</a>'.format(match, match))
+    return s
+
+
+def format_error(error_type, s):
+    # attempts to format an error message, depending on the type of error
+    if "WDApiError" in error_type or "NonUniqueLabelDescriptionPairError" in error_type:
+        return format_wdapierror(try_json(s))
+    if "ManualInterventionReqException" in error_type:
+        return format_ManualInterventionReqException(s)
+    else:
+        return s
+
+
+def format_ManualInterventionReqException(s):
+    # More than one WD item has the same property value Property: P1748, items affected: ['186020', '18557906']
+    if "More than one WD item has the same property value" in s:
+        pid = s.split("Property: ")[1].split(",")[0].strip()
+        qids = literal_eval(s.split("items affected: ")[1])
+        urls = ['<a href="https://www.wikidata.org/wiki/Q{}#{}">Q{}</a>'.format(x, pid, x) for x in qids]
+        return "More than one WD item has the same property value: {}".format(", ".join(urls))
+    elif "does not match provided core ID" in s:
+        qid = s.split("Retrieved item (")[1].split(")")[0]
+        s = s.replace(qid, '<a href="https://www.wikidata.org/wiki/{}">{}</a>'.format(qid, qid))
+        return s
+    else:
+        return s
+
+
+def format_wdapierror(d):
+    # if the message type is a WDApiError, attempt to clean it up a little
+    try:
+        return {'code': d['error']['code'],
+                'info': wiki_links_to_html(d['error']['info']),
+                'messages': d['error']['messages']}
+    except Exception:
+        return d
+
+
 @click.command()
 @click.argument('log-path')
 @click.option('--show-browser', default=False, is_flag=True, help='show log in browser')
@@ -138,25 +197,14 @@ def main(log_path, show_browser=False):
         _main(log_path, show_browser)
 
 
-def escape_html_chars(s):
-    return s.replace("&", r'&amp;').replace("<", r'&lt;').replace(">", r'&gt;')
-
-
-def try_json(s):
-    try:
-        d = json.loads(s.replace("'", '"'))
-    except Exception:
-        return s
-    return d
-
-
 def _main(log_path, show_browser=False):
     print(log_path)
     df, metadata = process_log(log_path)
     del df['Timestamp']
     df['Msg Type'] = df['Msg Type'].apply(escape_html_chars)
     df['Message'] = df['Message'].apply(escape_html_chars)
-    df['Message'] = df['Message'].apply(try_json)
+    # df['Message'] = df['Message'].apply(try_json)
+    df['Message'] = df.apply(lambda row: format_error(row['Msg Type'], row['Message']), 1)
 
     level_counts, info_counts, warning_counts, error_counts = generate_summary(df)
 
@@ -173,7 +221,7 @@ def _main(log_path, show_browser=False):
     if not errors_df.empty:
         errors_df = gen_ext_id_links(errors_df)
         errors_df = url_qid(errors_df, "QID")
-        #errors_df['Message'] = errors_df['Message'].apply(try_format_error)
+        # errors_df['Message'] = errors_df['Message'].apply(try_format_error)
 
     info_df = df.query("Level == 'INFO'")
     info_df.is_copy = False
