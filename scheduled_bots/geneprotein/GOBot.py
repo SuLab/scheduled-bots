@@ -217,8 +217,8 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
     print("Found {} pmids".format(len(pmid_map)))
     pmids_todo = pmids - set(pmid_map.keys())
     print("Creating {} pmid items".format(len(pmids_todo)))
-    #new_pmids = create_articles(pmids_todo, login, write)
-    #pmid_map.update(new_pmids)
+    new_pmids = create_articles(pmids_todo, login, write)
+    pmid_map.update(new_pmids)
     print("Done creating pmid items")
 
     # get all external IDs we may need by uniprot id
