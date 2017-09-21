@@ -84,8 +84,7 @@ def make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, pmid=
     return reference
 
 
-def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, retrieved: datetime, go_map: dict,
-                       pmid_map: dict, external_id: dict, login: wdi_login.WDLogin):
+def make_go_statements(uniprot_id: str, this_go: pd.DataFrame, go_map: dict, pmid_map: dict, external_id: dict):
     """
     add go terms to a protein item.
     Follows the schema described here:
@@ -105,9 +104,10 @@ def make_go_statements(item_wdid: str, uniprot_id: str, this_go: pd.DataFrame, r
     """
     statements = []
     for go_id, sub_df in this_go.groupby(level=0):
-        level = set(sub_df.index.get_level_values("Aspect"))
-        assert len(level) == 1
-        level_wdid = go_props[list(level)[0]]
+        aspect = set(sub_df.index.get_level_values("Aspect"))
+        assert len(aspect) == 1
+        aspect = list(aspect)[0]
+        level_wdid = go_props[aspect]
         go_wdid = go_map[go_id]
 
         statement = wdi_core.WDItemID(go_wdid, level_wdid)
@@ -217,8 +217,8 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
     print("Found {} pmids".format(len(pmid_map)))
     pmids_todo = pmids - set(pmid_map.keys())
     print("Creating {} pmid items".format(len(pmids_todo)))
-    new_pmids = create_articles(pmids_todo, login, write)
-    pmid_map.update(new_pmids)
+    #new_pmids = create_articles(pmids_todo, login, write)
+    #pmid_map.update(new_pmids)
     print("Done creating pmid items")
 
     # get all external IDs we may need by uniprot id
@@ -246,13 +246,12 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
         external_id = external_ids[item_wdid]
         #print(this_go)
         try:
-            statements = make_go_statements(item_wdid, uniprot_id, this_go, retrieved, go_map, pmid_map, external_id,
-                                            login)
+            statements = make_go_statements(uniprot_id, this_go, go_map, pmid_map, external_id)
             wditem = wdi_core.WDItemEngine(wd_item_id=item_wdid, domain='protein', data=statements, fast_run=fast_run,
                                            fast_run_base_filter={UNIPROT: "", "P703": organism_wdid},
                                            fast_run_use_refs=True,
                                            ref_handler=update_retrieved_if_new,
-                                           global_ref_mode="CUSTOM"
+                                           global_ref_mode="STRICT_OVERWRITE"
                                            )
             wdi_helpers.try_write(wditem, record_id=uniprot_id, record_prop=UNIPROT, edit_summary="update GO terms",
                                   login=login, write=write)
@@ -285,6 +284,13 @@ def get_all_taxa():
     response = wdi_core.WDItemEngine.execute_sparql_query(query=query)
     taxids = [x['taxid']['value'] for x in response['results']['bindings'] if int(x['count']['value']) >= 10]
     return ",".join(sorted(taxids))
+
+
+def remove_old_statements():
+    UniProt_GOA = "Q28018111"
+    retrieved = "20170301"
+
+    cleanup(UniProt_GOA, retrieved)
 
 
 if __name__ == "__main__":
