@@ -16,9 +16,6 @@ from wikidataintegrator import wdi_core, wdi_helpers, wdi_login, wdi_property_st
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
 from wikidataintegrator.wdi_helpers import id_mapper
 
-wdi_property_store.wd_properties['P492']['core_id'] = False
-wdi_property_store.wd_properties['P486']['core_id'] = False
-
 try:
     from scheduled_bots.local import WDUSER, WDPASS
 except ImportError:
@@ -44,6 +41,9 @@ PROPS = {'subclass of': 'P279',
          'OMIM ID': 'P492',
          'location': 'P276'
          }
+
+wdi_property_store.wd_properties[PROPS['OMIM ID']]['core_id'] = False
+wdi_property_store.wd_properties[PROPS['MeSH ID']]['core_id'] = False
 
 __metadata__ = {'name': 'DOIDBot',
                 'tags': ['disease', 'doid'],
