@@ -1,4 +1,6 @@
+import itertools
 import requests
+
 
 def get_values(pid, values):
     # todo: integrate this into wdi_helpers
@@ -13,6 +15,7 @@ def get_values(pid, values):
     results = request.json()['results']['bindings']
     dl = [{k: v['value'] for k, v in item.items()} for item in results]
     return {x['x']: x['item'].replace("http://www.wikidata.org/entity/", "") for x in dl}
+
 
 def login_to_wikidata(USER, PASS):
     baseurl = 'https://www.wikidata.org/w/'
@@ -80,3 +83,31 @@ def execute_sparql_query(query, prefix=None, endpoint='https://query.wikidata.or
     response = requests.get(endpoint, params=params, headers=headers)
     response.raise_for_status()
     return response.json()
+
+
+def grouper(n, iterable):
+    it = iter(iterable)
+    while True:
+        chunk = tuple(itertools.islice(it, n))
+        if not chunk:
+            return
+        yield chunk
+
+
+def make_deletion_templates(qids, title, reason):
+    s = '\n=={}==\n'.format(title)
+    for group in grouper(90, list(qids)):
+        del_template = "{{subst:Rfd group | {q} | reason = {reason} }}\n".replace("{q}", '|'.join(group)).replace(
+            "{reason}", reason)
+        s += del_template
+    return s
+
+
+def create_rfd(s: str, WDUSER, WDPASS):
+    # post the request for deletion on wikidata
+    edit_token, edit_cookie = login_to_wikidata(WDUSER, WDPASS)
+    data = {'action': 'edit', 'title': 'Wikidata:Requests_for_deletions',
+            'appendtext': s, 'format': 'json', 'token': edit_token}
+    r = requests.post("https://www.wikidata.org/w/api.php", data=data, cookies=edit_cookie)
+    r.raise_for_status()
+    print(r.json())
