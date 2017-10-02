@@ -240,8 +240,10 @@ class OBOImporter(object):
                     wd_item = wdi_core.WDItemEngine(item_name='test', domain='obo', data=data, fast_run=self.fast_run,
                                                     fast_run_base_filter=self.fast_run_base_filter,
                                                     global_ref_mode='STRICT_OVERWRITE')
-                wd_item.set_label(label=label)
-                wd_item.set_description(description=description[:250])
+                if wd_item.get_label() == "":
+                    wd_item.set_label(label=label)
+                if wd_item.get_description() == "":
+                    wd_item.set_description(description=description[:250])
                 # if len(description) <= 250:
                 #     wd_item.set_description(description=description)
                 # else:
