@@ -12,6 +12,7 @@ from time import gmtime, strftime, sleep
 import requests
 from tqdm import tqdm
 
+from scheduled_bots import utils
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login, wdi_property_store
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
 from wikidataintegrator.wdi_helpers import id_mapper
@@ -252,9 +253,12 @@ class DONode:
             if wd_item.get_label(lang="en") == "":
                 wd_item.set_label(self.lbl, lang="en")
             current_descr = wd_item.get_description(lang='en')
-            if current_descr.lower() in {"", "human disease", "disease"} and self.definition and len(
+            if current_descr == self.definition and self.definition and len(self.definition) < 250:
+                # change current def to cleaned def
+                wd_item.set_description(utils.clean_description(self.definition))
+            elif current_descr.lower() in {"", "human disease", "disease"} and self.definition and len(
                     self.definition) < 250:
-                wd_item.set_description(description=self.definition, lang='en')
+                wd_item.set_description(utils.clean_description(self.definition))
             elif current_descr.lower() == "":
                 wd_item.set_description(description="human disease", lang='en')
             if self.synonyms is not None:

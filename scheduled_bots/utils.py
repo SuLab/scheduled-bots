@@ -111,3 +111,20 @@ def create_rfd(s: str, WDUSER, WDPASS):
     r = requests.post("https://www.wikidata.org/w/api.php", data=data, cookies=edit_cookie)
     r.raise_for_status()
     print(r.json())
+
+
+def clean_description(s: str):
+    # adhere to style guidelines: https://www.wikidata.org/wiki/Help:Description
+    # Remove starting with "A ", remove final period, replace underscores with spaces
+
+    s = s.replace("_", " ")
+    if "." in s[:-1]:
+        # if s has a period in it anywhere but the last line, don't attempt to perform these actions
+        return s
+    if s.startswith("A "):
+        s = s[2:]
+    elif s.startswith("An "):
+        s = s[3:]
+    if s.endswith("."):
+        s = s[:-1]
+    return s
