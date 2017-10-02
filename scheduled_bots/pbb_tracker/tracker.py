@@ -12,6 +12,7 @@ from cachetools import cached, TTLCache
 from pymongo.errors import DuplicateKeyError
 from tqdm import tqdm
 from mwclient import Site
+from mwclient.errors import APIError
 from pymongo import MongoClient
 
 from scheduled_bots.pbb_tracker.connect_mysql import query_wikidata_mysql
@@ -44,8 +45,12 @@ def chunks(iterable, size):
 @cached(TTLCache(CACHE_SIZE, CACHE_TIMEOUT_SEC))
 def getConceptLabels(qids):
     qids = "|".join({qid.replace("wd:", "") if qid.startswith("wd:") else qid for qid in qids})
-    wd = site.api('wbgetentities', **{'ids': qids, 'languages': 'en', 'format': 'json', 'props': 'labels'})['entities']
-    return {k: v['labels']['en']['value'] if 'labels' in v and 'en' in v['labels'] else '' for k, v in wd.items()}
+    try:
+        wd = site.api('wbgetentities', **{'ids': qids, 'languages': 'en', 'format': 'json', 'props': 'labels'})['entities']
+        return {k: v['labels']['en']['value'] if 'labels' in v and 'en' in v['labels'] else '' for k, v in wd.items()}
+    except Exception as e:
+        print(e)
+        return {k: "" for k in qids}
 
 
 def isint(x):
