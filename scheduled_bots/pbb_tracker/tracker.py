@@ -12,11 +12,11 @@ from cachetools import cached, TTLCache
 from pymongo.errors import DuplicateKeyError
 from tqdm import tqdm
 from mwclient import Site
-from mwclient.errors import APIError
 from pymongo import MongoClient
 
 from scheduled_bots.pbb_tracker.connect_mysql import query_wikidata_mysql
 from wikidataintegrator.wdi_helpers import id_mapper
+from wikidataintegrator.wdi_core import WDItemEngine
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -53,17 +53,22 @@ def getConceptLabels(qids):
         return {k: "" for k in qids}
 
 
-def isint(x):
-    try:
-        int(x)
-    except Exception:
-        return False
-    return True
+def get_property_types():
+    # {'CommonsMedia', 'Time', 'Quantity', 'WikibaseProperty', 'WikibaseItem', 'GlobeCoordinate',
+    # 'String', 'ExternalId', 'Math', 'Monolingualtext', 'TabularData', 'Url', 'GeoShape'}
+    query = "SELECT ?p ?pt WHERE {?p wikibase:propertyType ?pt}"
+    results = WDItemEngine.execute_sparql_query(query)['results']['bindings']
+    results = [{k: v['value'] for k, v in item.items()} for item in results]
+    prop_wdtype = {x['p'].split("/")[-1]: x['pt'].split("#")[-1] for x in results}
+    return prop_wdtype
+
+
+PROP_TYPE = get_property_types()
 
 
 class Change:
-    def __init__(self, change_type, qid='', pid='', value='', value_label='', user='', timestamp='', reference=list(),
-                 revid=None, comment=''):
+    def __init__(self, change_type, qid='', pid='', value='', value_label='', user='',
+                 timestamp='', reference=list(), revid=None, comment=''):
         self.change_type = change_type
         self.qid = qid
         self.qid_label = ''
@@ -103,9 +108,9 @@ class Change:
     def lookupLabels(changes):
         pids = set(s.pid for s in changes)
         qids = set(s.qid for s in changes)
-        values = set(s.value for s in changes if s.value and s.value.startswith("Q") and isint(s.value[1:]))
+        values = set(s.value for s in changes if s.value and PROP_TYPE.get(s.pid) == "WikibaseItem")
         ref_qids = set(chain(*[
-            [s['value'] for s in change.ref_list if s['value'] and s['value'].startswith("Q") and isint(s['value'][1:])]
+            [s['value'] for s in change.ref_list if s['value'] and PROP_TYPE.get(s['prop']) == "WikibaseItem"]
             for change in changes]))
         ref_pids = set(chain(*[[s['prop'] for s in change.ref_list] for change in changes]))
         labels = dict()
@@ -152,7 +157,7 @@ def get_claim_value(claim):
     mainsnak = claim
     if 'datavalue' not in mainsnak:
         print("no datavalue: {}".format(mainsnak))
-        return None
+        return 'none'
     if mainsnak['datavalue']['type'] in {'wikibase-entityid'}:
         return mainsnak['datavalue']['value']['id']
     elif mainsnak['datavalue']['type'] in {'external-id', 'string'}:
@@ -167,9 +172,10 @@ def get_claim_value(claim):
         return mainsnak['datavalue']['value']['text']
     elif mainsnak['datavalue']['type'] in {'globe-coordinate', 'time', 'commonsMedia'}:
         # print(mainsnak)
-        return None
+        return 'none'
     else:
         print(mainsnak)
+    return 'none'
 
 
 def detect_claim_change(claimsx, claimsy):
