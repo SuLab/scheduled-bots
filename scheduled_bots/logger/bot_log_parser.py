@@ -3,6 +3,7 @@ import os
 import webbrowser
 from ast import literal_eval
 from functools import lru_cache
+from json import JSONDecodeError
 
 import click
 import pandas as pd
@@ -29,9 +30,12 @@ def get_prop_formatter(pid):
 
 
 def parse_log(file_path):
+    # todo: Actually parse the header and col names
+    # note, missing Rev ID in the old logs will just be NaN and won't throw an error
     df = pd.read_csv(file_path, sep=",",
-                     names=['Level', 'Timestamp', 'External ID', 'Prop', 'QID', 'Message', 'Msg Type'],
-                     dtype={'External ID': str}, comment='#', quotechar='"', skipinitialspace=True, delimiter=';')
+                     names=['Level', 'Timestamp', 'External ID', 'Prop', 'QID', 'Message', 'Msg Type', 'Rev ID'],
+                     skiprows=2, dtype={'External ID': str, 'Rev ID': str},
+                     comment='#', quotechar='"', skipinitialspace=True, delimiter=';')
     df.fillna('', inplace=True)
     df.replace("None", "", inplace=True)
     df = df.apply(lambda x: x.str.strip())
@@ -77,9 +81,12 @@ def process_log(file_path):
         line = file_path.readline()
     if not line.startswith("#"):
         raise ValueError("Expecting header in log file")
-    metadata = json.loads(line[1:])
-    if 'timestamp' in metadata:
-        metadata['timestamp'] = dateutil_parse(metadata['timestamp'])
+    try:
+        metadata = json.loads(line[1:])
+        if 'timestamp' in metadata:
+            metadata['timestamp'] = dateutil_parse(metadata['timestamp'])
+    except JSONDecodeError as e:
+        metadata = {"name": "", "timestamp": "", "run_id": ""}
 
     df = parse_log(file_path)
     return df, metadata
@@ -205,6 +212,7 @@ def _main(log_path, show_browser=False):
     df['Message'] = df['Message'].apply(escape_html_chars)
     # df['Message'] = df['Message'].apply(try_json)
     df['Message'] = df.apply(lambda row: format_error(row['Msg Type'], row['Message']), 1)
+    df['Rev ID'] = df['Rev ID'].apply(lambda x: '<a href="https://www.wikidata.org/w/index.php?oldid={}">{}</a>'.format(x,x) if x else x)
 
     level_counts, info_counts, warning_counts, error_counts = generate_summary(df)
 
