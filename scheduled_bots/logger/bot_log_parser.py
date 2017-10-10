@@ -102,8 +102,8 @@ def generate_summary(df):
 
     info_counts = df.query("Level == 'INFO'").Message.value_counts().to_dict()
     zlist = list(zip(*[('No Action', info_counts.get('SKIP', 0)),
-                       ('Updated', info_counts.get('UPDATE', 0)),
-                       ('Created', info_counts.get('CREATE', 0))]))
+                       ('Update', info_counts.get('UPDATE', 0)),
+                       ('Create', info_counts.get('CREATE', 0))]))
     info_counts = pd.Series(zlist[1], index=zlist[0])
     info_counts.name = "Count"
 
@@ -212,7 +212,7 @@ def _main(log_path, show_browser=False):
     df['Message'] = df['Message'].apply(escape_html_chars)
     # df['Message'] = df['Message'].apply(try_json)
     df['Message'] = df.apply(lambda row: format_error(row['Msg Type'], row['Message']), 1)
-    df['Rev ID'] = df['Rev ID'].apply(lambda x: '<a href="https://www.wikidata.org/w/index.php?oldid={}">{}</a>'.format(x,x) if x else x)
+    df['Rev ID'] = df['Rev ID'].apply(lambda x: '<a href="https://www.wikidata.org/w/index.php?oldid={}&diff=prev">{}</a>'.format(x,x) if x else x)
 
     level_counts, info_counts, warning_counts, error_counts = generate_summary(df)
 
