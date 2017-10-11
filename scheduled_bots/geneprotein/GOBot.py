@@ -160,8 +160,11 @@ def create_articles(pmids: Set[str], login: object, write: bool = True) -> Dict[
     for pmid in pmids:
         p = wdi_helpers.PubmedItem(pmid)
         if write:
-            pmid_wdid = p.get_or_create(login)
-            print(pmid_wdid)
+            try:
+                pmid_wdid = p.get_or_create(login)
+            except Exception as e:
+                print("Error creating article pmid: {}, error: {}".format(pmid, e))
+                continue
             pmid_map[pmid] = pmid_wdid
         else:
             pmid_map[pmid] = 'Q1'

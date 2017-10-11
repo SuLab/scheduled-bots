@@ -32,13 +32,16 @@ class IPRTerm:
                  "Conserved_site": "InterPro Conserved Site",
                  "Domain": "InterPro Domain",
                  "Family": "InterPro Family",
+                 "Homologous_superfamily": "Homologous Superfamily",
                  "PTM": "InterPro PTM",
                  "Repeat": "InterPro Repeat"}
+    # http://www.ebi.ac.uk/interpro/user_manual.html#faqs_04
     type2wdid = {"Active_site": "Q423026",  # Active site
                  "Binding_site": "Q616005",  # Binding site
                  "Conserved_site": "Q7644128",  # Supersecondary_structure
                  "Domain": "Q898273",  # Protein domain
                  "Family": "Q417841",  # Protein family
+                 "Homologous_superfamily": "Q7251477",  # Protein superfamily
                  "PTM": "Q898362",  # Post-translational modification
                  "Repeat": "Q3273544"}  # Structural motif
 
