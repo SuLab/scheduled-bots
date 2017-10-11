@@ -8,7 +8,8 @@ from pymongo import MongoClient
 from tqdm import tqdm
 
 from scheduled_bots.interpro import remove_deprecated_statements
-from scheduled_bots.interpro.IPRTerm import IPRTerm
+from scheduled_bots.interpro.IPRTerm import IPRTerm, INTERPRO
+from wikidataintegrator.wdi_fastrun import FastRunContainer
 
 __metadata__ = {'name': 'InterproBot_Items',
                 'maintainer': 'GSS',
@@ -47,8 +48,6 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
         terms.append(term)
         if run_one:
             break
-        if n>=1000:
-            pass
 
     time.sleep(10*60)  # sleep for 10 min so (hopefully) the wd sparql endpoint updates
 
@@ -63,8 +62,8 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
     # first remove the fastrun stores so it has to be re-updated
     for term in terms:
         term.wd_item.fast_run_container.clear()
-
+    frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter={INTERPRO: ''}, use_refs=True)
     for term in tqdm(terms, mininterval=2.0):
-        remove_deprecated_statements(term.wd_item, release_wdid, ["P279", "P2926", 'P527', 'P361'], login)
+        remove_deprecated_statements(term.wd_item.wd_item_id, frc, release_wdid, ["P279", "P2926", 'P527', 'P361'], login)
 
     return os.path.join(log_dir, log_name)
