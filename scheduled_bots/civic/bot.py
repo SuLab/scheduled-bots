@@ -174,7 +174,8 @@ def run_one(variant_id):
         if evidence_item['drug_interaction_type'] == "Combination":
             # make this a drug therapy combination item instead!!
             drug_qids = [DrugCombo(drug_qids).get_or_create(login)]
-        drug = drug_qids[0]
+        else:
+            drug = drug_qids[0]
         ## Pubmed
         evidence_reference = []
         pmid = evidence_item["source"]["pubmed_id"]
