@@ -45,6 +45,26 @@ ITEMS = {
     'Homo sapiens': 'Q15978631'
 }
 
+# CIViC evidence scores
+evidence_level = dict()
+evidence_level["A"] = "Q36805652"
+evidence_level["B"] = "Q36806012"
+evidence_level["C"] = "Q36799701"
+evidence_level["D"] = "Q36806470"
+evidence_level["E"] = "Q36811327"
+
+# CIViC trust ratings
+trustratings = dict()
+trustratings["1"] = "Q28045396"
+trustratings["2"] = "Q28045397"
+trustratings["3"] = "Q28045398"
+trustratings["4"] = "Q28045383"
+trustratings["5"] = "Q28045399"
+
+
+
+
+
 wdi_property_store.wd_properties['P3329'] = {
     'datatype': 'string',
     'name': 'CIViC Variant ID',
@@ -162,139 +182,147 @@ def run_one(variant_id):
             continue
         disease = DO_QID_MAP[evidence_item["disease"]["doid"]]
 
-        ## Drugs
-        print(evidence_item["drugs"])
-        drug_qids = []
-        for drug in evidence_item["drugs"]:
-            drug_label = drug['name'].lower()
-            if drug_label not in DRUGLABEL_QID_MAP:
-                return panic(variant_id, drug_label, "drug not found")
-            drug_qids.append(DRUGLABEL_QID_MAP[drug_label])
+        if evidence_item["status"] == "accepted" and evidence_item["rating"] != None:
+            evidence_qualifiers = []
+            evidence_qualifiers.append(
+                wdi_core.WDItemID(value=evidence_level[str(evidence_item["evidence_level"])], prop_nr="P459",
+                                  is_qualifier=True))
+            evidence_qualifiers.append(
+                wdi_core.WDItemID(value=trustratings[str(evidence_item["rating"])], prop_nr="P4271", is_qualifier=True))
 
-        if evidence_item['drug_interaction_type'] == "Combination":
-            # make this a drug therapy combination item instead!!
-            drug_qids = [DrugCombo(drug_qids).get_or_create(login)]
-        else:
-            drug = drug_qids[0]
-        ## Pubmed
-        evidence_reference = []
-        pmid = evidence_item["source"]["pubmed_id"]
-        pmid_qid = pmid_lookup(pmid)
-        refStatedIn = wdi_core.WDItemID(value=pmid_qid, prop_nr='P248', is_reference=True)
-        refDisputedBy = wdi_core.WDItemID(value=pmid_qid, prop_nr="P1310", is_qualifier=True)
-        evidence_reference.append(refStatedIn)
+            ## Drugs
+            print(evidence_item["drugs"])
+            drug_qids = []
+            for drug in evidence_item["drugs"]:
+                drug_label = drug['name'].lower()
+                if drug_label not in DRUGLABEL_QID_MAP:
+                    return panic(variant_id, drug_label, "drug not found")
+                drug_qids.append(DRUGLABEL_QID_MAP[drug_label])
 
-        timeStringNow = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
-        refRetrieved = wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)
-        evidence_reference.append(refRetrieved)
+            if evidence_item['drug_interaction_type'] == "Combination":
+                # make this a drug therapy combination item instead!!
+                drug_qids = [DrugCombo(drug_qids).get_or_create(login)]
+            else:
+                drug = drug_qids[0]
+            ## Pubmed
+            evidence_reference = []
+            pmid = evidence_item["source"]["pubmed_id"]
+            pmid_qid = pmid_lookup(pmid)
+            refStatedIn = wdi_core.WDItemID(value=pmid_qid, prop_nr='P248', is_reference=True)
+            refDisputedBy = wdi_core.WDItemID(value=pmid_qid, prop_nr="P1310", is_qualifier=True)
+            evidence_reference.append(refStatedIn)
 
-        # Positive therapeutic predictor
-        if evidence_item["evidence_type"] == "Predictive" and evidence_item[
-            "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Supports":
-            temp_qualifier = [wdi_core.WDItemID(value=disease, prop_nr="P2175", is_qualifier=True)]
-            for qualifier in evidence_qualifiers:
-                temp_qualifier.append(qualifier)
-            evidence_qualifiers = temp_qualifier
+            timeStringNow = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
+            refRetrieved = wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)
+            evidence_reference.append(refRetrieved)
 
-            prep["P3354"].append(wdi_core.WDItemID(value=drug, prop_nr="P3354",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
+            # Positive therapeutic predictor
+            if evidence_item["evidence_type"] == "Predictive" and evidence_item[
+                "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Supports":
+                temp_qualifier = [wdi_core.WDItemID(value=disease, prop_nr="P2175", is_qualifier=True)]
+                for qualifier in evidence_qualifiers:
+                    temp_qualifier.append(qualifier)
+                evidence_qualifiers = temp_qualifier
 
-        # Evidence does not support Positive therapeutic predictor
-        if evidence_item["evidence_type"] == "Predictive" and evidence_item[
-            "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Does Not Support":
-            temp_qualifier = [wdi_core.WDItemID(value=disease, prop_nr="P2175", is_qualifier=True)]
-            temp_qualifier.append(refDisputedBy)
-            for qualifier in evidence_qualifiers:
-                temp_qualifier.append(qualifier)
-            evidence_qualifiers = temp_qualifier
-            prep["P3354"].append(wdi_core.WDItemID(value=drug, prop_nr="P3354",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
-        # Negative therapeutic predictor
-        if evidence_item["evidence_type"] == "Resistance or Non-Response" and evidence_item[
-            "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Supports":
-            temp_qualifier = [wdi_core.WDItemID(value=disease, prop_nr="P2175", is_qualifier=True)]
-            for qualifier in evidence_qualifiers:
-                temp_qualifier.append(qualifier)
-            evidence_qualifiers = temp_qualifier
-            prep["P3355"].apeend(wdi_core.WDItemID(value=drug, prop_nr="P3355",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
+                prep["P3354"].append(wdi_core.WDItemID(value=drug, prop_nr="P3354",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
 
-        # Evidence does not support Negative therapeutic predictor
-        if evidence_item["evidence_type"] == "Predictive" and evidence_item[
-            "clinical_significance"] == "Resistance or Non-Response" and evidence_item[
-            "evidence_direction"] == "Does Not Support":
-            temp_qualifier = [wdi_core.WDItemID(value=disease, prop_nr="P2175", is_qualifier=True)]
-            temp_qualifier.append(refDisputedBy)
-            for qualifier in evidence_qualifiers:
-                temp_qualifier.append(qualifier)
-            evidence_qualifiers = temp_qualifier
-            prep["P3355"].append(wdi_core.WDItemID(value=drug, prop_nr="P3355",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
-        # Positive diagnostic predictor
-        if evidence_item["evidence_type"] == "Diagnostic" and evidence_item[
-            "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Supports":
-            prep["P3356"].append(wdi_core.WDItemID(value=disease, prop_nr="P3356",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=evidence_qualifiers))
-        # Evidence does not support Positive diagnostic predictor
-        if evidence_item["evidence_type"] == "Diagnostic" and evidence_item[
-            "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Does Not Support":
-            evidence_qualifiers.append(refDisputedBy)
-            prep["P3356"].append(wdi_core.WDItemID(value=disease, prop_nr="P3356",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
-        # Negative diagnostic predictor
-        if evidence_item["evidence_type"] == "Diagnostic" and evidence_item[
-            "clinical_significance"] == "Resistance or Non-Response" and evidence_item[
-            "evidence_direction"] == "Supports":
-            prep["P3357"].append(wdi_core.WDItemID(value=disease, prop_nr="P3357",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
+            # Evidence does not support Positive therapeutic predictor
+            if evidence_item["evidence_type"] == "Predictive" and evidence_item[
+                "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Does Not Support":
+                temp_qualifier = [wdi_core.WDItemID(value=disease, prop_nr="P2175", is_qualifier=True)]
+                temp_qualifier.append(refDisputedBy)
+                for qualifier in evidence_qualifiers:
+                    temp_qualifier.append(qualifier)
+                evidence_qualifiers = temp_qualifier
+                prep["P3354"].append(wdi_core.WDItemID(value=drug, prop_nr="P3354",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
+            # Negative therapeutic predictor
+            if evidence_item["evidence_type"] == "Resistance or Non-Response" and evidence_item[
+                "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Supports":
+                temp_qualifier = [wdi_core.WDItemID(value=disease, prop_nr="P2175", is_qualifier=True)]
+                for qualifier in evidence_qualifiers:
+                    temp_qualifier.append(qualifier)
+                evidence_qualifiers = temp_qualifier
+                prep["P3355"].apeend(wdi_core.WDItemID(value=drug, prop_nr="P3355",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
 
-        # Evidence does not support Negative diagnostic predictor
-        if evidence_item["evidence_type"] == "Diagnostic" and evidence_item[
-            "clinical_significance"] == "Resistance or Non-Response" and evidence_item[
-            "evidence_direction"] == "Does Not Support":
-            evidence_qualifiers.append(refDisputedBy)
-            prep["P3357"].append(wdi_core.WDItemID(value=disease, prop_nr="P3357",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
+            # Evidence does not support Negative therapeutic predictor
+            if evidence_item["evidence_type"] == "Predictive" and evidence_item[
+                "clinical_significance"] == "Resistance or Non-Response" and evidence_item[
+                "evidence_direction"] == "Does Not Support":
+                temp_qualifier = [wdi_core.WDItemID(value=disease, prop_nr="P2175", is_qualifier=True)]
+                temp_qualifier.append(refDisputedBy)
+                for qualifier in evidence_qualifiers:
+                    temp_qualifier.append(qualifier)
+                evidence_qualifiers = temp_qualifier
+                prep["P3355"].append(wdi_core.WDItemID(value=drug, prop_nr="P3355",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
+            # Positive diagnostic predictor
+            if evidence_item["evidence_type"] == "Diagnostic" and evidence_item[
+                "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Supports":
+                prep["P3356"].append(wdi_core.WDItemID(value=disease, prop_nr="P3356",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=evidence_qualifiers))
+            # Evidence does not support Positive diagnostic predictor
+            if evidence_item["evidence_type"] == "Diagnostic" and evidence_item[
+                "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Does Not Support":
+                evidence_qualifiers.append(refDisputedBy)
+                prep["P3356"].append(wdi_core.WDItemID(value=disease, prop_nr="P3356",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
+            # Negative diagnostic predictor
+            if evidence_item["evidence_type"] == "Diagnostic" and evidence_item[
+                "clinical_significance"] == "Resistance or Non-Response" and evidence_item[
+                "evidence_direction"] == "Supports":
+                prep["P3357"].append(wdi_core.WDItemID(value=disease, prop_nr="P3357",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
 
-        # Positive prognostic predictor
-        if evidence_item["evidence_type"] == "Prognositc" and evidence_item[
-            "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Supports":
-            prep["P3358"].append(wdi_core.WDItemID(value=disease, prop_nr="P3358",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
+            # Evidence does not support Negative diagnostic predictor
+            if evidence_item["evidence_type"] == "Diagnostic" and evidence_item[
+                "clinical_significance"] == "Resistance or Non-Response" and evidence_item[
+                "evidence_direction"] == "Does Not Support":
+                evidence_qualifiers.append(refDisputedBy)
+                prep["P3357"].append(wdi_core.WDItemID(value=disease, prop_nr="P3357",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
 
-        # Evidence does not support Positive prognostic predictor
-        if evidence_item["evidence_type"] == "Prognositc" and evidence_item[
-            "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Does Not Support":
-            evidence_qualifiers.append(refDisputedBy)
-            prep["P3358"].append(wdi_core.WDItemID(value=disease, prop_nr="P3358",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
+            # Positive prognostic predictor
+            if evidence_item["evidence_type"] == "Prognositc" and evidence_item[
+                "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Supports":
+                prep["P3358"].append(wdi_core.WDItemID(value=disease, prop_nr="P3358",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
 
-        # Negative prognostic predictor
-        if evidence_item["evidence_type"] == "Prognostic" and evidence_item[
-            "clinical_significance"] == "Resistance or Non-Response" and evidence_item[
-            "evidence_direction"] == "Supports":
-            prep["P3359"].append(wdi_core.WDItemID(value=disease, prop_nr="P3359",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
+            # Evidence does not support Positive prognostic predictor
+            if evidence_item["evidence_type"] == "Prognositc" and evidence_item[
+                "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Does Not Support":
+                evidence_qualifiers.append(refDisputedBy)
+                prep["P3358"].append(wdi_core.WDItemID(value=disease, prop_nr="P3358",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
 
-        # Evidence does not support Negative prognostic predictor
-        if evidence_item["evidence_type"] == "Prognostic" and evidence_item[
-            "clinical_significance"] == "Resistance or Non-Response" and evidence_item[
-            "evidence_direction"] == "Does Not Support":
-            evidence_qualifiers.append(refDisputedBy)
-            prep["P3359"].append(wdi_core.WDItemID(value=disease, prop_nr="P3359",
-                                                   references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
+            # Negative prognostic predictor
+            if evidence_item["evidence_type"] == "Prognostic" and evidence_item[
+                "clinical_significance"] == "Resistance or Non-Response" and evidence_item[
+                "evidence_direction"] == "Supports":
+                prep["P3359"].append(wdi_core.WDItemID(value=disease, prop_nr="P3359",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
+
+            # Evidence does not support Negative prognostic predictor
+            if evidence_item["evidence_type"] == "Prognostic" and evidence_item[
+                "clinical_significance"] == "Resistance or Non-Response" and evidence_item[
+                "evidence_direction"] == "Does Not Support":
+                evidence_qualifiers.append(refDisputedBy)
+                prep["P3359"].append(wdi_core.WDItemID(value=disease, prop_nr="P3359",
+                                                       references=[copy.deepcopy(evidence_reference)],
+                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
 
     data2add = []
     for key in prep.keys():
