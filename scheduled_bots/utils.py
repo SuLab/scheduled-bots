@@ -1,6 +1,8 @@
 import itertools
 import requests
-
+from cachetools import cached, TTLCache
+CACHE_SIZE = 10000
+CACHE_TIMEOUT_SEC = 300  # 5 min
 
 def get_values(pid, values):
     # todo: integrate this into wdi_helpers
@@ -128,3 +130,18 @@ def clean_description(s: str):
     if s.endswith("."):
         s = s[:-1]
     return s
+
+@cached(TTLCache(CACHE_SIZE, CACHE_TIMEOUT_SEC))
+def getConceptLabel(qid):
+    return getConceptLabels((qid,))[qid]
+
+
+@cached(TTLCache(CACHE_SIZE, CACHE_TIMEOUT_SEC))
+def getConceptLabels(qids):
+    qids = "|".join({qid.replace("wd:", "") if qid.startswith("wd:") else qid for qid in qids})
+    params = {'action': 'wbgetentities', 'ids': qids, 'languages': 'en', 'format': 'json', 'props': 'labels'}
+    r = requests.get("https://www.wikidata.org/w/api.php", params=params)
+    print(r.url)
+    r.raise_for_status()
+    wd = r.json()['entities']
+    return {k: v['labels']['en']['value'] for k, v in wd.items()}
