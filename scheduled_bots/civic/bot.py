@@ -53,7 +53,7 @@ wdi_property_store.wd_properties['P3329'] = {
 }
 
 __metadata__ = {
-    'name': 'CivicBot',
+    'name': 'ProteinBoxBot',
     'maintainer': 'Andra',
     'tags': ['variant'],
     'properties': list(PROPS.values())
@@ -78,7 +78,7 @@ def create_reference(variant_id):
     refStatedIn = wdi_core.WDItemID(value=ITEMS['CIViC database'], prop_nr=PROPS['stated in'], is_reference=True)
     timeStringNow = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
     refRetrieved = wdi_core.WDTime(timeStringNow, prop_nr='P813', is_reference=True)
-    refReferenceURL = wdi_core.WDUrl("https://civic.genome.wustl.edu/links/variants/" + variant_id,
+    refReferenceURL = wdi_core.WDUrl("https://civic.genome.wustl.edu/links/variants/" + str(variant_id),
                                      prop_nr=PROPS['reference URL'],
                                      is_reference=True)
     variant_reference = [refStatedIn, refRetrieved, refReferenceURL]
@@ -96,7 +96,7 @@ def pmid_lookup(pmid):
 
 
 def run_one(variant_id):
-    r = requests.get('https://civic.genome.wustl.edu/api/variants/' + variant_id)
+    r = requests.get('https://civic.genome.wustl.edu/api/variants/' + str(variant_id))
     variant_data = r.json()
 
     variant_reference = create_reference(variant_id)
@@ -337,5 +337,6 @@ if __name__ == "__main__":
     variant_data = r.json()
 
     for record in variant_data['records']:
-        if record['variant_id'] == 12:
-            run_one(record['variant_id'])
+        # if record['id'] == 12:
+        print(record['id'])
+        run_one(record['id'])
