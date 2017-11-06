@@ -36,8 +36,14 @@ PROPS = {
     'biological variant of': 'P3433',
     'Sequence Ontology ID': 'P3986',
     'Disease Ontology ID': 'P699',
-    'PubMed ID': 'P698'
-
+    'PubMed ID': 'P698',
+    'positive therapeutic predictor': 'P3354',
+    'negative therapeutic predictor': 'P3355',
+    'positive diagnostic predictor': 'P3356',
+    'negative diagnostic predictor': 'P3357',
+    'positive prognostic predictor': 'P3358',
+    'negative prognostic predictor': 'P3359',
+    'HGVS nomenclature': 'P3331',
 }
 
 ITEMS = {
@@ -60,10 +66,6 @@ trustratings["2"] = "Q28045397"
 trustratings["3"] = "Q28045398"
 trustratings["4"] = "Q28045383"
 trustratings["5"] = "Q28045399"
-
-
-
-
 
 wdi_property_store.wd_properties['P3329'] = {
     'datatype': 'string',
@@ -90,9 +92,13 @@ DO_QID_MAP = wdi_helpers.id_mapper(PROPS['Disease Ontology ID'])
 def load_drug_label_mappings():
     # we have a csv with drug label to qid mappings because civic doens't provide any mappings
     drugdf = pd.read_csv("drugs.tsv", sep='\t')
-    return dict(zip(drugdf.name, drugdf.qid))
+    d = dict(zip(drugdf.name, drugdf.qid))
+    d = {k: v for k, v in d.items() if isinstance(v, str)}
+    return d
+
 
 DRUGLABEL_QID_MAP = load_drug_label_mappings()
+
 
 def create_reference(variant_id):
     refStatedIn = wdi_core.WDItemID(value=ITEMS['CIViC database'], prop_nr=PROPS['stated in'], is_reference=True)
@@ -106,8 +112,10 @@ def create_reference(variant_id):
 
 
 def panic(variant_id, msg='', msg_type=''):
-    msg = wdi_helpers.format_msg(variant_id, PROPS['CIViC Variant ID'], None, msg, msg_type)
-    wdi_core.WDItemEngine.log("ERROR", msg)
+    s = wdi_helpers.format_msg(variant_id, PROPS['CIViC Variant ID'], None, msg, msg_type)
+    wdi_core.WDItemEngine.log("ERROR", s)
+    print(s)
+    return None
 
 
 @cached(TTLCache(CACHE_SIZE, CACHE_TIMEOUT_SEC))
@@ -116,16 +124,24 @@ def pmid_lookup(pmid):
 
 
 def run_one(variant_id):
-    r = requests.get('https://civic.genome.wustl.edu/api/variants/' + str(variant_id))
+    variant_id = str(variant_id)
+    r = requests.get('https://civic.genome.wustl.edu/api/variants/' + variant_id)
     variant_data = r.json()
 
     variant_reference = create_reference(variant_id)
 
-    prep = dict()
+    prep = {
+        PROPS['positive therapeutic predictor']: list(),
+        PROPS['positive diagnostic predictor']: list(),
+        PROPS['positive prognostic predictor']: list(),
+        PROPS['negative therapeutic predictor']: list(),
+        PROPS['negative diagnostic predictor']: list(),
+        PROPS['negative prognostic predictor']: list(),
+    }
 
-    entrez_id = variant_data["entrez_id"]
+    entrez_id = str(variant_data["entrez_id"])
     if entrez_id not in ENTREZ_QID_MAP:
-        return panic(variant_id)
+        return panic(variant_id, msg=entrez_id, msg_type="Entrez ID not found")
 
     prep[PROPS['biological variant of']] = [wdi_core.WDItemID(value=ENTREZ_QID_MAP[entrez_id],
                                                               prop_nr=PROPS['biological variant of'],
@@ -134,6 +150,12 @@ def run_one(variant_id):
     # variant_id
     prep[PROPS['CIViC Variant ID']] = [
         wdi_core.WDString(value=variant_id, prop_nr='P3329', references=[copy.deepcopy(variant_reference)])]
+
+    # hgvs ids
+    prep[PROPS['HGVS nomenclature']] = []
+    for hgvs in variant_data['hgvs_expressions']:
+        prep[PROPS['HGVS nomenclature']].append(
+            wdi_core.WDString(value=hgvs, prop_nr=PROPS['HGVS nomenclature'], references=[variant_reference]))
 
     # coordinates
     coordinates = variant_data["coordinates"]
@@ -180,7 +202,7 @@ def run_one(variant_id):
     for evidence_item in variant_data["evidence_items"]:
         if not evidence_item["disease"]["doid"]:
             continue
-        disease = DO_QID_MAP[evidence_item["disease"]["doid"]]
+        disease = DO_QID_MAP["DOID:" + evidence_item["disease"]["doid"]]
 
         if evidence_item["status"] == "accepted" and evidence_item["rating"] != None:
             evidence_qualifiers = []
@@ -191,7 +213,7 @@ def run_one(variant_id):
                 wdi_core.WDItemID(value=trustratings[str(evidence_item["rating"])], prop_nr="P4271", is_qualifier=True))
 
             ## Drugs
-            print(evidence_item["drugs"])
+            pprint(evidence_item)
             drug_qids = []
             for drug in evidence_item["drugs"]:
                 drug_label = drug['name'].lower()
@@ -202,8 +224,9 @@ def run_one(variant_id):
             if evidence_item['drug_interaction_type'] == "Combination":
                 # make this a drug therapy combination item instead!!
                 drug_qids = [DrugCombo(drug_qids).get_or_create(login)]
-            else:
-                drug = drug_qids[0]
+            # TODO: "substitution"
+            print(drug_qids)
+
             ## Pubmed
             evidence_reference = []
             pmid = evidence_item["source"]["pubmed_id"]
@@ -223,10 +246,10 @@ def run_one(variant_id):
                 for qualifier in evidence_qualifiers:
                     temp_qualifier.append(qualifier)
                 evidence_qualifiers = temp_qualifier
-
-                prep["P3354"].append(wdi_core.WDItemID(value=drug, prop_nr="P3354",
-                                                       references=[copy.deepcopy(evidence_reference)],
-                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
+                for drug_qid in drug_qids:
+                    prep["P3354"].append(wdi_core.WDItemID(value=drug_qid, prop_nr="P3354",
+                                                           references=[copy.deepcopy(evidence_reference)],
+                                                           qualifiers=copy.deepcopy(evidence_qualifiers)))
 
             # Evidence does not support Positive therapeutic predictor
             if evidence_item["evidence_type"] == "Predictive" and evidence_item[
@@ -236,9 +259,10 @@ def run_one(variant_id):
                 for qualifier in evidence_qualifiers:
                     temp_qualifier.append(qualifier)
                 evidence_qualifiers = temp_qualifier
-                prep["P3354"].append(wdi_core.WDItemID(value=drug, prop_nr="P3354",
-                                                       references=[copy.deepcopy(evidence_reference)],
-                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
+                for drug_qid in drug_qids:
+                    prep["P3354"].append(wdi_core.WDItemID(value=drug_qid, prop_nr="P3354",
+                                                           references=[copy.deepcopy(evidence_reference)],
+                                                           qualifiers=copy.deepcopy(evidence_qualifiers)))
             # Negative therapeutic predictor
             if evidence_item["evidence_type"] == "Resistance or Non-Response" and evidence_item[
                 "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Supports":
@@ -246,9 +270,10 @@ def run_one(variant_id):
                 for qualifier in evidence_qualifiers:
                     temp_qualifier.append(qualifier)
                 evidence_qualifiers = temp_qualifier
-                prep["P3355"].apeend(wdi_core.WDItemID(value=drug, prop_nr="P3355",
-                                                       references=[copy.deepcopy(evidence_reference)],
-                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
+                for drug_qid in drug_qids:
+                    prep["P3355"].append(wdi_core.WDItemID(value=drug_qid, prop_nr="P3355",
+                                                           references=[copy.deepcopy(evidence_reference)],
+                                                           qualifiers=copy.deepcopy(evidence_qualifiers)))
 
             # Evidence does not support Negative therapeutic predictor
             if evidence_item["evidence_type"] == "Predictive" and evidence_item[
@@ -259,9 +284,10 @@ def run_one(variant_id):
                 for qualifier in evidence_qualifiers:
                     temp_qualifier.append(qualifier)
                 evidence_qualifiers = temp_qualifier
-                prep["P3355"].append(wdi_core.WDItemID(value=drug, prop_nr="P3355",
-                                                       references=[copy.deepcopy(evidence_reference)],
-                                                       qualifiers=copy.deepcopy(evidence_qualifiers)))
+                for drug_qid in drug_qids:
+                    prep["P3355"].append(wdi_core.WDItemID(value=drug_qid, prop_nr="P3355",
+                                                           references=[copy.deepcopy(evidence_reference)],
+                                                           qualifiers=copy.deepcopy(evidence_qualifiers)))
             # Positive diagnostic predictor
             if evidence_item["evidence_type"] == "Diagnostic" and evidence_item[
                 "clinical_significance"] == "Sensitivity" and evidence_item["evidence_direction"] == "Supports":
@@ -323,7 +349,6 @@ def run_one(variant_id):
                 prep["P3359"].append(wdi_core.WDItemID(value=disease, prop_nr="P3359",
                                                        references=[copy.deepcopy(evidence_reference)],
                                                        qualifiers=copy.deepcopy(evidence_qualifiers)))
-
     data2add = []
     for key in prep.keys():
         for statement in prep[key]:
@@ -332,7 +357,8 @@ def run_one(variant_id):
 
     pprint(prep)
     name = variant_data["name"]
-    item = wdi_core.WDItemEngine(data=data2add, domain="genes", fast_run=fast_run,
+    label = variant_data["entrez_name"] + " " + name
+    item = wdi_core.WDItemEngine(data=data2add, domain="genes", fast_run=fast_run, item_name=label,
                                  fast_run_base_filter=fast_run_base_filter)
     synonyms = []
     if name not in ignore_synonym_list:
@@ -343,7 +369,7 @@ def run_one(variant_id):
         elif name == "BIALLELIC INACTIVATION":
             item.set_label("biallelische inactivatie van " + variant_data["entrez_name"], "nl")
 
-    item.set_label(variant_data["entrez_name"] + " " + name, "en")
+    item.set_label(label, "en")
 
     if item.get_description(lang='en') == "":
         item.set_description("genetic variant", "en")
@@ -365,6 +391,6 @@ if __name__ == "__main__":
     variant_data = r.json()
 
     for record in variant_data['records']:
-        # if record['id'] == 12:
-        print(record['id'])
-        run_one(record['id'])
+        if record['id'] == 96:
+            print(record['id'])
+            run_one(record['id'])
