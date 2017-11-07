@@ -239,7 +239,7 @@ medi0680
 medi4736	Q19904005		
 mek inhibitor			
 melphalan	Q2298283		
-mereletinib Q21506464
+mereletinib			
 met inhibition, erbb3 inhibition			
 metformin	Q19484		
 methotrexate	Q422232		
@@ -266,7 +266,7 @@ nivolumab	Q7041828
 notch1 antibody			
 nsc348884			
 nu7441	Q27088099		
-nutlin-3	Q7070462
+nutlin-3	Q7070462		
 nutlin-3a			
 nvp-ast487	Q27074554		
 o(6)-benzylguanine			
@@ -278,9 +278,9 @@ osi-906 (linsitinib)
 osimertinib	Q21506464		
 oxaliplatin	Q422327		
 paclitaxel	Q423762		
-palbociclib	Q15269707
-palbociclib (pd0332991) Q15269707
-palbociclib, binimetinib    Q15269707
+palbociclib	Q15269707		
+palbociclib (pd0332991)	Q15269707		
+palbociclib, binimetinib			
 panitumumab	Q417775		
 panobinostat	Q7131441		
 patritumab	Q7148077		
@@ -390,7 +390,7 @@ verteporfin	Q782318
 vincristine	Q408977		
 vinorelbine	Q420532		
 vismodegib	Q2070286		
-vorinostat (saha)   Q905901
+vorinostat (saha)	Q905901		
 vtx-11e			
 whi-p154			
 wye354			
