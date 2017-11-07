@@ -9,52 +9,52 @@ PROPS = {
 }
 
 # chromosomes
-chromosomes = dict()
-chromosomes['1'] = "Q430258"
-chromosomes['2'] = "Q638893"
-chromosomes['3'] = "Q668633"
-chromosomes['4'] = "Q836605"
-chromosomes['5'] = "Q840741"
-chromosomes['6'] = "Q540857"
-chromosomes['7'] = "Q657319"
-chromosomes['8'] = "Q572848"
-chromosomes['9'] = "Q840604"
-chromosomes['10'] = "Q840737"
-chromosomes['11'] = "Q847096"
-chromosomes['12'] = "Q847102"
-chromosomes['13'] = "Q840734"
-chromosomes['14'] = "Q138955"
-chromosomes['15'] = "Q765245"
-chromosomes['16'] = "Q742870"
-chromosomes['17'] = "Q220677"
-chromosomes['18'] = "Q780468"
-chromosomes['19'] = "Q510786"
-chromosomes['20'] = "Q666752"
-chromosomes['21'] = "Q753218"
-chromosomes['22'] = "Q753805"
-chromosomes['22'] = "Q753805"
-chromosomes['X'] = "Q61333"
-chromosomes['Y'] = "Q202771"
-chromosomes["MT"] = "Q27075"
+CHROMOSOME = dict()
+CHROMOSOME['1'] = "Q430258"
+CHROMOSOME['2'] = "Q638893"
+CHROMOSOME['3'] = "Q668633"
+CHROMOSOME['4'] = "Q836605"
+CHROMOSOME['5'] = "Q840741"
+CHROMOSOME['6'] = "Q540857"
+CHROMOSOME['7'] = "Q657319"
+CHROMOSOME['8'] = "Q572848"
+CHROMOSOME['9'] = "Q840604"
+CHROMOSOME['10'] = "Q840737"
+CHROMOSOME['11'] = "Q847096"
+CHROMOSOME['12'] = "Q847102"
+CHROMOSOME['13'] = "Q840734"
+CHROMOSOME['14'] = "Q138955"
+CHROMOSOME['15'] = "Q765245"
+CHROMOSOME['16'] = "Q742870"
+CHROMOSOME['17'] = "Q220677"
+CHROMOSOME['18'] = "Q780468"
+CHROMOSOME['19'] = "Q510786"
+CHROMOSOME['20'] = "Q666752"
+CHROMOSOME['21'] = "Q753218"
+CHROMOSOME['22'] = "Q753805"
+CHROMOSOME['22'] = "Q753805"
+CHROMOSOME['X'] = "Q61333"
+CHROMOSOME['Y'] = "Q202771"
+CHROMOSOME["MT"] = "Q27075"
 
 # CIViC evidence scores
-evidence_level = dict()
-evidence_level["A"] = "Q36805652"
-evidence_level["B"] = "Q36806012"
-evidence_level["C"] = "Q36799701"
-evidence_level["D"] = "Q36806470"
-evidence_level["E"] = "Q36811327"
+EVIDENCE_LEVEL = dict()
+EVIDENCE_LEVEL["A"] = "Q36805652"
+EVIDENCE_LEVEL["B"] = "Q36806012"
+EVIDENCE_LEVEL["C"] = "Q36799701"
+EVIDENCE_LEVEL["D"] = "Q36806470"
+EVIDENCE_LEVEL["E"] = "Q36811327"
 
 # CIViC trust ratings
-trustratings = dict()
-trustratings["1"] = "Q28045396"
-trustratings["2"] = "Q28045397"
-trustratings["3"] = "Q28045398"
-trustratings["4"] = "Q28045383"
-trustratings["5"] = "Q28045399"
+TRUST_RATING = dict()
+TRUST_RATING["1"] = "Q28045396"
+TRUST_RATING["2"] = "Q28045397"
+TRUST_RATING["3"] = "Q28045398"
+TRUST_RATING["4"] = "Q28045383"
+TRUST_RATING["5"] = "Q28045399"
 
 
-ignore_synonym_list = [
+IGNORE_SYNONYMS = [
     "AMPLIFICATION",
     "EXPRESSION",
     "DELETION",
