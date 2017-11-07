@@ -365,9 +365,12 @@ def run_one(variant_id):
             evidence_qualifiers.append(refDisputedBy)
             prep["P3359"].append(wdi_core.WDItemID(value=disease, prop_nr=PROPS['negative prognostic predictor'],
                                                    references=[copy.deepcopy(evidence_reference)],
-                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
+                                                  qualifiers=copy.deepcopy(evidence_qualifiers)))
+    dowrite = False
     data2add = []
     for key in prep.keys():
+        if key in ["P3354", "P3355", "P3356", "P3357", "P3358", "P3359"]:
+            dowrite = True
         for statement in prep[key]:
             data2add.append(statement)
             print(statement.prop_nr, statement.value)
@@ -399,8 +402,9 @@ def run_one(variant_id):
     if len(synonyms) > 0:
         item.set_aliases(aliases=synonyms, lang='en', append=True)
 
-    try_write(item, record_id=variant_id, record_prop=PROPS['CIViC Variant ID'],
-              edit_summary="edit variant associations", login=login)
+    if dowrite:
+        try_write(item, record_id=variant_id, record_prop=PROPS['CIViC Variant ID'],
+                  edit_summary="edit variant associations", login=login)
 
 
 if __name__ == "__main__":
@@ -409,7 +413,7 @@ if __name__ == "__main__":
     variants_data = r.json()
 
     for record in variants_data['records']:
-        if record['id'] == 98:
+            # if record['id'] == 98:
             print(record['id'])
             try:
                 run_one(record['id'])
