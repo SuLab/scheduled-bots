@@ -45,6 +45,7 @@ PROPS = {'subclass of': 'P279',
 
 wdi_property_store.wd_properties[PROPS['OMIM ID']]['core_id'] = False
 wdi_property_store.wd_properties[PROPS['MeSH ID']]['core_id'] = False
+wdi_property_store.wd_properties[PROPS['Orphanet ID']]['core_id'] = False
 
 __metadata__ = {'name': 'DOIDBot',
                 'tags': ['disease', 'doid'],
