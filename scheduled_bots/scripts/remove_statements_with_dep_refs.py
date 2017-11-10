@@ -70,3 +70,50 @@ for prot_qid, family_qid in tqdm(d.items()):
             item.write(login, edit_summary="remove outdated domains")
         except Exception as e:
             print(prot_qid, e)
+
+########
+## other old style refs
+########
+query = """
+SELECT ?item ?subclass WHERE {
+  #?item wdt:P703 wd:Q15978631 .
+  ?item wdt:P352 ?uniprot .
+  ?item wdt:P527 ?subclass .
+  ?subclass wdt:P2926 ?ipr .
+  ?subclass p:P2926 ?s .
+  ?s prov:wasDerivedFrom ?ref .
+  filter not exists {?ref pr:P248 wd:Q41725885}
+}"""
+results = wdi_core.WDItemEngine.execute_sparql_query(query)
+d = defaultdict(set)
+for x in results['results']['bindings']:
+    d[x['item']['value'].split("/")[-1]].add(x['subclass']['value'].split("/")[-1])
+d = {k: set(int(x[1:]) for x in v) for k,v in d.items()}
+
+for prot_qid, family_qid in tqdm(d.items()):
+    write=False
+    item = wdi_core.WDItemEngine(wd_item_id=prot_qid)
+    for s in item.statements:
+        if s.get_value() in family_qid:
+            setattr(s, 'remove', '')
+            write=True
+    item.update(item.statements)
+    if write:
+        try:
+            item.write(login, edit_summary="remove outdated domains")
+        except Exception as e:
+            print(prot_qid, e)
+
+#####
+## Other old items to delete, that used the old ref format and I didn't find before
+## nov 10 2017 found 19 items. Submitted for deletion
+######
+query = """SELECT ?item WHERE {
+  ?item wdt:P2926 ?ipr .
+  ?item p:P2926 ?s .
+  ?s prov:wasDerivedFrom ?ref .
+  ?ref pr:P348 ?v
+}"""
+results = wdi_core.WDItemEngine.execute_sparql_query(query)
+d = {x['item']['value'].split("/")[-1] for x in results['results']['bindings']}
+print("|".join(d))
