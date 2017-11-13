@@ -186,9 +186,11 @@ def run_one(variant_id):
     prep["P31"] = []
     for variant_type in variant_data["variant_types"]:
         if variant_type["name"] == "N/A":
-            continue
-        prep['P31'].append(wdi_core.WDItemID(value=SO_QID_MAP[variant_type["so_id"]], prop_nr='P31',
-                                             references=[variant_reference]))
+            prep['P31'].append(wdi_core.WDItemID(value="Q15304597", prop_nr='P31',
+                                                 references=[variant_reference]))
+        else:
+            prep['P31'].append(wdi_core.WDItemID(value=SO_QID_MAP[variant_type["so_id"]], prop_nr='P31',
+                                                 references=[variant_reference]))
 
     evidence = dict()
     evidence["P3354"] = dict()
@@ -202,9 +204,8 @@ def run_one(variant_id):
     evidence_items = [x for x in variant_data['evidence_items'] if
                       x["status"] == "accepted" and x["rating"] is not None]
 
-    # TODO: Andra, if there are no evidence items, do we bother makign the item?
     if not evidence_items:
-        raise ValueError("no evidence items")
+        return
 
     for evidence_item in evidence_items:
         pprint(evidence_item)
@@ -236,6 +237,7 @@ def run_one(variant_id):
         if evidence_item['drug_interaction_type'] == "Combination":
             # make this a drug therapy combination item instead!!
             drug_qids = [DrugCombo(drug_qids).get_or_create(login)]
+
         # TODO: "substitution"
         print("drug_qids: {}".format(drug_qids))
 
