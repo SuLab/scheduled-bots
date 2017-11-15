@@ -46,7 +46,8 @@ def chunks(iterable, size):
 def getConceptLabels(qids):
     qids = "|".join({qid.replace("wd:", "") if qid.startswith("wd:") else qid for qid in qids})
     try:
-        wd = site.api('wbgetentities', **{'ids': qids, 'languages': 'en', 'format': 'json', 'props': 'labels'})['entities']
+        wd = site.api('wbgetentities', **{'ids': qids, 'languages': 'en', 'format': 'json', 'props': 'labels'})[
+            'entities']
         return {k: v['labels']['en']['value'] if 'labels' in v and 'en' in v['labels'] else '' for k, v in wd.items()}
     except Exception as e:
         print(e)
@@ -310,6 +311,28 @@ def get_revisions_past_weeks(qids, weeks):
     return revisions
 
 
+def get_merges(qids, weeks):
+    # input: a list of revision IDs
+    # output: list of revision IDs that are tagged as a merge
+    # comment example: /* wbcreateredirect:0||Q20948851|Q9410367 */
+
+    qids_str = '"' + '","'.join(qids) + '"'
+    query = '''select page.*, redirect.* FROM page
+                  inner join redirect on page.page_id = redirect.rd_from WHERE
+                  (page.page_title IN({qids}) OR
+                  redirect.rd_title IN ({qids}));'''.format(qids=qids_str)
+    redirect_df = query_wikidata_mysql(query)
+    redirect_df.page_title = redirect_df.page_title.apply(bytes.decode)
+    redirect_df.rd_title = redirect_df.rd_title.apply(bytes.decode)
+    redirect_df.page_links_updated = redirect_df.page_links_updated.apply(
+        lambda x: datetime.datetime.strptime(x.decode(), '%Y%m%d%H%M%S'))
+
+    redirect_df2 = redirect_df[redirect_df.page_links_updated > datetime.datetime.now() - datetime.timedelta(weeks=weeks)]
+    names = ['page_id', 'page_namespace', 'page_title', 'page_links_updated', 'page_latest', 'rd_from', 'rd_title']
+    redirect_df2 = redirect_df2[names]
+
+    return redirect_df2
+
 def get_revision_ids_needed(coll, qids, weeks=1):
     # Get the revision IDs for revisions on `qids` items in the past `weeks` weeks
     # # excluding the ones we already have in `coll`
@@ -388,7 +411,7 @@ def process_lda_revisions(coll, qids, weeks):
 @click.option('--pid', default="P699", help='property filter')
 @click.option('--idfilter', default='', help='additional filter. example "P703:Q15978631;P1057:Q847102"')
 @click.option('--weeks', default=2, help='number of weeks ago')
-@click.option('--force_update', default=False, help='skip checking for existing revision')
+@click.option('--force-update', is_flag=True, help='skip checking for existing revision')
 @click.option('--filter-user', default="ProteinBoxBot", help='filter out changes by this user')
 def main(pid, weeks, idfilter, force_update, filter_user):
     """
@@ -401,6 +424,7 @@ def main(pid, weeks, idfilter, force_update, filter_user):
     """
     coll_name = pid + "_" + idfilter if idfilter else pid
     save_name = coll_name + "_" + str(datetime.date.today()) + "_{}weeks".format(weeks) + ".xls"
+    writer = pd.ExcelWriter(save_name)
     coll = MongoClient().wikidata[coll_name]
     coll.create_index("id")
     idfilter = [(k.split(":")[0], k.split(":")[1]) for k in idfilter.split(";")] if idfilter else []
@@ -426,6 +450,7 @@ def main(pid, weeks, idfilter, force_update, filter_user):
     print("Getting revisions from the past {} weeks".format(weeks_to_dl))
 
     need_revisions = get_revision_ids_needed(coll, qids, weeks=weeks_to_dl)
+    print("Downloading revisions")
     download_revisions(coll, need_revisions, pid, qid_extid)
 
     print("Processing changes in the past {} weeks".format(weeks))
@@ -438,7 +463,7 @@ def main(pid, weeks, idfilter, force_update, filter_user):
     if not df.empty:
         df = df[["revid", "url", "timestamp", "user", "change_type", "comment", "has_ref", "merge",
                  "metadata", "qid", "qid_label", "pid", "pid_label", "value", "value_label", "ref_str"]]
-    writer = pd.ExcelWriter(save_name)
+
     df.to_excel(writer, sheet_name="changes")
 
     if not df.empty and filter_user:
@@ -455,6 +480,13 @@ def main(pid, weeks, idfilter, force_update, filter_user):
         lda_df = lda_df[["revid", "url", "timestamp", "user", "change_type", "comment",
                          "merge", "qid", "qid_label", "value"]]
     lda_df.to_excel(writer, sheet_name="labels")
+    
+    print("Getting redirects")
+    redirect_df = get_merges(qids, weeks)
+    redirect_df['history_url'] = redirect_df.page_title.apply(lambda x: "https://www.wikidata.org/w/index.php?title={}&action=history".format(x))
+    redirect_df['url'] = redirect_df.page_latest.apply(lambda x: "https://www.wikidata.org/w/index.php?diff={}".format(x))
+    redirect_df.to_excel(writer, sheet_name="redirects")
+
     writer.save()
 
 
