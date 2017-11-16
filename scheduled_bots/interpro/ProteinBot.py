@@ -14,7 +14,7 @@ from wikidataintegrator.wdi_fastrun import FastRunContainer
 __metadata__ = {'name': 'InterproBot_Proteins',
                 'maintainer': 'GSS',
                 'tags': ['protein', 'interpro'],
-                'properties': ["P279", "P527"]
+                'properties': ["P279", "P527", "P361"]
                 }
 
 INTERPRO = "P2926"
@@ -23,6 +23,7 @@ UNIPROT = "P352"
 PROPS = {
     "subclass of": "P279",
     "has part": "P527",
+    "part of": "P361"
 }
 
 
@@ -42,10 +43,12 @@ def create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_f
 
         if doc['subclass']:
             for f in doc['subclass']:
-                statements.append(wdi_core.WDItemID(value=IPRTerm.ipr2wd[f], prop_nr='P279', references=[reference]))
+                # changed subclass to part of
+                # https://github.com/SuLab/GeneWikiCentral/issues/68
+                statements.append(wdi_core.WDItemID(IPRTerm.ipr2wd[f], PROPS['part of'], references=[reference]))
         if doc['has_part']:
             for hp in doc['has_part']:
-                statements.append(wdi_core.WDItemID(value=IPRTerm.ipr2wd[hp], prop_nr='P527', references=[reference]))
+                statements.append(wdi_core.WDItemID(IPRTerm.ipr2wd[hp], PROPS['has part'], references=[reference]))
 
         if uniprot_id not in uniprot2wd:
             print("wdid_not_found " + uniprot_id + " " + uniprot2wd[uniprot_id])
@@ -53,7 +56,7 @@ def create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_f
 
         wd_item = wdi_core.WDItemEngine(wd_item_id=uniprot2wd[uniprot_id], domain="proteins", data=statements,
                                         fast_run=True, fast_run_base_filter=fast_run_base_filter,
-                                        append_value=["P279", "P527"],
+                                        append_value=[PROPS['has part'], PROPS['part of']],
                                         global_ref_mode='CUSTOM', fast_run_use_refs=True,
                                         ref_handler=update_retrieved_if_new)
     except Exception as e:
@@ -120,6 +123,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
 
     frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter={UNIPROT: "", "P703": taxon}, use_refs=True)
     for qid in qids:
-        remove_deprecated_statements(qid, frc, release_wdid, [PROPS[x] for x in ['subclass of', 'has part']], login)
+        # the old subclass of statements should get removed here (see: https://github.com/SuLab/GeneWikiCentral/issues/68)
+        remove_deprecated_statements(qid, frc, release_wdid, [PROPS[x] for x in ['subclass of', 'has part', 'part of']], login)
 
     return os.path.join(log_dir, log_name)
