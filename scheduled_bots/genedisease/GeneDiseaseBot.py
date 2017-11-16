@@ -85,7 +85,7 @@ class GWASCatalog(object):
 
 
 class GeneDiseaseRelationship:
-    phenocarta_ref_source = 'http://chibi.ubc.ca/Gemma/phenotypes.html?phenotypeUrlId=DOID_{doid}&ncbiId={ncbi}'
+    phenocarta_ref_source = 'https://gemma.msl.ubc.ca/phenotypes.html?phenotypeUrlId=DOID_{doid}&ncbiId={ncbi}'
 
     def __init__(self, ncbi, symbol, taxon, relationship, doid, phenotype, pmid, link):
         self.ncbi = ncbi
@@ -314,7 +314,7 @@ def download_gwas(url):
     :param url: path to gwas catalog file to download
     :return:
     """
-    # url = "http://www.chibi.ubc.ca/Gemma/phenocarta/LatestEvidenceExport/AnnotationsByDataset/GWAS_Catalog.tsv"
+    # url = "https://gemma.msl.ubc.ca/phenocarta/LatestEvidenceExport/AnnotationsByDataset/GWAS_Catalog.tsv"
     r = requests.get(url, stream=True)
     r.raise_for_status()
     with open('GWAS_Catalog.tsv', 'wb') as handle:
