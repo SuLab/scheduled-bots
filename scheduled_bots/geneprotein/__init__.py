@@ -131,6 +131,7 @@ PROPS = {'found in taxon': 'P703',
          'UniProt ID': 'P352',
          'Ensembl Protein ID': 'P705',
          'OMIM ID': 'P492',
+         'NCBI Taxonomy ID': 'P685'
          }
 
 # http://www.geneontology.org/doc/GO.xrf_abbs
