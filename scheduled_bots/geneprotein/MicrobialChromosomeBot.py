@@ -60,7 +60,7 @@ class MicrobialChromosomeBot:
                    'refseq': x.split(":")[1].split("/")[0].strip()} for x in replicons.split(";")]
         return chroms
 
-    def get_or_create(self, taxid, login=None):
+    def get_or_create_chromosomes(self, taxid, login=None):
         # main function to use to get or create all of the chromosomes for a bacterial organism
         # returns dict with key = refseq ID, value = qid for chromosome item
         if self.df.empty:
@@ -138,3 +138,20 @@ class MicrobialChromosomeBot:
         wd_item.set_description(item_description, lang='en')
         wdi_helpers.try_write(wd_item, genome_id, 'P2249', login)
         return wd_item.wd_item_id
+
+    def get_all_taxids(self):
+        if self.df.empty:
+            self.get_microbial_ref_genome_table()
+        return set(self.df.TaxID)
+
+    def get_organism_info(self, taxid):
+        taxid = str(taxid)
+        if taxid not in self.get_all_taxids():
+            raise ValueError("taxid {} not found in microbe ref genomes".format(taxid))
+        entry = self.df[self.df.TaxID == taxid].to_dict("records")[0]
+        qid = prop2qid(PROPS['NCBI Taxonomy ID'], taxid)
+        return {'name': entry['Organism/Name'],
+                'type': "microbial",
+                'wdid': qid,
+                'qid': qid,
+                'taxid': taxid}

@@ -16,8 +16,6 @@ example microbial gene:
 https://www.wikidata.org/wiki/Q23097138
 https://mygene.info/v3/gene/7150837
 
-Restructuring this: https://bitbucket.org/sulab/wikidatabots/src/226614eeda5f258fc913b10fdcaa3c22c7f64045/automated_bots/genes/mammals/gene.py?at=jenkins-automation&fileviewer=file-view-default
-
 """
 # TODO: Gene on two chromosomes
 # https://www.wikidata.org/wiki/Q20787772
@@ -28,6 +26,7 @@ import json
 import time
 import argparse
 import traceback
+
 from tqdm import tqdm
 from itertools import chain
 from datetime import datetime
@@ -37,16 +36,17 @@ from pymongo import MongoClient
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers, wdi_property_store
 from wikidataintegrator.wdi_fastrun import FastRunContainer
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
-#wdi_property_store.wd_properties['P704']['core_id'] = False
-#wdi_property_store.wd_properties['P639']['core_id'] = False
+
+# wdi_property_store.wd_properties['P704']['core_id'] = False
+# wdi_property_store.wd_properties['P639']['core_id'] = False
 
 DAYS = 120
 update_retrieved_if_new = partial(update_retrieved_if_new, days=DAYS)
 
 from scheduled_bots.geneprotein import HelperBot, organisms_info, type_of_gene_map, descriptions_by_type
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
+from scheduled_bots.geneprotein.MicrobialChromosomeBot import MicrobialChromosomeBot
 from scheduled_bots.geneprotein.HelperBot import make_ref_source, parse_mygene_src_version, source_items
-from scheduled_bots.geneprotein.MicrobeBotResources import get_organism_info, get_all_taxa
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -325,69 +325,7 @@ class Gene:
                                             self.login, write=write)
 
 
-class MicrobeGene(Gene):
-    """
-    Microbes
-
-    """
-
-    def __init__(self, record, organism_info, login):
-        super().__init__(record, organism_info, login)
-
-    def create_label(self):
-        self.label = self.record['name']['@value'] + " " + self.record['locus_tag']['@value']
-
-    def create_description(self):
-        if self.organism_info['type']:
-            self.description = '{} gene found in {}'.format(self.organism_info['type'], self.organism_info['name'])
-        else:
-            self.description = 'Gene found in {}'.format(self.organism_info['name'])
-
-    def validate_record(self):
-        pass
-
-    def create_statements(self):
-        # create generic gene statements
-        s = super().create_statements()
-
-        # add on gene position statements
-        s.extend(self.create_gp_statements())
-
-        return s
-
-    def create_gp_statements(self):
-        """
-        Create genomic_pos start stop orientation no chromosome
-        :return:
-        """
-        genomic_pos_value = self.record['genomic_pos']['@value'][0]
-        genomic_pos_source = self.record['genomic_pos']['@source']
-        genomic_pos_id_prop = source_ref_id[genomic_pos_source['id']]
-        assert len(self.external_ids[genomic_pos_id_prop]) == 1
-
-        genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop],
-                                          list(self.external_ids[genomic_pos_id_prop])[0], login=self.login)
-
-        s = []
-
-        # create qualifier for chromosome REFSEQ ID (not chrom item)
-        chromosome = genomic_pos_value['chr']
-        rs_chrom = wdi_core.WDString(value=chromosome, prop_nr='P2249', is_qualifier=True)
-
-        # strand orientation
-        strand_orientation = 'Q22809680' if genomic_pos_value['strand'] == 1 else 'Q22809711'
-        s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'],
-                                   references=[genomic_pos_ref], qualifiers=[rs_chrom]))
-        # genomic start and end
-        s.append(wdi_core.WDString(str(int(genomic_pos_value['start'])), PROPS['genomic start'],
-                                   references=[genomic_pos_ref], qualifiers=[rs_chrom]))
-        s.append(wdi_core.WDString(str(int(genomic_pos_value['end'])), PROPS['genomic end'],
-                                   references=[genomic_pos_ref], qualifiers=[rs_chrom]))
-
-        return s
-
-
-class EukaryoticGene(Gene):
+class ChromosomalGene(Gene):
     """
     yeast, mouse, rat, worm, fly, zebrafish
     """
@@ -483,7 +421,71 @@ class EukaryoticGene(Gene):
         return s
 
 
-class HumanGene(EukaryoticGene):
+class MicrobeGene(Gene):
+    """
+    Microbes
+
+    """
+
+    def __init__(self, record, organism_info, refseq_qid_chrom, login):
+        super().__init__(record, organism_info, login)
+        self.refseq_qid_chrom = refseq_qid_chrom
+
+    def create_label(self):
+        self.label = self.record['name']['@value'] + " " + self.record['locus_tag']['@value']
+
+    def create_description(self):
+        if self.organism_info['type']:
+            self.description = '{} gene found in {}'.format(self.organism_info['type'], self.organism_info['name'])
+        else:
+            self.description = 'Gene found in {}'.format(self.organism_info['name'])
+
+    def validate_record(self):
+        pass
+
+    def create_statements(self):
+        # create generic gene statements
+        s = super().create_statements()
+
+        # add on gene position statements
+        s.extend(self.create_gp_statements())
+
+        return s
+
+    def create_gp_statements(self):
+        """
+        Create genomic_pos start stop orientation plus chromosome qualifiers
+        :return:
+        """
+        genomic_pos_value = self.record['genomic_pos']['@value'][0]
+        genomic_pos_source = self.record['genomic_pos']['@source']
+        genomic_pos_id_prop = source_ref_id[genomic_pos_source['id']]
+        assert isinstance(self.external_ids[genomic_pos_id_prop], str)
+        external_id = self.external_ids[genomic_pos_id_prop]
+
+        genomic_pos_ref = make_ref_source(genomic_pos_source, PROPS[genomic_pos_id_prop], external_id, login=self.login)
+
+        s = []
+
+        # create qualifier for chromosome (which has the refseq ID on it)
+        chr_refseq = genomic_pos_value['chr']
+        chr_qid = self.refseq_qid_chrom[chr_refseq]
+        qualifiers = [wdi_core.WDItemID(value=chr_qid, prop_nr=PROPS['chromosome'], is_qualifier=True)]
+
+        # strand orientation
+        strand_orientation = 'Q22809680' if genomic_pos_value['strand'] == 1 else 'Q22809711'
+        s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'],
+                                   references=[genomic_pos_ref], qualifiers=qualifiers))
+        # genomic start and end
+        s.append(wdi_core.WDString(str(int(genomic_pos_value['start'])), PROPS['genomic start'],
+                                   references=[genomic_pos_ref], qualifiers=qualifiers))
+        s.append(wdi_core.WDString(str(int(genomic_pos_value['end'])), PROPS['genomic end'],
+                                   references=[genomic_pos_ref], qualifiers=qualifiers))
+
+        return s
+
+
+class HumanGene(ChromosomalGene):
     def create_statements(self):
         # create gene statements
         s = Gene.create_statements(self)
@@ -613,6 +615,8 @@ class GeneBot:
         self.organism_info = organism_info
 
     def run(self, records, total=None, fast_run=True, write=True):
+        # this shouldn't ever actually get used now
+        raise ValueError()
         records = self.filter(records)
         for record in tqdm(records, mininterval=2, total=total):
             gene = self.GENE_CLASS(record, self.organism_info, self.login)
@@ -661,8 +665,8 @@ class GeneBot:
             remove_deprecated_statements(qid, frc, releases, last_updated, list(PROPS.values()), self.login)
 
 
-class MammalianGeneBot(GeneBot):
-    GENE_CLASS = EukaryoticGene
+class ChromosomalGeneBot(GeneBot):
+    GENE_CLASS = ChromosomalGene
 
     def __init__(self, organism_info, chr_num_wdid, login):
         super().__init__(organism_info, login)
@@ -686,11 +690,11 @@ class MammalianGeneBot(GeneBot):
                 self.failed.append(gene.entrez)
 
 
-class HumanGeneBot(MammalianGeneBot):
+class HumanGeneBot(ChromosomalGeneBot):
     GENE_CLASS = HumanGene
 
 
-class MicrobeGeneBot(GeneBot):
+class MicrobeGeneBot(ChromosomalGeneBot):
     GENE_CLASS = MicrobeGene
 
 
@@ -775,6 +779,7 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
                                         header=json.dumps(__metadata__))
 
     # get organism metadata (name, organism type, wdid)
+    # TODO: this can be pulled from wd
     if taxid in organisms_info and organisms_info[taxid]['type'] != "microbial":
         validate_type = 'eukaryotic'
         organism_info = organisms_info[taxid]
@@ -785,13 +790,14 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
         if int(organism_info['taxid']) == 9606:
             bot = HumanGeneBot(organism_info, chr_num_wdid, login)
         else:
-            bot = MammalianGeneBot(organism_info, chr_num_wdid, login)
+            bot = ChromosomalGeneBot(organism_info, chr_num_wdid, login)
     else:
-        # check if its one of the microbe refs
+        # check if its one of the reference microbial genomes
         # raises valueerror if not...
-        organism_info = get_organism_info(taxid)
+        organism_info = mcb.get_organism_info(taxid)
+        refseq_qid_chrom = mcb.get_or_create_chromosomes(taxid, login)
         print(organism_info)
-        bot = MicrobeGeneBot(organism_info, login)
+        bot = MicrobeGeneBot(organism_info, refseq_qid_chrom, login)
         validate_type = "microbial"
 
     # only do certain records
@@ -851,6 +857,7 @@ if __name__ == "__main__":
     taxon = args.taxon
     fast_run = args.fastrun
     coll = MongoClient(args.mongo_uri)[args.mongo_db]["mygene"]
+    mcb = MicrobialChromosomeBot()
 
     # get metadata about sources
     # this should be stored in the same db under the collection: mygene_sources
@@ -864,7 +871,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if "microbe" in taxon:
-        microbe_taxa = get_all_taxa()
+        microbe_taxa = mcb.get_all_taxids()
         taxon = taxon.replace("microbe", ','.join(map(str, microbe_taxa)))
 
     for taxon1 in taxon.split(","):
