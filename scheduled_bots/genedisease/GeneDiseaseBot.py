@@ -157,7 +157,6 @@ class GeneDiseaseBot(object):
         self.wd_items = []
 
     def run(self):
-        wdi_core.WDItemEngine.log("INFO", "Begin processing relationships")
         wd_genes = defaultdict(list)
         wd_diseases = defaultdict(list)
         gdrs = list(self.gwas_catalog.data)
@@ -253,9 +252,6 @@ class GeneDiseaseBot(object):
                                           wdi_helpers.format_msg(gdr.doid, PROPS['Disease Ontology ID'], wdid, msg,
                                                                  type(e)))
 
-        if self.write:
-            wdi_core.WDItemEngine.log("INFO", "All Items Written")
-
     def write_item(self, wd_item):
         wdi_helpers.try_write(wd_item['item'], record_id=wd_item['record_id'],
                               record_prop=wd_item['record_prop'], edit_summary='edit genetic association',
@@ -331,7 +327,7 @@ if __name__ == "__main__":
     Bot to add/update gene-disease relationships to wikidata.
     """
     parser = argparse.ArgumentParser(description='run wikidata gene-disease bot')
-    parser.add_argument('--force', help="don't check for new data, run bot anyways", action='store_true')
+    #parser.add_argument('--force', help="don't check for new data, run bot anyways", action='store_true')
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
@@ -339,15 +335,17 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if not args.force and not is_download_required():
-        print("No run required. Quitting")
-        sys.exit(0)
+    if not is_download_required():
+        print("No run required, but running anyways")
+        remote_newer = False
     else:
         print("Downloading new data")
-        last_modified = download_data()
+        remote_newer = True
+    last_modified = download_data()
 
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     __metadata__['run_id'] = run_id
+    __metadata__['remote_newer'] = remote_newer
     __metadata__['sources'] = [{'name': 'Phenocarta', 'version': str(last_modified)}]
     fast_run = args.fastrun
 
