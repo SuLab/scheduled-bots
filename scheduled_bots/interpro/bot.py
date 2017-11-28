@@ -1,3 +1,53 @@
+"""
+USe api: http://www.uniprot.org/uniprot/?query=organism%3A%22Homo+sapiens+%28Human%29+%5B9606%5D%22&sort=score
+import requests
+
+cookies = {
+    'uniprot-results-download': 'tab',
+    'insd-target-sequences': 'embl',
+    'insd_cds-target-sequences': 'embl_cds',
+    'insd-target-cross_references': 'embl',
+    'insd_cds-target-cross_references': 'embl_cds',
+    'uniprot-columns2': 'id%2Centry_name%2Creviewed%2Cprotein_names%2Cgenes%2Corganism%2Clength%2Cdatabase%28InterPro%29',
+    '_ga': 'GA1.2.12501074.1488310603',
+    '_gid': 'GA1.2.1809071125.1511808535',
+    '_gat': '1',
+}
+
+headers = {
+    'DNT': '1',
+    'Accept-Encoding': 'gzip, deflate, sdch',
+    'Accept-Language': 'en-US,en;q=0.8',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Referer': 'http://www.uniprot.org/uniprot/?query=organism:9606+keyword:181',
+    'Connection': 'keep-alive',
+}
+
+params = (
+    ('sort', ''),
+    ('desc', ''),
+    ('compress', 'yes'),
+    ('query', 'organism:9606 keyword:181'),
+    ('fil', ''),
+    ('format', 'tab'),
+    ('force', 'yes'),
+    ('columns', 'id,entry name,reviewed,protein names,genes,organism,length,database(InterPro)'),
+)
+
+requests.get('http://www.uniprot.org/uniprot/', headers=headers, params=params, cookies=cookies)
+
+#NB. Original query string below. It seems impossible to parse and
+#reproduce query strings 100% accurately so the one below is given
+#in case the reproduced version is not "correct".
+# requests.get('http://www.uniprot.org/uniprot/?sort=&desc=&compress=yes&query=organism:9606%20keyword:181&fil=&format=tab&force=yes&columns=id,entry%20name,reviewed,protein%20names,genes,organism,length,database(InterPro)', headers=headers, cookies=cookies)
+
+
+
+"""
+
+
 import argparse
 import os
 
@@ -22,9 +72,9 @@ except ImportError:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run interpro wikidata import bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
-    parser.add_argument('--run-one', help='run one doc', type=str)
+    parser.add_argument('--run-one', help='run one doc', action='store_true')
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help='limit protein -> interpro to taxon', type=str)
+    parser.add_argument('--taxon', help='limit protein -> interpro to taxon (as a qid)', type=str)
     parser.add_argument('--interpro-version', help="example: '60.0'", type=str)
     parser.add_argument('--interpro-date', help="format example: '03-NOV-16'", type=str)
     parser.add_argument('--protein', help='run protein ipr bot', action='store_true')

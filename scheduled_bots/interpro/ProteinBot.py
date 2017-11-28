@@ -41,8 +41,8 @@ def create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_f
                                     is_reference=True)
         reference = [ref_stated_in, ref_ipr]
 
-        if doc['subclass']:
-            for f in doc['subclass']:
+        if doc['part_of']:
+            for f in doc['part_of']:
                 # changed subclass to part of
                 # https://github.com/SuLab/GeneWikiCentral/issues/68
                 statements.append(wdi_core.WDItemID(IPRTerm.ipr2wd[f], PROPS['part of'], references=[reference]))
@@ -72,7 +72,7 @@ def create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_f
     return wd_item
 
 
-def create_uniprot_relationships(login, release_wdid, collection, taxon=None, write=True):
+def create_uniprot_relationships(login, release_wdid, collection, taxon=None, write=True, run_one=False):
     # only do uniprot proteins that are already in wikidata
     # returns list of qids of items that are modified or skipped (excluding created)
     if taxon:
@@ -88,6 +88,8 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
         wd_item = create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_filter, write=write)
         if wd_item and not wd_item.create_new_item:
             qids.append(wd_item.wd_item_id)
+        if run_one:
+            break
     return qids
 
 
@@ -112,7 +114,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='ipr{}'.format(taxon))
 
-    qids = create_uniprot_relationships(login, release_wdid, collection, taxon=taxon, write=write)
+    qids = create_uniprot_relationships(login, release_wdid, collection, taxon=taxon, write=write, run_one=run_one)
     for frc in wdi_core.WDItemEngine.fast_run_store:
         frc.clear()
 
