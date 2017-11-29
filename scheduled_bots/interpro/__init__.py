@@ -51,3 +51,18 @@ def get_all_taxa():
     result = wdi_core.WDItemEngine.execute_sparql_query(query=query)
     taxa = set([x['t']['value'].replace("http://www.wikidata.org/entity/","")  for x in result['results']['bindings']])
     return taxa
+
+"""
+#USe api: http://www.uniprot.org/uniprot/?query=organism%3A%22Homo+sapiens+%28Human%29+%5B9606%5D%22&sort=score
+import requests
+import pandas as pd
+from io import StringIO
+params = {'compress': 'no',
+          'format': 'tab',
+          'force': 'yes',
+          'query': 'organism:243230',
+          'columns': 'id,entry name,reviewed,protein names,genes,organism,length,database(InterPro)'}
+r = requests.get('http://www.uniprot.org/uniprot/', params=params)
+
+df = pd.read_csv(StringIO(r.text), sep='\t')
+"""

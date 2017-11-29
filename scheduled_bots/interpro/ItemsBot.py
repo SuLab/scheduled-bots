@@ -17,6 +17,7 @@ __metadata__ = {'name': 'InterproBot_Items',
                 'properties': ["P279", "P2926", 'P527', 'P361']
                 }
 
+# todo: make sure the old instance of statements get removed also https://www.wikidata.org/wiki/Q24724550
 
 def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb://localhost:27017",
          mongo_db="wikidata_src", mongo_coll="interpro", run_one=False, write=True):
@@ -64,6 +65,6 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
         term.wd_item.fast_run_container.clear()
     frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter={INTERPRO: ''}, use_refs=True)
     for term in tqdm(terms, mininterval=2.0):
-        remove_deprecated_statements(term.wd_item.wd_item_id, frc, release_wdid, ["P279", "P2926", 'P527', 'P361'], login)
+        remove_deprecated_statements(term.wd_item.wd_item_id, frc, release_wdid, ["P31", "P279", "P2926", 'P527', 'P361'], login)
 
     return os.path.join(log_dir, log_name)
