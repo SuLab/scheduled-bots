@@ -1,16 +1,13 @@
 import argparse
 import json
 import os
-import subprocess
-import sys
+
 from collections import defaultdict
 from datetime import datetime
 from functools import partial
 from time import gmtime, strftime
 
 import pytz
-import requests
-from dateutil import parser as du
 from scheduled_bots.utils import get_values
 from tqdm import tqdm
 from wikidataintegrator import ref_handlers
@@ -19,7 +16,6 @@ from wikidataintegrator.wdi_helpers import id_mapper
 
 DAYS = 6 * 30
 update_retrieved_if_new = partial(ref_handlers.update_retrieved_if_new, days=DAYS)
-GWAS_URL = 'https://gemma.msl.ubc.ca/phenocarta/LatestEvidenceExport/AnnotationsByDataset/GWAS_Catalog.tsv'
 GWAS_PATH = "GWAS_Catalog.tsv"
 
 try:
@@ -46,25 +42,6 @@ __metadata__ = {'name': 'GeneDiseaseBot',
                 'tags': ['gene', 'disease'],
                 'properties': list(PROPS.values())
                 }
-
-
-def is_download_required():
-    # looks in the current folder for "GWAS_Catalog.tsv"
-    if not os.path.exists(GWAS_PATH):
-        return True
-    last_modified_local = datetime.fromtimestamp(os.path.getmtime(GWAS_PATH), pytz.timezone("UTC"))
-    print("last_modified_local: {}".format(last_modified_local))
-
-    last_modified_remote = du.parser().parse(requests.head(GWAS_URL).headers['Last-Modified'])
-    print("last_modified_remote: {}".format(last_modified_remote))
-
-    return last_modified_remote != last_modified_local
-
-
-def download_data():
-    subprocess.check_output(['wget', '-N', GWAS_URL])
-    last_modified = datetime.fromtimestamp(os.path.getmtime(GWAS_PATH), pytz.timezone("UTC"))
-    return last_modified
 
 
 class GWASCatalog(object):
@@ -325,27 +302,24 @@ class GeneDiseaseBot(object):
 if __name__ == "__main__":
     """
     Bot to add/update gene-disease relationships to wikidata.
+    Data from: https://gemma.msl.ubc.ca/phenocarta/LatestEvidenceExport/AnnotationsByDataset/GWAS_Catalog.tsv
     """
     parser = argparse.ArgumentParser(description='run wikidata gene-disease bot')
-    #parser.add_argument('--force', help="don't check for new data, run bot anyways", action='store_true')
+    parser.add_argument("path", help="path to GWAS_Catalog.tsv")
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
     parser.set_defaults(fastrun=True)
 
     args = parser.parse_args()
+    path = args.path
 
-    if not is_download_required():
-        print("No run required, but running anyways")
-        remote_newer = False
-    else:
-        print("Downloading new data")
-        remote_newer = True
-    last_modified = download_data()
+    assert os.path.exists(path), "Cannot find {}".format(path)
+
+    last_modified = datetime.fromtimestamp(os.path.getmtime(path), pytz.timezone("UTC"))
 
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     __metadata__['run_id'] = run_id
-    __metadata__['remote_newer'] = remote_newer
     __metadata__['sources'] = [{'name': 'Phenocarta', 'version': str(last_modified)}]
     fast_run = args.fastrun
 
@@ -355,4 +329,4 @@ if __name__ == "__main__":
     wdi_core.WDItemEngine.setup_logging(log_name=log_name, header=json.dumps(__metadata__), logger_name='gene-disease')
 
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
-    GeneDiseaseBot(login=login, fast_run=fast_run, write=not args.dummy).run()
+    GeneDiseaseBot(catalog_tsv_path=path, login=login, fast_run=fast_run, write=not args.dummy).run()
