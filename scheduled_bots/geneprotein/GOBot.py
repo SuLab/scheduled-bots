@@ -17,13 +17,11 @@ from functools import partial
 from typing import Dict, Set
 
 import pandas as pd
-import pymongo
-from pymongo import MongoClient
 from scheduled_bots.geneprotein import go_props, go_evidence_codes, curators_wdids, curator_ref, PROPS
-from tqdm import tqdm
-from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 from scheduled_bots.utils import get_values
+from tqdm import tqdm
 from wikidataintegrator import ref_handlers
+from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 
 DAYS = 6 * 30
 update_retrieved_if_new = partial(ref_handlers.update_retrieved_if_new_multiple_refs, days=DAYS)
@@ -47,7 +45,7 @@ ENTREZ = "P351"
 UNIPROT = "P352"
 
 
-def make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, pmid=None):
+def make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, retrieved, pmid=None):
     # initialize this reference for this evidence code with retrieved
     reference = [wdi_core.WDTime(retrieved.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', is_reference=True)]
 
@@ -74,8 +72,9 @@ def make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, pmid=
         raise ValueError("curator not found: {}".format(curator))
 
     # reference URL
-    #ref_url = "http://www.ebi.ac.uk/QuickGO/GAnnotation?protein={}".format(uniprot_id)
-    ref_url = "http://www.ebi.ac.uk/QuickGO/annotations?protein={}&geneProductId=UniProtKB:{}".format(uniprot_id, uniprot_id)
+    # ref_url = "http://www.ebi.ac.uk/QuickGO/GAnnotation?protein={}".format(uniprot_id)
+    ref_url = "http://www.ebi.ac.uk/QuickGO/annotations?protein={}&geneProductId=UniProtKB:{}".format(uniprot_id,
+                                                                                                      uniprot_id)
     reference.append(wdi_core.WDString(ref_url, 'P854', is_reference=True))
 
     # ref determination method
@@ -84,7 +83,7 @@ def make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, pmid=
     return reference
 
 
-def make_go_statements(uniprot_id: str, this_go: pd.DataFrame, go_map: dict, pmid_map: dict, external_id: dict):
+def make_go_statements(uniprot_id: str, this_go: pd.DataFrame, go_map: dict, pmid_map: dict, external_id: dict, retrieved):
     """
     add go terms to a protein item.
     Follows the schema described here:
@@ -104,7 +103,7 @@ def make_go_statements(uniprot_id: str, this_go: pd.DataFrame, go_map: dict, pmi
     """
     statements = []
     for go_id, sub_df in this_go.groupby(level=0):
-        aspect = set(sub_df.index.get_level_values("Aspect"))
+        aspect = set(sub_df.index.get_level_values("aspect"))
         assert len(aspect) == 1
         aspect = list(aspect)[0]
         level_wdid = go_props[aspect]
@@ -117,13 +116,13 @@ def make_go_statements(uniprot_id: str, this_go: pd.DataFrame, go_map: dict, pmi
 
             # ss_df looks like this:
             """
-            GO ID       Evidence  Source  DB         Aspect
+            go_id       evidence  source  db         aspect
             GO:0000171  IDA       MGI     UniProtKB  Function    [PMID:11413139, PMID:1234]
                                   SGD     UniProtKB  Function     [PMID:9620854]
             """
             # or
             """
-            GO ID       Evidence  Source    DB         Aspect
+            go_id       evidence  source    db         aspect
             GO:0004526  IEA       InterPro  UniProtKB  Function    [GO_REF:0000002]
                                   UniProt   UniProtKB  Function    [GO_REF:0000003]
             """
@@ -135,10 +134,10 @@ def make_go_statements(uniprot_id: str, this_go: pd.DataFrame, go_map: dict, pmi
                 pmids = set([x[5:] for x in refs if x.startswith("PMID:")])
                 if pmids:
                     for pmid in pmids:
-                        reference = make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, pmid=pmid)
+                        reference = make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, retrieved, pmid=pmid)
                         statement.references.append(reference)
                 else:
-                    reference = make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid)
+                    reference = make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, retrieved)
                     statement.references.append(reference)
 
         # not required, but for asthetics...
@@ -171,14 +170,14 @@ def create_articles(pmids: Set[str], login: object, write: bool = True) -> Dict[
     return pmid_map
 
 
-def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
+def main(taxon, file, retrieved, log_dir="./logs", fast_run=True, write=True):
     """
     Main function for annotating GO terms on proteins
     
-    :param coll: mongo collection containing GO annotations
-    :type coll: pymongo.collection.Collection
     :param taxon: taxon to use (ncbi tax id)
     :type taxid: str
+    :param file: path to gaf_file to use. See below for format
+    :type str
     :param retrieved: date that the GO annotations were retrieved
     :type retrieved: datetime
     :param log_dir: dir to store logs
@@ -187,7 +186,14 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
     :type fast_run: bool
     :param write: actually perform write
     :type write: bool
-    :return: 
+    :return:
+
+    The following columns are expected in the gaf file
+    ['db','id','go_id','reference','evidence','aspect','taxon','source']
+
+    This can be created by selecting columns $1,$2,$5,$6,$7,$9,$13,$15 from goa_uniprot_all.gaf.gz
+    downloaded from ftp://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz
+
     """
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
     if wdi_core.WDItemEngine.logger is not None:
@@ -206,7 +212,9 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
     go_map = wdi_helpers.id_mapper("P686")
 
     # Get GO terms from our local store for this taxon
-    df = pd.DataFrame(list(coll.find({'Taxon': "taxon:" + str(taxon)})))
+    colnames = ['db', 'id', 'go_id', 'reference', 'evidence', 'aspect', 'taxon', 'source']
+    df = pd.read_csv(file, sep=' ', names=colnames, index_col=False)
+    df = df[df.taxon == "taxon:" + str(taxon)]
     if len(df) == 0:
         print("No GO annotations found for taxid: {}".format(taxon))
         return None
@@ -214,7 +222,7 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
         print("Found {} GO annotations".format(len(df)))
 
     # get all pmids and make items for them
-    pmids = set([x[5:] for x in df['Reference'] if x.startswith("PMID:")])
+    pmids = set([x[5:] for x in df['reference'] if x.startswith("PMID:")])
     print("Need {} pmids".format(len(pmids)))
     pmid_map = get_values("P698", pmids)
     print("Found {} pmids".format(len(pmid_map)))
@@ -236,7 +244,7 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
             external_ids[wdid][external_id_name] = id
 
     # groupby ID, GOID & evidence, the make references a list
-    go_annotations = df.groupby(['ID', 'GO ID', 'Evidence', 'Source', 'DB', 'Aspect'])['Reference'].apply(list)
+    go_annotations = df.groupby(['id', 'go_id', 'evidence', 'source', 'db', 'aspect'])['reference'].apply(list)
 
     # iterate through all proteins & write
     failed_items = []
@@ -247,9 +255,9 @@ def main(coll, taxon, retrieved, log_dir="./logs", fast_run=True, write=True):
             continue
         this_go = go_annotations[uniprot_id]
         external_id = external_ids[item_wdid]
-        #print(this_go)
+        # print(this_go)
         try:
-            statements = make_go_statements(uniprot_id, this_go, go_map, pmid_map, external_id)
+            statements = make_go_statements(uniprot_id, this_go, go_map, pmid_map, external_id, retrieved)
             wditem = wdi_core.WDItemEngine(wd_item_id=item_wdid, domain='protein', data=statements, fast_run=fast_run,
                                            fast_run_base_filter={UNIPROT: "", "P703": organism_wdid},
                                            fast_run_use_refs=True,
@@ -276,9 +284,7 @@ def get_all_taxa():
     Get all taxa in wikidata with a protein
     :return:
     """
-    query = """SELECT ?taxid (COUNT(?protein) AS ?count)
-                WHERE
-                {
+    query = """SELECT ?taxid (COUNT(?protein) AS ?count) WHERE {
                   ?protein wdt:P352 ?uni .
                   ?protein wdt:P703 ?taxa .
                   ?taxa wdt:P685 ?taxid .
@@ -288,22 +294,12 @@ def get_all_taxa():
     taxids = [x['taxid']['value'] for x in response['results']['bindings'] if int(x['count']['value']) >= 10]
     return ",".join(sorted(taxids))
 
-
-def remove_old_statements():
-    UniProt_GOA = "Q28018111"
-    retrieved = "20170301"
-
-    cleanup(UniProt_GOA, retrieved)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata GO bot')
+    parser.add_argument("file", help="path to gaf file", type=str)
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--taxon', help="only run using this taxon. Can give comma-delimited list or 'all'", type=str)
-    parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
-    parser.add_argument('--mongo-db', type=str, default="wikidata_src")
-    parser.add_argument('--mongo-coll', type=str, default="quickgo")
+    parser.add_argument('--taxon', help="only run using this taxon (required)", type=str)
     parser.add_argument('--retrieved', help="date go annotations were retrieved (YYYYMMDD)", type=str)
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
@@ -313,8 +309,10 @@ if __name__ == "__main__":
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     __metadata__['run_id'] = run_id
     taxon = args.taxon
+    file = args.file
+    if not taxon:
+        raise ValueError("taxon is required")
     fast_run = args.fastrun
-    coll = MongoClient(args.mongo_uri)[args.mongo_db][args.mongo_coll]
     retrieved = datetime.strptime(args.retrieved, "%Y%m%d") if args.retrieved else datetime.now()
 
     log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
@@ -323,11 +321,4 @@ if __name__ == "__main__":
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='go{}'.format(taxon))
 
-    if taxon == "all":
-        taxon = get_all_taxa()
-
-    for tax in taxon.split(","):
-        main(coll, tax, retrieved, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
-        # done with this run, clear fast run container to save on RAM
-        wdi_core.WDItemEngine.fast_run_store = []
-        wdi_core.WDItemEngine.fast_run_container = None
+    main(taxon, file, retrieved, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
