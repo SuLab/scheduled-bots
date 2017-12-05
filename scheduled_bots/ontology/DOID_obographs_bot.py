@@ -371,7 +371,9 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
     graphs = {g['id']: g for g in d['graphs']}
     graph = graphs['http://purl.obolibrary.org/obo/doid.owl']
     # get the has phenotype, has_material_basis_in, and transmitted by edges from another graph
-    graph['edges'].extend(graphs['http://purl.obolibrary.org/obo/doid/obo/ext.owl']['edges'])
+    # graph['edges'].extend(graphs['http://purl.obolibrary.org/obo/doid/obo/ext.owl']['edges'])
+    # this changed URI, because... ?
+    graph['edges'].extend(graphs['htts://raw.githubusercontent.com/DiseaseOntology/HumanDiseaseOntology/master/src/ontology/ext.owl']['edges'])
     do = DOGraph(graph, login, fast_run)
     nodes = sorted(do.nodes.values(), key=lambda x: x.doid)
     items = []
