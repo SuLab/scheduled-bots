@@ -6,6 +6,7 @@ from wikidataintegrator.wdi_helpers import try_write
 PROPS = {
     "subclass of": "P279",
     "has part": "P527",
+    "instance of": "P31"
 }
 
 # chromosomes
@@ -97,7 +98,7 @@ class DrugCombo:
         # get existing combinations:
         query_str = """SELECT ?item ?itemLabel (GROUP_CONCAT(?part; separator=";") as ?f) WHERE {
           ?item wdt:P527 ?part .
-          ?item wdt:P31 wd:Q1304270 .
+          ?item wdt:P31|wdt:P279 wd:Q1304270 .
           SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
         } GROUP BY ?item ?itemLabel"""
         results = WDItemEngine.execute_sparql_query(query_str)['results']['bindings']
@@ -117,8 +118,8 @@ class DrugCombo:
         if self.component_qids in self.combo_qid:
             return self.combo_qid[self.component_qids]
         if not login:
-            print("Login is required to create item")
-            return None
+            print("component_qids: {}".format(self.component_qids))
+            raise ValueError("Login is required to create item")
         return self.create(login)
 
     def create(self, login):
@@ -136,4 +137,11 @@ class DrugCombo:
         item = wdi_core.WDItemEngine(item_name=name, data=s, domain="asdf")
         item.set_label(name)
         item.set_description(description)
-        return try_write(item, record_id=";".join(self.component_qids), record_prop='', login=login)
+        success = try_write(item, record_id=";".join(self.component_qids), record_prop='', login=login)
+        if success:
+            self.combo_qid[self.component_qids] = item.wd_item_id
+            self.qid_combo[item.wd_item_id] = self.component_qids
+            return item.wd_item_id
+        else:
+            raise ValueError("unsuccessful item creation")
+

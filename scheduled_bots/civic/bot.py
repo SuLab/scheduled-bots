@@ -1,12 +1,14 @@
+import json
+import argparse
 import copy
+import traceback
+from datetime import datetime
 import os
-from pprint import pprint
-from time import gmtime, strftime
 
 import pandas as pd
 import requests
 from cachetools import cached, TTLCache
-
+from tqdm import tqdm
 from scheduled_bots.civic import CHROMOSOME, IGNORE_SYNONYMS, DrugCombo, EVIDENCE_LEVEL, TRUST_RATING
 from wikidataintegrator import wdi_core, wdi_login, wdi_property_store, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
@@ -73,7 +75,6 @@ __metadata__ = {
 }
 
 fast_run_base_filter = {'P3329': ''}
-fast_run = True
 GENOME_BUILD_QUALIFIER = wdi_core.WDItemID(value="Q21067546", prop_nr='P659', is_qualifier=True)
 ENTREZ_QID_MAP = wdi_helpers.id_mapper(PROPS['Entrez Gene ID '], ((PROPS['found in taxon'], ITEMS['Homo sapiens']),))
 SO_QID_MAP = wdi_helpers.id_mapper(PROPS['Sequence Ontology ID'])
@@ -92,9 +93,9 @@ def load_drug_label_mappings():
 DRUGLABEL_QID_MAP = load_drug_label_mappings()
 
 
-def create_reference(variant_id):
+def create_reference(variant_id, retrieved):
     refStatedIn = wdi_core.WDItemID(value=ITEMS['CIViC database'], prop_nr=PROPS['stated in'], is_reference=True)
-    timeStringNow = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
+    timeStringNow = retrieved.strftime("+%Y-%m-%dT00:00:00Z")
     refRetrieved = wdi_core.WDTime(timeStringNow, prop_nr=PROPS['retrieved'], is_reference=True)
     refReferenceURL = wdi_core.WDUrl("https://civic.genome.wustl.edu/links/variants/" + str(variant_id),
                                      prop_nr=PROPS['reference URL'],
@@ -115,12 +116,12 @@ def pmid_lookup(pmid):
     return wdi_helpers.prop2qid(prop=PROPS['PubMed ID'], value=pmid)
 
 
-def run_one(variant_id):
+def run_one(variant_id, retrieved, fast_run, write, login):
     variant_id = str(variant_id)
     r = requests.get('https://civic.genome.wustl.edu/api/variants/' + variant_id)
     variant_data = r.json()
 
-    variant_reference = create_reference(variant_id)
+    variant_reference = create_reference(variant_id, retrieved)
 
     prep = {
         PROPS['positive therapeutic predictor']: list(),
@@ -208,8 +209,6 @@ def run_one(variant_id):
         return
 
     for evidence_item in evidence_items:
-        pprint(evidence_item)
-
         ## determination method and rating qualifiers
         evidence_qualifiers = [wdi_core.WDItemID(value=EVIDENCE_LEVEL[str(evidence_item["evidence_level"])],
                                                  prop_nr=PROPS['determination method'],
@@ -223,7 +222,7 @@ def run_one(variant_id):
             continue
         doid = "DOID:" + evidence_item["disease"]["doid"]
         if doid not in DO_QID_MAP:
-            return panic(variant_id, doid, "disease not found")
+            return panic(variant_id, doid, "disease")
         disease = DO_QID_MAP[doid]
 
         ## Drugs
@@ -231,21 +230,23 @@ def run_one(variant_id):
         for drug in evidence_item["drugs"]:
             drug_label = drug['name'].lower()
             if drug_label not in DRUGLABEL_QID_MAP:
-                return panic(variant_id, drug_label, "drug not found")
+                return panic(variant_id, drug_label, "drug")
             drug_qids.append(DRUGLABEL_QID_MAP[drug_label])
 
-        if evidence_item['drug_interaction_type'] == "Combination":
+        # print("drug_qids: {}".format(drug_qids))
+        dit = evidence_item['drug_interaction_type']
+        if dit == "Combination":
             # make this a drug therapy combination item instead!!
-            drug_qids = [DrugCombo(drug_qids).get_or_create(login)]
-
-        # TODO: "substitution"
-        print("drug_qids: {}".format(drug_qids))
+            drug_qids = [DrugCombo(drug_qids).get_or_create(login if write else None)]
+        elif dit and dit not in {"Combination"}:
+            # todo: Sequential, Substitutes
+            return panic(variant_id, "drug_interaction_type: {}".format(dit), "drug")
 
         ## Reference
         pmid = evidence_item["source"]["pubmed_id"]
         pmid_qid = pmid_lookup(pmid)
         refStatedIn = wdi_core.WDItemID(value=pmid_qid, prop_nr=PROPS['stated in'], is_reference=True)
-        timeStringNow = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
+        timeStringNow = retrieved.strftime("+%Y-%m-%dT00:00:00Z")
         refRetrieved = wdi_core.WDTime(timeStringNow, prop_nr=PROPS['retrieved'], is_reference=True)
         url = "https://civic.genome.wustl.edu/links/evidence/" + str(evidence_item['id'])
         refReferenceURL = wdi_core.WDUrl(url, prop_nr=PROPS['reference URL'], is_reference=True)
@@ -367,7 +368,7 @@ def run_one(variant_id):
             evidence_qualifiers.append(refDisputedBy)
             prep["P3359"].append(wdi_core.WDItemID(value=disease, prop_nr=PROPS['negative prognostic predictor'],
                                                    references=[copy.deepcopy(evidence_reference)],
-                                                  qualifiers=copy.deepcopy(evidence_qualifiers)))
+                                                   qualifiers=copy.deepcopy(evidence_qualifiers)))
     dowrite = False
     data2add = []
     for key in prep.keys():
@@ -375,9 +376,7 @@ def run_one(variant_id):
             dowrite = True
         for statement in prep[key]:
             data2add.append(statement)
-            print(statement.prop_nr, statement.value)
 
-    pprint(prep)
     name = variant_data["name"]
     label = variant_data["entrez_name"] + " " + name
     item = wdi_core.WDItemEngine(data=data2add, domain="genes", fast_run=fast_run, item_name=label,
@@ -406,20 +405,38 @@ def run_one(variant_id):
 
     if dowrite:
         try_write(item, record_id=variant_id, record_prop=PROPS['CIViC Variant ID'],
-                  edit_summary="edit variant associations", login=login)
+                  edit_summary="edit variant associations", login=login, write=write)
 
 
-if __name__ == "__main__":
+def main(retrieved, fast_run, write):
     login = wdi_login.WDLogin(WDUSER, WDPASS)
     r = requests.get('https://civic.genome.wustl.edu/api/variants?count=999999999')
     variants_data = r.json()
 
-    for record in variants_data['records']:
-            # if record['id'] == 98:
-            print(record['id'])
-            try:
-                run_one(record['id'])
-            except Exception as e:
-                print(e)
-                wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(
-                    record['id'], PROPS['CIViC Variant ID'], None, str(e), type(e)))
+    for record in tqdm(variants_data['records']):
+        try:
+            run_one(record['id'], retrieved, fast_run, write, login)
+        except Exception as e:
+            traceback.print_exc()
+            wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(
+                record['id'], PROPS['CIViC Variant ID'], None, str(e), type(e)))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='run civic bot')
+    parser.add_argument('--dummy', help='do not actually do write', action='store_true')
+    parser.add_argument('--no-fastrun', action='store_true')
+    args = parser.parse_args()
+    log_dir = "./logs"
+    run_id = datetime.now().strftime('%Y%m%d_%H:%M')
+    __metadata__['run_id'] = run_id
+    fast_run = False if args.no_fastrun else True
+    retrieved = datetime.now()
+
+    log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
+    if wdi_core.WDItemEngine.logger is not None:
+        wdi_core.WDItemEngine.logger.handles = []
+    wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
+                                        logger_name='civic')
+
+    main(retrieved, fast_run=fast_run, write=not args.dummy)
