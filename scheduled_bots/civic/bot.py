@@ -152,12 +152,12 @@ def run_one(variant_id, retrieved, fast_run, write, login):
 
     # coordinates
     coordinates = variant_data["coordinates"]
-    if coordinates["chromosome"] != None:
+    if coordinates["chromosome"]:
         prep['P1057'] = [wdi_core.WDItemID(value=CHROMOSOME[coordinates["chromosome"]],
                                            prop_nr=PROPS['chromosome'],
                                            references=[variant_reference],
                                            qualifiers=[GENOME_BUILD_QUALIFIER])]
-        if coordinates["chromosome2"] != None:
+        if coordinates["chromosome2"]:
             prep['P1057'].append(wdi_core.WDItemID(value=CHROMOSOME[coordinates["chromosome2"]],
                                                    prop_nr=PROPS['chromosome'],
                                                    references=[variant_reference],
@@ -173,7 +173,7 @@ def run_one(variant_id, retrieved, fast_run, write, login):
                                           references=[variant_reference],
                                           qualifiers=[GENOME_BUILD_QUALIFIER])]
 
-        if coordinates["start2"] != None:
+        if coordinates["start2"]:
             prep['P644'].append(wdi_core.WDString(value=str(coordinates["start2"]),
                                                   prop_nr=PROPS['genomic start'],
                                                   references=[variant_reference],
