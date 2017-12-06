@@ -4,6 +4,7 @@ import copy
 import traceback
 from datetime import datetime
 import os
+from pprint import pprint
 
 import pandas as pd
 import requests
@@ -109,11 +110,6 @@ def panic(variant_id, msg='', msg_type=''):
     wdi_core.WDItemEngine.log("ERROR", s)
     print(s)
     return None
-
-
-@cached(TTLCache(CACHE_SIZE, CACHE_TIMEOUT_SEC))
-def pmid_lookup(pmid):
-    return wdi_helpers.prop2qid(prop=PROPS['PubMed ID'], value=pmid)
 
 
 def run_one(variant_id, retrieved, fast_run, write, login):
@@ -244,7 +240,9 @@ def run_one(variant_id, retrieved, fast_run, write, login):
 
         ## Reference
         pmid = evidence_item["source"]["pubmed_id"]
-        pmid_qid = pmid_lookup(pmid)
+        pmid_qid = wdi_helpers.PubmedItem(pmid).get_or_create(login if write else None)
+        if pmid_qid is None:
+            return panic(variant_id, "not found: {}".format(pmid), "pmid")
         refStatedIn = wdi_core.WDItemID(value=pmid_qid, prop_nr=PROPS['stated in'], is_reference=True)
         timeStringNow = retrieved.strftime("+%Y-%m-%dT00:00:00Z")
         refRetrieved = wdi_core.WDTime(timeStringNow, prop_nr=PROPS['retrieved'], is_reference=True)
@@ -379,6 +377,7 @@ def run_one(variant_id, retrieved, fast_run, write, login):
 
     name = variant_data["name"]
     label = variant_data["entrez_name"] + " " + name
+    # pprint([x.get_json_representation() for x in data2add])
     item = wdi_core.WDItemEngine(data=data2add, domain="genes", fast_run=fast_run, item_name=label,
                                  fast_run_base_filter=fast_run_base_filter, fast_run_use_refs=True,
                                  ref_handler=update_retrieved_if_new_multiple_refs)
