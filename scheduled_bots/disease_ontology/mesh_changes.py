@@ -214,7 +214,7 @@ def get_mesh_changes(leftover_in_wd):
             mesh_info.append(x)
     df = pd.DataFrame(mesh_info)
     df = df[['doid', 'do_label', 'do_def', 'doid_url', 'mesh', 'mesh_label',
-             'mesh_descr', 'mesh_url', 'qid', 'wd_label', 'relation']]
+             'mesh_descr', 'mesh_synonyms', 'mesh_url', 'qid', 'wd_label', 'relation']]
     print(df.head(2))
 
     remove_me = df[df.mesh_label.isnull()]

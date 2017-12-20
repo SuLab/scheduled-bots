@@ -4,6 +4,7 @@ owltools, then create a new branch and commit it to github. Then create a pull r
 metadata.
 
 """
+import pandas as pd
 import requests
 from requests.auth import HTTPBasicAuth
 from scheduled_bots.disease_ontology.mesh_changes import main
@@ -81,9 +82,13 @@ if __name__ == "__main__":
     df, df_fmt = main("2017-11-28")
     df.to_csv('df_2017-11-28.csv')
     df_fmt.to_csv('df_fmt_2017-11-28.csv')
+    # df = pd.read_csv('df_2017-11-28.csv')
+    # df_fmt = pd.read_csv('df_fmt_2017-11-28.csv')
+
     df_fmt = df_fmt.rename(columns={'doid': 'DOID', 'do_label': 'DOID Label',
                                     'do_def': 'DOID Description', 'mesh': 'MeSH ID',
                                     'mesh_label': 'MeSH Label', 'mesh_descr': 'MeSH Description',
+                                    'mesh_synonyms': 'MeSH Synonyms',
                                     'qid': 'Wikidata QID', 'wd_label': 'Wikidata Label',
                                     'relation': 'Relation'})
 
