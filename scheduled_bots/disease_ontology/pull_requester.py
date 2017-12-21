@@ -73,7 +73,7 @@ def create_pullrequest(title, body, branch_id):
         "base": "master"
     }
     url = "https://api.github.com/repos/{}/HumanDiseaseOntology/pulls".format(REMOTE_GIT)
-    r = requests.post(url, json=data, auth=HTTPBasicAuth(GITHUB_USER, GITHUB_PASS))
+    r = requests.post(url, data=data, auth=HTTPBasicAuth(GITHUB_USER, GITHUB_PASS))
     assert r.status_code == 201, r.text
     return r
 
@@ -93,7 +93,6 @@ if __name__ == "__main__":
                                     'relation': 'Relation'})
 
     for idx in range(len(df)):
-        #idx = 2
         row = df.iloc[idx]
         doid = row.doid
         ext_id = "MESH:" + row.mesh
@@ -108,6 +107,3 @@ if __name__ == "__main__":
         commit_and_push_changes(branch_id=branch_id, msg=msg)
         t = tabulate(table, headers='keys', tablefmt='pipe')
         create_pullrequest(title=msg, body=t, branch_id=branch_id)
-
-        if idx>5:
-            break
