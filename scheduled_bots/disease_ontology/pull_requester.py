@@ -17,7 +17,7 @@ import os
 GIT_LOCAL_BASE = "/home/gstupp/projects/HumanDiseaseOntology/src/ontology"
 GITHUB_USER = "stuppie"
 REMOTE_GIT = "stuppie"  # change to "DiseaseOntology" to use the official DO repo. "stuppie" is my fork (for testing)
-
+# REMOTE_GIT = "DiseaseOntology"
 
 # assumes there exists a file "doid-edit.owl" in the current folder
 # in my case, this is a softlink to the file in the cloned git repo
@@ -26,7 +26,8 @@ def add_xref(owl_path, doid, ext_id, relation="oboInOwl:hasDbXref"):
     # needs owltools in path
     if os.path.exists("tmp.ttl"):
         os.remove("tmp.ttl")
-    prefix = """@prefix :      <http://purl.obolibrary.org/obo/doid.owl#> .
+    prefix = """
+    @prefix :      <http://purl.obolibrary.org/obo/doid.owl#> .
     @prefix owl:   <http://www.w3.org/2002/07/owl#> .
     @prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix oboInOwl: <http://www.geneontology.org/formats/oboInOwl#> .
@@ -37,6 +38,9 @@ def add_xref(owl_path, doid, ext_id, relation="oboInOwl:hasDbXref"):
     @prefix skos:   <http://www.w3.org/2004/02/skos/core#> .
     """
     ttl = 'obo:DOID_{}  {}  "{}"^^xsd:string .'.format(doid.split(":")[1], relation, ext_id)
+    if relation == "skos:exactMatch":
+        # to maintain backward compatibility with hasDbXref, add this also if the relation is an exact match
+        ttl += '\nobo:DOID_{}  {}  "{}"^^xsd:string .'.format(doid.split(":")[1], "oboInOwl:hasDbXref", ext_id)
     with open("tmp.ttl", "w") as f:
         print(prefix, file=f)
         print(ttl, file=f)
@@ -73,7 +77,7 @@ def create_pullrequest(title, body, branch_id):
         "base": "master"
     }
     url = "https://api.github.com/repos/{}/HumanDiseaseOntology/pulls".format(REMOTE_GIT)
-    r = requests.post(url, data=data, auth=HTTPBasicAuth(GITHUB_USER, GITHUB_PASS))
+    r = requests.post(url, json=data, auth=HTTPBasicAuth(GITHUB_USER, GITHUB_PASS))
     assert r.status_code == 201, r.text
     return r
 
@@ -93,6 +97,7 @@ if __name__ == "__main__":
                                     'relation': 'Relation'})
 
     for idx in range(len(df)):
+        # break
         row = df.iloc[idx]
         doid = row.doid
         ext_id = "MESH:" + row.mesh
