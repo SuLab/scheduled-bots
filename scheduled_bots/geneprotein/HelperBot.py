@@ -271,3 +271,19 @@ def make_reference(source, id_prop, identifier, retrieved):
         wdi_core.WDString(value=str(identifier), prop_nr=id_prop, is_reference=True),  # Link to ID
         wdi_core.WDTime(retrieved.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', is_reference=True)]
     return reference
+
+
+def get_all_taxa():
+    """
+    Get all taxa in wikidata with an entrezgene ID
+    :return: list of taxids (as str)
+    """
+    query = """SELECT ?taxid (COUNT(?item) AS ?count) WHERE {
+                  ?item wdt:P351 ?entrez .
+                  ?item wdt:P703 ?taxa .
+                  ?taxa wdt:P685 ?taxid .
+                } group by ?taxid order by ?count
+                """
+    response = wdi_core.WDItemEngine.execute_sparql_query(query=query)
+    taxids = [str(x['taxid']['value']) for x in response['results']['bindings'] if int(x['count']['value']) >= 10]
+    return taxids

@@ -15,6 +15,8 @@ from collections import Counter
 import itertools
 
 import requests
+from HelperBot import get_all_taxa
+from tqdm import tqdm
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -26,7 +28,8 @@ except ImportError:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
 from scheduled_bots.geneprotein.GeneBot import wdi_core
-from pymongo import MongoClient
+from scheduled_bots.geneprotein.Downloader import MyGeneDownloader
+
 from scheduled_bots.utils import login_to_wikidata
 
 
@@ -35,40 +38,10 @@ from scheduled_bots.utils import login_to_wikidata
 # df = get_ref_microbe_taxids()
 # ref_taxids = list(map(str, df['taxid'].tolist()))
 
-def get_deprecated_genes_rank():
-    """
-    Query for those where entrez statement is deprecated rank
-    Just ran this once, to get rid of these which were leftover from previous GeneBot implementations
-    """
-    s = """SELECT ?entrez ?item WHERE {
-      ?item p:P703 ?s .
-      ?s wikibase:rank wikibase:DeprecatedRank .
-      ?s ps:P703 wd:Q5 .
-      ?item p:P351 ?s2 .
-      ?s2 wikibase:rank wikibase:DeprecatedRank .
-      ?s2 ps:P351 ?entrez .
-      FILTER NOT EXISTS {?article schema:about ?item}
-      OPTIONAL {?item wdt:P688 ?prot}
-      FILTER NOT EXISTS {?something ?prop ?item }
-    }"""
-    bindings = wdi_core.WDItemEngine.execute_sparql_query(s)['results']['bindings']
-    entrez_qid = {x['entrez']['value']: x['item']['value'].rsplit("/")[-1] for x in bindings}
-
-    print("{} wikidata".format(len(entrez_qid)))
-    wd = set(entrez_qid.keys())
-    coll = MongoClient().wikidata_src.mygene
-    mygene = set([str(x['entrezgene']) for x in coll.find({'entrezgene': {'$exists': True}})])
-    print("{} mygene".format(len(mygene)))
-    missing = wd - mygene
-    print("{} deprecated".format(len(missing)))
-    qids = {entrez_qid[x] for x in missing}
-
-    return qids
 
 def get_deprecated_genes(taxids=None):
     if taxids is None:
-        taxids = ['3702', '559292', '123', '10090', '9606', '10116', '243161', '10116', '7227', '6239', '7955',
-                  '515635', '765698', '525903', '759362', '565050', '446465', '9545', '9913']
+        taxids = set(get_all_taxa()) | {'36329'}
     taxid_str = '{' + " ".join(['"' + x + '"' for x in taxids]) + '}'
 
     # get all genes that DONT Have any sitelinks and dont have any item links to them
@@ -89,8 +62,10 @@ def get_deprecated_genes(taxids=None):
 
     print("{} wikidata".format(len(entrez_qid)))
     wd = set(entrez_qid.keys())
-    coll = MongoClient().wikidata_src.mygene
-    mygene = set([str(x['entrezgene']) for x in coll.find({'entrezgene': {'$exists': True}})])
+
+    mgd = MyGeneDownloader(fields="entrezgene")
+    docs, total = mgd.get_mg_cursor(",".join(taxids))
+    mygene = set([str(x['entrezgene']) for x in tqdm(docs, total=total) if "entrezgene" in x])
     print("{} mygene".format(len(mygene)))
     missing = wd - mygene
     print("{} deprecated".format(len(missing)))

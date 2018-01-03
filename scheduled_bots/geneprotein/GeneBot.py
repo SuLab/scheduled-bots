@@ -31,8 +31,8 @@ from tqdm import tqdm
 from itertools import chain
 from datetime import datetime
 from functools import partial
-from pymongo import MongoClient
 
+from scheduled_bots.geneprotein.Downloader import MyGeneDownloader
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers, wdi_property_store
 from wikidataintegrator.wdi_fastrun import FastRunContainer
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
@@ -738,12 +738,10 @@ def remove_deprecated_statements(qid, frc, releases, last_updated, props, login)
         wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
 
 
-def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, doc_filter=None):
+def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, entrez=None):
     """
     Main function for creating/updating genes
 
-    :param coll: mongo collection containing gene data from mygene
-    :type coll: pymongo.collection.Collection
     :param taxid: taxon to use (ncbi tax id)
     :type taxid: str
     :param metadata: looks like: {"ensembl" : 84, "cpdb" : 31, "netaffy" : "na35", "ucsc" : "20160620", .. }
@@ -754,8 +752,8 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
     :type fast_run: bool
     :param write: actually perform write
     :type write: bool
-    :param doc_filter: Override the doc_filter for determining which docs to write. Useful for testing
-    :type doc_filter: dict
+    :param entrez: Only run this one gene
+    :type entrez: int
     :return: None
     """
 
@@ -800,11 +798,14 @@ def main(coll, taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, wr
         bot = MicrobeGeneBot(organism_info, refseq_qid_chrom, login)
         validate_type = "microbial"
 
-    # only do certain records
-    doc_filter_default = {'taxid': taxid, 'entrezgene': {'$exists': True}, 'type_of_gene': {'$ne': "biological-region"}}
-    doc_filter = doc_filter if doc_filter is not None else doc_filter_default
-    docs = coll.find(doc_filter).batch_size(20)
-    total = docs.count()
+    # Get handle to mygene records
+    mgd = MyGeneDownloader()
+    if entrez:
+        doc, total = mgd.get_mg_gene(entrez)
+        docs = iter([doc])
+    else:
+        doc_filter = lambda x: (x.get("type_of_gene") != "biological-region") and ("entrezgene" in x)
+        docs, total = mgd.get_mg_cursor(taxid, doc_filter)
     print("total number of records: {}".format(total))
     docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
@@ -856,18 +857,15 @@ if __name__ == "__main__":
     __metadata__['run_id'] = run_id
     taxon = args.taxon
     fast_run = args.fastrun
-    coll = MongoClient(args.mongo_uri)[args.mongo_db]["mygene"]
     mcb = MicrobialChromosomeBot()
 
     # get metadata about sources
-    # this should be stored in the same db under the collection: mygene_sources
-    metadata_coll = MongoClient(args.mongo_uri)[args.mongo_db]["mygene_sources"]
-    assert metadata_coll.count() == 1
-    metadata = metadata_coll.find_one()
+    mgd = MyGeneDownloader()
+    metadata = mgd.get_metadata()['src_version']
 
     if args.entrez:
-        main(coll, taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
-             write=not args.dummy, doc_filter={'_id': args.entrez})
+        main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
+             write=not args.dummy, entrez=args.entrez)
         sys.exit(0)
 
     if "microbe" in taxon:
@@ -875,7 +873,7 @@ if __name__ == "__main__":
         taxon = taxon.replace("microbe", ','.join(map(str, microbe_taxa)))
 
     for taxon1 in taxon.split(","):
-        main(coll, taxon1, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
+        main(taxon1, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
         # done with this run, clear fast run container to save on RAM
         wdi_core.WDItemEngine.fast_run_store = []
         wdi_core.WDItemEngine.fast_run_container = None
