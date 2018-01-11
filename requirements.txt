@@ -13,6 +13,7 @@ lxml==3.8.0
 multi-key-dict==2.0.3
 mwclient==0.8.6
 mwparserfromhell==0.5
+mygene==3.0.0
 myvariant==0.3.1
 numpy==1.13.1
 oauthlib
