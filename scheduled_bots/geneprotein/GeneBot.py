@@ -807,6 +807,8 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         doc_filter = lambda x: (x.get("type_of_gene") != "biological-region") and ("entrezgene" in x)
         docs, total = mgd.get_mg_cursor(taxid, doc_filter)
     print("total number of records: {}".format(total))
+    # the scroll_id/cursor times out from mygene if we iterate. So.... get the whole thing now
+    docs = list(docs)
     docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
@@ -837,7 +839,7 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
 
 if __name__ == "__main__":
     """
-    Data to be used is stored in a mongo collection. collection name: "mygene"
+    Data to be used is retrieved from mygene.info
     """
     parser = argparse.ArgumentParser(description='run wikidata gene bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
@@ -845,8 +847,6 @@ if __name__ == "__main__":
     parser.add_argument('--taxon',
                         help="only run using this taxon (ncbi tax id). or 'microbe' for all microbes. comma separated",
                         type=str, required=True)
-    parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
-    parser.add_argument('--mongo-db', type=str, default="wikidata_src")
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
     parser.add_argument('--entrez', help="Run only this one gene")
