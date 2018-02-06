@@ -51,9 +51,9 @@ class OBOImporter(object):
         'http://purl.obolibrary.org/obo/BFO_0000050': {'P361': ''},  # part of
 
         'http://purl.obolibrary.org/obo/RO_0002211': {'P128': ''},  # regulates
-        'http://purl.obolibrary.org/obo/RO_0002212': {'P128': {'P794': 'Q22260640'}},
+        'http://purl.obolibrary.org/obo/RO_0002212': {'P128': {'P2868': 'Q22260640'}},
     # negatively regulates WD item: Q22260640
-        'http://purl.obolibrary.org/obo/RO_0002213': {'P128': {'P794': 'Q22260639'}},
+        'http://purl.obolibrary.org/obo/RO_0002213': {'P128': {'P2868': 'Q22260639'}},
     # positively regulates WD item: Q22260639
     }
 
