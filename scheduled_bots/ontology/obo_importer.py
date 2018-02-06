@@ -84,6 +84,8 @@ class OBOImporter(object):
 
     ols_session = requests.Session()
 
+    append_props = {'P31', 'P279', 'P527', 'P361', 'P128'} | set(xref_props.values())
+
     def __init__(self, root_objects, ontology, core_property_nr, ontology_ref_item, login, local_qid_onto_map,
                  use_prefix=True, fast_run=True, fast_run_base_filter=None, write=True, sub_ontology=None):
 
@@ -235,6 +237,7 @@ class OBOImporter(object):
                     wd_item = wdi_core.WDItemEngine(wd_item_id=self.local_qid_onto_map[go_id]['qid'], domain='obo',
                                                     data=data, fast_run=self.fast_run,
                                                     fast_run_base_filter=self.fast_run_base_filter,
+                                                    append_value=self.append_props,
                                                     global_ref_mode='STRICT_OVERWRITE')
                 else:
                     wd_item = wdi_core.WDItemEngine(item_name='test', domain='obo', data=data, fast_run=self.fast_run,
