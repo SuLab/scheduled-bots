@@ -19,6 +19,8 @@ from datetime import datetime
 import pymongo
 from pymongo import MongoClient
 from tqdm import tqdm
+
+from scheduled_bots.geneprotein.Downloader import MyGeneDownloader
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 
 from scheduled_bots.geneprotein import HelperBot
@@ -47,12 +49,10 @@ __metadata__ = {'name': 'OrthologBot',
                 }
 
 
-def main(coll, metadata, log_dir="./logs", fast_run=True, write=True):
+def main(metadata, log_dir="./logs", fast_run=True, write=True):
     """
     Main function for creating/updating genes
 
-    :param coll: mongo collection containing gene data from mygene
-    :type coll: pymongo.collection.Collection
     :param metadata: looks like: {"ensembl" : 84, "cpdb" : 31, "netaffy" : "na35", "ucsc" : "20160620", .. }
     :type metadata: dict
     :param log_dir: dir to store logs
@@ -81,10 +81,10 @@ def main(coll, metadata, log_dir="./logs", fast_run=True, write=True):
     taxon_wdid = wdi_helpers.id_mapper(PROPS['NCBI Taxonomy ID'])
 
     # only do certain records
-    # coll = MongoClient().wikidata_src.mygene
-    doc_filter = {'type_of_gene': 'protein-coding', 'homologene': {'$exists': True}}
-    docs = coll.find(doc_filter, ['taxid', 'entrezgene', 'homologene'])
-    total = docs.count()
+    mgd = MyGeneDownloader(q="_exists_:homologene AND type_of_gene:protein-coding",
+                           fields=','.join(['taxid', 'homologene', 'entrezgene']))
+    docs, total = mgd.query()
+    docs = list(tqdm(docs, total=total))
     records = HelperBot.tag_mygene_docs(docs, metadata)
 
     # group together all orthologs
@@ -107,7 +107,7 @@ def main(coll, metadata, log_dir="./logs", fast_run=True, write=True):
 
     print("taxid: # of genes  : {}".format({k: len(v) for k, v in d.items()}))
 
-    homogene_ver = metadata['HomoloGene']
+    homogene_ver = metadata['homologene']
     release = wdi_helpers.Release("HomoloGene build{}".format(homogene_ver), "Version of HomoloGene", homogene_ver,
                                   edition_of_wdid='Q468215',
                                   archive_url='ftp://ftp.ncbi.nih.gov/pub/HomoloGene/build{}/'.format(
@@ -155,13 +155,11 @@ def do_item(entrezgene, orthologs, reference, entrez_homo, entrez_taxon, taxon_w
 
 if __name__ == "__main__":
     """
-    Data to be used is stored in a mongo collection. collection name: "mygene"
+    Data to be used is retrieved from mygene.info
     """
     parser = argparse.ArgumentParser(description='run wikidata gene bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
     parser.add_argument('--dummy', help='do not actually do write', action='store_true')
-    parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
-    parser.add_argument('--mongo-db', type=str, default="wikidata_src")
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
     parser.set_defaults(fastrun=True)
@@ -170,17 +168,10 @@ if __name__ == "__main__":
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     __metadata__['run_id'] = run_id
     fast_run = args.fastrun
-    coll = MongoClient(args.mongo_uri)[args.mongo_db]["mygene"]
 
     # get metadata about sources
-    # this should be stored in the same db under the collection: mygene_sources
-    metadata_coll = MongoClient(args.mongo_uri)[args.mongo_db]["mygene_sources"]
-    assert metadata_coll.count() == 1
-    metadata = metadata_coll.find_one()
-
-    # TODO:  Get this from mygene/metadata!@!!!!
-    print("TODO: hard coded homologene")
-    metadata['HomoloGene'] = '68'
+    mgd = MyGeneDownloader()
+    metadata = mgd.get_metadata()['src_version']
 
     log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
     if wdi_core.WDItemEngine.logger is not None:
@@ -188,5 +179,4 @@ if __name__ == "__main__":
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='orthologs')
 
-    main(coll, metadata, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
-    #main(coll, metadata, log_dir=log_dir, fast_run=fast_run, write=False)
+    main(metadata, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)

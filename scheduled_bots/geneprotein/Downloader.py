@@ -14,6 +14,7 @@ class MyGeneDownloader:
         self.fields = "entrezgene,ensembl,locus_tag,genomic_pos,name,other_names,symbol,uniprot,refseq,taxid," + \
                       "type_of_gene,genomic_pos_hg19,HGNC,homologene,MGI,RGD,SGD,FLYBASE,WormBase,ZFIN,BGD," + \
                       "alias,map_location" if not fields else fields
+        # self.fields = ",".join(self.fields) if not isinstance(self.fields, str) else self.fields
 
     def get_metadata(self):
         r = requests.get(os.path.join(self.base_url, 'metadata'))
@@ -40,6 +41,16 @@ class MyGeneDownloader:
             q = filter(filter_f, q)
 
         return q, total
+
+    def query(self):
+        mg = MyGeneInfo(url=self.base_url)
+        # get the total
+        q = mg.query(self.q, fields=self.fields, entrezonly=self.entrezonly)
+        total = q['total']
+        # get the cursor
+        q = mg.query(self.q, fields=self.fields, fetch_all=True, entrezonly=self.entrezonly)
+        return q, total
+
 
     def get_mg_gene(self, entrezgene):
         mg = MyGeneInfo(url=self.base_url)
