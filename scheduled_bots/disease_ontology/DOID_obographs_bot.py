@@ -247,7 +247,12 @@ class DONode:
             wd_item = wdi_core.WDItemEngine(item_name=self.lbl, data=self.s, domain="diseases",
                                             append_value=[PROPS['subclass of'], PROPS['instance of'],
                                                           PROPS['has cause'], PROPS['location'],
-                                                          PROPS['OMIM ID']],
+                                                          PROPS['OMIM ID'], PROPS['Orphanet ID'],
+                                                          PROPS['MeSH ID'], PROPS['ICD-10-CM'],
+                                                          PROPS['ICD-10'], PROPS['ICD-9-CM'],
+                                                          PROPS['ICD-9'], PROPS['NCI Thesaurus ID'],
+                                                          PROPS['UMLS CUI']
+                                                          ],
                                             fast_run=self.do_graph.fast_run,
                                             fast_run_base_filter={'P699': ''},
                                             fast_run_use_refs=True,
