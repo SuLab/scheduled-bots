@@ -113,9 +113,13 @@ class DOGraph:
 
     def parse_nodes(self, nodes):
         for node in nodes:
-            tmp_node = DONode(node, self)
-            if "http://purl.obolibrary.org/obo/DOID_" in tmp_node.id and not tmp_node.deprecated and tmp_node.type == "CLASS":
-                self.nodes[tmp_node.id] = tmp_node
+            try:
+                tmp_node = DONode(node, self)
+                if "http://purl.obolibrary.org/obo/DOID_" in tmp_node.id and not tmp_node.deprecated and tmp_node.type == "CLASS":
+                    self.nodes[tmp_node.id] = tmp_node
+            except Exception as e:
+                msg = wdi_helpers.format_msg(node['id'], 'P699', None, str(e), msg_type=type(e))
+                wdi_core.WDItemEngine.log("ERROR", msg)
 
     def parse_edges(self, edges):
         for edge in edges:
@@ -202,7 +206,7 @@ class DONode:
             bp = defaultdict(set)
             for basicPropertyValue in meta['basicPropertyValues']:
                 bp[basicPropertyValue['pred']].add(basicPropertyValue['val'])
-            assert len(bp['http://www.geneontology.org/formats/oboInOwl#hasOBONamespace']) == 1
+            assert len(bp['http://www.geneontology.org/formats/oboInOwl#hasOBONamespace']) == 1, "unknown namespace"
             self.namespace = list(bp['http://www.geneontology.org/formats/oboInOwl#hasOBONamespace'])[0]
             if 'http://www.geneontology.org/formats/oboInOwl#hasAlternativeId' in bp:
                 self.alt_id = bp['http://www.geneontology.org/formats/oboInOwl#hasAlternativeId']
@@ -371,15 +375,13 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
     graphs = {g['id']: g for g in d['graphs']}
     graph = graphs['http://purl.obolibrary.org/obo/doid.owl']
     # get the has phenotype, has_material_basis_in, and transmitted by edges from another graph
-    # graph['edges'].extend(graphs['http://purl.obolibrary.org/obo/doid/obo/ext.owl']['edges'])
-    # this changed URI, because... ?
-    graph['edges'].extend(graphs['htts://raw.githubusercontent.com/DiseaseOntology/HumanDiseaseOntology/master/src/ontology/ext.owl']['edges'])
+    graph['edges'].extend(graphs['http://purl.obolibrary.org/obo/doid/obo/ext.owl']['edges'])
     do = DOGraph(graph, login, fast_run)
     nodes = sorted(do.nodes.values(), key=lambda x: x.doid)
     items = []
     for n, node in tqdm(enumerate(nodes), total=len(nodes)):
         item = node.create(write=write)
-        #if n>100:
+        # if n>100:
         #    sys.exit(0)
         if item:
             items.append(item)
