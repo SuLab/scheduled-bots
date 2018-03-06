@@ -46,6 +46,7 @@ PROPS = {'subclass of': 'P279',
 wdi_property_store.wd_properties[PROPS['OMIM ID']]['core_id'] = False
 wdi_property_store.wd_properties[PROPS['MeSH ID']]['core_id'] = False
 wdi_property_store.wd_properties[PROPS['Orphanet ID']]['core_id'] = False
+wdi_property_store.wd_properties[PROPS['NCI Thesaurus ID']]['core_id'] = False
 
 __metadata__ = {'name': 'DOIDBot',
                 'tags': ['disease', 'doid'],
@@ -206,8 +207,12 @@ class DONode:
             bp = defaultdict(set)
             for basicPropertyValue in meta['basicPropertyValues']:
                 bp[basicPropertyValue['pred']].add(basicPropertyValue['val'])
-            assert len(bp['http://www.geneontology.org/formats/oboInOwl#hasOBONamespace']) == 1, "unknown namespace"
-            self.namespace = list(bp['http://www.geneontology.org/formats/oboInOwl#hasOBONamespace'])[0]
+            namespace = bp['http://www.geneontology.org/formats/oboInOwl#hasOBONamespace']
+            assert len(namespace) <= 1, "unknown namespace"
+            if namespace:
+                self.namespace = list(namespace)[0]
+            else:
+                self.namespace = self.do_graph.default_namespace
             if 'http://www.geneontology.org/formats/oboInOwl#hasAlternativeId' in bp:
                 self.alt_id = bp['http://www.geneontology.org/formats/oboInOwl#hasAlternativeId']
 
@@ -298,6 +303,8 @@ class DONode:
         for xref in self.xrefs:
             if ":" in xref:
                 prefix, code = xref.split(":", 1)
+                prefix = prefix.strip()
+                code = code.strip()
                 if prefix.upper() in DOGraph.xref_prop:
                     if prefix.upper() == "OMIM" and code.startswith("PS"):
                         continue
@@ -335,8 +342,18 @@ class DONode:
                                              references=[miriam_ref]))
 
 
+def get_deprecated_nodes(graph):
+    doid_qid = id_mapper('P699')
+    nodes = [node['id'].split("/")[-1].replace("_", ":") for node in graph['nodes'] if
+             "http://purl.obolibrary.org/obo/DOID_" in node['id']
+             and 'meta' in node and node['meta'].get("deprecated", False)
+             and node.get('type', None) == "CLASS"]
+    dep_nodes = {node: doid_qid[node] for node in nodes if node in doid_qid}
+    return dep_nodes
+
+
 def get_releases():
-    s = "select ?item where {?item wdt:P856 <http://disease-ontology.org> .}"
+    s = "select ?item where {?item wdt:P31 wd:Q3331189; wdt:P629 wd:Q5282129}"
     return [x['item']['value'].split("/")[-1] for x in
             wdi_core.WDItemEngine.execute_sparql_query(s)['results']['bindings']]
 
@@ -355,8 +372,9 @@ def remove_deprecated_statements(qid, frc, release_wdid, props, login):
 
     s_dep = []
     for s in orig_statements:
-        if any(any(x.get_prop_nr() == 'P248' and x.get_value() in releases for x in r) and any(
-                        x.get_prop_nr() == 'P1065' for x in r) for r in s.get_references()):
+        if s.get_prop_nr() == "P699":
+            continue
+        if any(any(x.get_prop_nr() == 'P248' and x.get_value() in releases for x in r) for r in s.get_references()):
             setattr(s, 'remove', '')
             s_dep.append(s)
 
@@ -400,6 +418,9 @@ def main(json_path='doid.json', log_dir="./logs", fast_run=True, write=True):
     frc.clear()
     for doid in tqdm(doid_wdid.values()):
         remove_deprecated_statements(doid, frc, do.release, list(PROPS.values()), login)
+
+    print("You have to remove these deprecated diseases manually: ")
+    print(get_deprecated_nodes(graph))
 
 
 if __name__ == "__main__":
