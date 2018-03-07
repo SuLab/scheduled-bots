@@ -16,6 +16,8 @@ example microbial gene:
 https://www.wikidata.org/wiki/Q23097138
 https://mygene.info/v3/gene/7150837
 
+sparql query for listing current subclasses: http://tinyurl.com/y8ecgka7
+
 """
 # TODO: Gene on two chromosomes
 # https://www.wikidata.org/wiki/Q20787772
@@ -292,9 +294,10 @@ class Gene:
         type_of_gene = self.record['type_of_gene']['@value']
         assert type_of_gene in type_of_gene_map, "unknown type of gene: {}".format(type_of_gene)
         self.type_of_gene = type_of_gene
+        # "protein-coding gene" will be instance of "gene"
         s.append(wdi_core.WDItemID(type_of_gene_map[type_of_gene], PROPS['instance of'], references=[gene_ref]))
 
-        if type_of_gene_map[type_of_gene] != "Q7187":
+        if type_of_gene not in {'protein-coding', 'pseudo', 'other', 'unknown'}:
             # make sure we add instance of "gene" as well
             s.append(wdi_core.WDItemID("Q7187", PROPS['instance of'], references=[gene_ref]))
 
@@ -306,6 +309,9 @@ class Gene:
     def create_item(self, fast_run=True, write=True):
         self.parse_external_ids()
         self.statements = self.create_statements()
+        # remove subclass of gene statements
+        # s = wdi_core.WDItemID("Q7187", "P279")
+        # setattr(s, 'remove', '')
         self.create_label()
         self.create_description()
         self.create_aliases()
