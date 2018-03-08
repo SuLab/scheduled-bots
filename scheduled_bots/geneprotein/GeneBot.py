@@ -879,7 +879,11 @@ if __name__ == "__main__":
         taxon = taxon.replace("microbe", ','.join(map(str, microbe_taxa)))
 
     for taxon1 in taxon.split(","):
-        main(taxon1, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
+        try:
+            main(taxon1, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
+        except Exception as e:
+            # if one taxon fails, still try to run the others
+            traceback.print_exc()
         # done with this run, clear fast run container to save on RAM
         wdi_core.WDItemEngine.fast_run_store = []
         wdi_core.WDItemEngine.fast_run_container = None

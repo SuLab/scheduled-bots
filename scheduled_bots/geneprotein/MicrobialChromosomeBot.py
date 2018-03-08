@@ -32,6 +32,8 @@ class MicrobialChromosomeBot:
         assdf = pd.read_csv("assembly_summary.txt", sep="\t", dtype=object, header=0, skiprows=1)
         assdf = assdf.query("refseq_category == 'reference genome'")
         accessions = set(assdf.gbrs_paired_asm)
+        # adding Chlamydia muridarum str. Nigg
+        accessions.add("GCA_000006685.1")
 
         # Download prokaryotes genome table
         # but oh wait, it has no ref genome column
