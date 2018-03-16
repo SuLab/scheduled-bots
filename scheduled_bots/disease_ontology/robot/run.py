@@ -82,6 +82,8 @@ def parse_xrefs(xrefs):
     d = defaultdict(set)
     for xref in xrefs:
         prefix, value = xref.split(":", 1)
+        prefix = prefix.strip()
+        value = value.strip()
         if prefix in PREFIXES:
             d[prefix].add(value)
     d = dict(d)
@@ -112,7 +114,7 @@ def parse_do_owl():
     }
     """
     rows = g.query(query, initBindings={'true': true})
-    res = [{str(k): str(v) for k, v in binding.items()} for binding in rows.bindings]
+    res = [{str(k): str(v).strip() for k, v in binding.items()} for binding in rows.bindings]
 
     df = pd.DataFrame(res)
     df["doid"] = df.id.map(purl_to_curie)
@@ -217,6 +219,7 @@ wd = get_wikidata_do_xrefs()
 do = parse_do_owl()
 
 leftover_in_wd, leftover_in_do = compare(wd, do)
+print(leftover_in_do)
 
 make_robot_xref_additions(do, wd, leftover_in_wd)
 make_robot_xref_subtractions(do, wd, leftover_in_do)
