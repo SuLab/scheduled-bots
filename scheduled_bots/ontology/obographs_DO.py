@@ -9,7 +9,6 @@ from wikidataintegrator import wdi_login
 JSON_PATH = "doid.json"
 GRAPH_URI = 'http://purl.obolibrary.org/obo/doid.owl'
 
-from scheduled_bots.local import WDUSER, WDPASS
 from scheduled_bots import PROPS
 
 
@@ -52,11 +51,12 @@ class DOGraph(Graph):
         super(DOGraph, self).filter_nodes()
         self.nodes = [x for x in self.nodes if "DOID:" in x.id_curie]
 
+if __name__ == "__main__":
+    from scheduled_bots.local import WDUSER, WDPASS
+    login = wdi_login.WDLogin(WDUSER, WDPASS)
+    g = DOGraph()
+    g.parse_graph(JSON_PATH, GRAPH_URI)
 
-login = wdi_login.WDLogin(WDUSER, WDPASS)
-g = DOGraph()
-g.parse_graph(JSON_PATH, GRAPH_URI)
-
-g.create_release(login)
-g.create_nodes(login, write=False)
-g.create_edges(login, write=False)
+    g.create_release(login)
+    g.create_nodes(login, write=False)
+    g.create_edges(login, write=False)
