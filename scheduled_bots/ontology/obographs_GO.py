@@ -13,14 +13,17 @@ sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sp
 login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
 
 from wikidataintegrator.wdi_helpers import WikibaseHelper
+
 h = WikibaseHelper(sparql_endpoint_url)
+
 
 class GOGraph(Graph):
     NAME = "Gene Ontology"
     QID = h.get_qid("Q135085")
     DEFAULT_DESCRIPTION = ""
     APPEND_PROPS = {h.get_pid(x) for x in {PROPS['subclass of'], PROPS['instance of'],
-                    PROPS['has cause'], PROPS['location']}}
+                                           PROPS['has cause'], PROPS['location'], PROPS['part of'],
+                                           PROPS['has part'], PROPS['regulates (molecular biology)']}}
     FAST_RUN = True
     FAST_RUN_FILTER = {h.get_pid(PROPS['Gene Ontology ID']): ''}
 
@@ -43,7 +46,7 @@ class GOGraph(Graph):
         if edge['pred'] in {'http://purl.obolibrary.org/obo/RO_0002212', 'http://purl.obolibrary.org/obo/RO_0002213'}:
             subj_node = self.uri_node_map[edge['sub']]
             obj_qid = self.get_object_qid(edge['obj'])
-            print(obj_qid, edge['pred'])
+            # print(obj_qid, edge['pred'])
             qual_qid = self.uri_node_map[self.regulates[edge['pred']]].qid
             qualifier = wdi_core.WDItemID(qual_qid, h.get_pid(PROPS['subject has role']),
                                           is_qualifier=True)
