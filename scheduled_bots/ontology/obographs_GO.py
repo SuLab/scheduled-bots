@@ -63,11 +63,10 @@ class GOGraph(Graph):
             return super(GOGraph, self).make_statement_from_edge(edge)
 
 
-g = GOGraph(mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
-g.parse_graph(JSON_PATH, GRAPH_URI)
-
+g = GOGraph(JSON_PATH, GRAPH_URI, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
+g.parse_graph()
 g.create_release(login)
-
 g.create_nodes(login)
-
 g.create_edges(login)
+g.check_for_existing_deprecated_nodes()
+g.remove_deprecated_statements(login)

@@ -6,7 +6,7 @@ Requires a obographs JSON file made from an owl file
 
 import traceback
 from functools import partial
-from itertools import repeat
+from itertools import repeat, chain
 from time import strftime, gmtime
 
 import multiprocessing
@@ -17,11 +17,7 @@ from datetime import datetime
 
 from scheduled_bots import utils
 from wikidataintegrator import wdi_core, wdi_property_store, wdi_helpers, wdi_login
-from wikidataintegrator.ref_handlers import update_retrieved_if_new
-
-update_retrieved_if_new_P11 = partial(update_retrieved_if_new, retrieved_pid="P11")
-
-from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
+from wikidataintegrator.ref_handlers import update_retrieved_if_new, update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers import WikibaseHelper
 
 uri_to_curie = lambda s: s.split("/")[-1].replace("_", ":")
@@ -40,6 +36,7 @@ class Node:
         self.mediawiki_api_url = graph.mediawiki_api_url
         self.sparql_endpoint_url = graph.sparql_endpoint_url
         self.ref_handler = graph.ref_handler
+        self.pids = set()  # set of pids this node used
 
         self.qid = None
         self.xrefs = set()
@@ -103,6 +100,7 @@ class Node:
 
         primary_ext_id_pid, primary_ext_id = cu.parse_curie(self.id_curie)
         primary_ext_id_pid = self.helper.get_pid(primary_ext_id_pid)
+        self.pids.add(primary_ext_id_pid)
 
         # kind of hacky way to make sure this ID is unique
         wdi_property_store.wd_properties[primary_ext_id_pid] = {'core_id': True}
@@ -115,6 +113,7 @@ class Node:
                 continue
             pid, ext_id = cu.parse_curie(xref)
             pid = self.helper.get_pid(pid)
+            self.pids.add(pid)
             s.append(wdi_core.WDExternalID(ext_id, pid, references=[ref]))
 
         return s
@@ -154,6 +153,66 @@ class Node:
 
         self.qid = self.item.wd_item_id
 
+    def remove_deprecated_statements(self, releases, frc, login):
+        """
+
+        :param releases: a set of qid for releases which, when used as 'stated in' on a reference,
+        the statement should be removed
+        :param frc:
+        :param login:
+        :return:
+        """
+
+        def is_old_ref(ref, releases):
+            stated_in = self.helper.get_pid('P248')
+            return any(r.get_prop_nr() == stated_in and "Q" + str(r.get_value()) in releases for r in ref)
+
+        qid = self.qid
+        primary_ext_id_pid, primary_ext_id = cu.parse_curie(self.id_curie)
+        primary_ext_id_pid = self.helper.get_pid(primary_ext_id_pid)
+
+        statements = frc.reconstruct_statements(qid)
+
+        s_remove = []
+        s_deprecate = []
+        for s in statements:
+            if len(s.get_references()) == 1 and is_old_ref(s.get_references()[0], releases):
+                # this is the only ref on this statement and its from an old release
+                if s.get_prop_nr() == primary_ext_id_pid:
+                    # if its on the primary ID for this item, deprecate instead of removing it
+                    s.set_rank('deprecated')
+                    s_deprecate.append(s)
+                else:
+                    setattr(s, 'remove', '')
+                    s_remove.append(s)
+            if len(s.get_references()) > 1 and any(is_old_ref(ref, releases) for ref in s.get_references()):
+                # there is another reference on this statement, and a old reference
+                # we should just remove the old reference and keep the statement
+                s.set_references([ref for ref in s.get_references() if not is_old_ref(ref, releases)])
+                s_deprecate.append(s)
+
+        if s_deprecate or s_remove:
+            print("-----")
+            print(qid)
+            print([(x.get_prop_nr(), x.value) for x in s_deprecate])
+            print([(x.get_prop_nr(), x.value) for x in s_remove])
+            """
+            I don't know why I have to split it up like this, but if you try to remove statements with append_value
+            set, the statements don't get removed, and if you try to remove a ref off a statement without append_value
+            set, then all other statements get removed. It works if you do them seperately...
+            """
+            if s_deprecate:
+                wd_item = wdi_core.WDItemEngine(wd_item_id=qid, domain='none', data=s_deprecate, fast_run=False,
+                                                mediawiki_api_url=self.mediawiki_api_url,
+                                                sparql_endpoint_url=self.sparql_endpoint_url,
+                                                append_value=self.graph.APPEND_PROPS)
+                wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
+            if s_remove:
+                wd_item = wdi_core.WDItemEngine(wd_item_id=qid, domain='none', data=s_remove, fast_run=False,
+                                                mediawiki_api_url=self.mediawiki_api_url,
+                                                sparql_endpoint_url=self.sparql_endpoint_url)
+                wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
+
 
 def create_node(node, login, write):
     # pickleable function that calls create on node
@@ -176,15 +235,22 @@ class Graph:
     # the following is optional
     NAMESPACE_URI = None  # if set, self.parse_namespace is not run
 
-    def __init__(self, mediawiki_api_url='https://www.wikidata.org/w/api.php',
+    def __init__(self, json_path, graph_uri, mediawiki_api_url='https://www.wikidata.org/w/api.php',
                  sparql_endpoint_url='https://query.wikidata.org/sparql'):
         assert self.NAME, "Must initialize subclass"
+        self.json_path = json_path
+        self.graph_uri = graph_uri
+        self.mediawiki_api_url = mediawiki_api_url
+        self.sparql_endpoint_url = sparql_endpoint_url
+
         self.version = None
         self.date = None
         self.default_namespace = None
         self.json_graph = None
         self.nodes = None
+        self.deprecated_nodes = None
         self.edges = None
+        self.release = None  # the wdi_helper.Release instance
 
         # str: the QID of the release item. e.g.:
         self.release_qid = None
@@ -194,21 +260,22 @@ class Graph:
         self.uri_node_map = dict()
         # dict[str, str]: mapping of the hasOBONamespace value to its URI (to be used as 'instance of')
         self.namespace_uri = dict()
+        # we want to save all of the properties we used
+        self.pids = set()
 
-        self.mediawiki_api_url = mediawiki_api_url
-        self.sparql_endpoint_url = sparql_endpoint_url
         self.helper = WikibaseHelper(sparql_endpoint_url)
-        # self.engine = wdi_core.WDItemEngine.wikibase_item_engine_factory(mediawiki_api_url, sparql_endpoint_url)
+        self.ref_handler = partial(update_retrieved_if_new_multiple_refs, retrieved_pid=self.helper.get_pid("P813"))
 
-        # self.ref_handler = partial(update_retrieved_if_new, retrieved_pid=self.helper.get_pid("P813"))
-        self.ref_handler = update_retrieved_if_new_P11
+        self.load_graph()
+        self.parse_graph()
 
-    def parse_graph(self, json_path, graph_uri):
-        with open(json_path) as f:
+    def load_graph(self):
+        with open(self.json_path) as f:
             d = json.load(f)
         graphs = {g['id']: g for g in d['graphs']}
+        self.json_graph = graphs[self.graph_uri]
 
-        self.json_graph = graphs[graph_uri]
+    def parse_graph(self):
         self.parse_meta()
         self.parse_nodes()
         self.filter_nodes()
@@ -265,6 +332,7 @@ class Graph:
         self.edges = [edge for edge in self.edges if edge['pred'] in self.PRED_PID_MAP]
 
     def filter_nodes(self):
+        self.deprecated_nodes = [x for x in self.nodes if x.deprecated and x.type == "CLASS"]
         self.nodes = [x for x in self.nodes if not x.deprecated and x.type == "CLASS"]
 
     def create_nodes_par(self, login, write=True):
@@ -280,13 +348,13 @@ class Graph:
             pass
 
     def create_release(self, login):
-        r = wdi_helpers.Release('{} release {}'.format(self.NAME, self.edition),
-                                'Release of the {}'.format(self.NAME), self.edition,
-                                archive_url=self.version, edition_of_wdid=self.QID,
-                                pub_date=self.date.date().strftime('+%Y-%m-%dT%H:%M:%SZ'),
-                                sparql_endpoint_url=self.sparql_endpoint_url,
-                                mediawiki_api_url=self.mediawiki_api_url)
-        wd_item_id = r.get_or_create(login)
+        self.release = wdi_helpers.Release('{} release {}'.format(self.NAME, self.edition),
+                                           'Release of the {}'.format(self.NAME), self.edition,
+                                           archive_url=self.version, edition_of_wdid=self.QID,
+                                           pub_date=self.date.date().strftime('+%Y-%m-%dT%H:%M:%SZ'),
+                                           sparql_endpoint_url=self.sparql_endpoint_url,
+                                           mediawiki_api_url=self.mediawiki_api_url)
+        wd_item_id = self.release.get_or_create(login)
         if wd_item_id:
             self.release_qid = wd_item_id
         else:
@@ -342,6 +410,7 @@ class Graph:
         #  print("edge: {}".format(edge))
         # the predicate has to be defined explicitly
         pred_pid = self.PRED_PID_MAP[edge['pred']]
+        self.pids.add(pred_pid)
 
         # The subject is the item that we have a node for
         subj_node = self.uri_node_map[edge['sub']]
@@ -385,6 +454,57 @@ class Graph:
                 print("oh no: {} {}".format(obj_pid, obj_value))
         else:
             print("oh no: {} {}".format(obj_pid, obj_value))
+
+    def check_for_existing_deprecated_nodes(self):
+        # check in wikidata if there are items with the primary ID of deprecated nodes
+        dep_qid = set()
+        dep_uri = [x.id_uri for x in self.deprecated_nodes]
+        for uri in dep_uri:
+            pid, value = cu.parse_curie(uri_to_curie(uri))
+            pid = self.helper.get_pid(pid)
+
+            if pid not in self.pid_id_mapper:
+                print("loading: {}".format(pid))
+                id_map = wdi_helpers.id_mapper(pid, return_as_set=True,
+                                               prefer_exact_match=True,
+                                               endpoint=self.sparql_endpoint_url)
+                self.pid_id_mapper[pid] = id_map if id_map else dict()
+
+            if value in self.pid_id_mapper[pid]:
+                obj_qids = self.pid_id_mapper[pid][value]
+                dep_qid.update(obj_qids)
+        print("the following QID should be checked and deleted: {}".format(dep_qid))
+        return dep_qid
+
+    def remove_deprecated_statements(self, login):
+        # get all editions and filter out the current (i.e. latest release)
+        if not self.release:
+            print("create release item first")
+            return None
+        relaeses_d = self.release.get_all_releases()
+        print(relaeses_d)
+        releases = set(relaeses_d.values())
+        releases.discard(self.release_qid)
+        print(releases)
+
+        # get all the props we used
+        all_pids = set(chain(*[x.pids for x in self.nodes]))
+        all_pids.update(self.pids)
+        print(all_pids)
+
+        # get a fastrun container
+        frc = self.nodes[0].item.fast_run_container
+        if not frc:
+            print("fastrun container not found. not removing deprecated statements")
+            return None
+        frc.clear()
+
+        # populate the frc using all PIDs we've touched
+        for prop in all_pids:
+            frc.write_required([wdi_core.WDString("fake value", prop)])
+
+        for node in self.nodes:
+            node.remove_deprecated_statements(releases, frc, login)
 
     def __str__(self):
         return "{} {} #nodes:{} #edges:{}".format(self.default_namespace, self.version, len(self.nodes),

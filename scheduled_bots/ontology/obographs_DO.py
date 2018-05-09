@@ -10,6 +10,12 @@ mediawiki_api_url = "http://localhost:7171/w/api.php"
 sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
 login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
 
+if False:
+    mediawiki_api_url = 'https://www.wikidata.org/w/api.php'
+    sparql_endpoint_url = 'https://query.wikidata.org/sparql'
+    from scheduled_bots.local import WDUSER, WDPASS
+    login = wdi_login.WDLogin(WDUSER, WDPASS)
+
 from scheduled_bots import PROPS
 from wikidataintegrator.wdi_helpers import WikibaseHelper
 
@@ -56,11 +62,13 @@ class DOGraph(Graph):
         self.nodes = [x for x in self.nodes if "DOID:" in x.id_curie]
 
 
-g = DOGraph(mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
-g.parse_graph(JSON_PATH, GRAPH_URI)
+g = DOGraph(JSON_PATH, GRAPH_URI, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
 
 g.create_release(login)
 
 g.create_nodes(login)
 
 g.create_edges(login)
+
+g.check_for_existing_deprecated_nodes()
+g.remove_deprecated_statements(login)
