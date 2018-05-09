@@ -1,7 +1,8 @@
-from scheduled_bots.ontology.DOID_obographs_bot import DOGraph
+from scheduled_bots.disease_ontology.DOID_obographs_bot import DOGraph
+from scheduled_bots.local import WDUSER, WDPASS
 from tqdm import tqdm
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
-from scheduled_bots.local import WDUSER, WDPASS
+
 login = wdi_login.WDLogin(WDUSER, WDPASS)
 import json
 json_path='doid.json'

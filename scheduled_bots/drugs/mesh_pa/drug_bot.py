@@ -128,3 +128,11 @@ for record in tqdm(records):
     except Exception as e:
         print(e)
         print(record)
+
+# TODO:
+#################
+## Add drug mesh subclass links
+#################
+# example: alprazolam is a benzodiazepine
+# https://meshb.nlm.nih.gov/record/ui?ui=D000525
+# https://www.wikidata.org/wiki/Q319877#P279

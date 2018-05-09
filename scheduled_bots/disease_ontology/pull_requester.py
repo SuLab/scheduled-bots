@@ -23,6 +23,14 @@ REMOTE_GIT = "stuppie"  # change to "DiseaseOntology" to use the official DO rep
 # in my case, this is a softlink to the file in the cloned git repo
 
 def add_xref(owl_path, doid, ext_id, relation="oboInOwl:hasDbXref"):
+    # make sure the skos prefix def is in the owl_file
+    if not any(line.strip() == "Prefix(skos:=<http://www.w3.org/2004/02/skos/core#>)" for line in open(owl_path)):
+        print("adding skos prefix")
+        lines = list(open(owl_path).readlines())
+        lines.insert(0, "Prefix(skos:=<http://www.w3.org/2004/02/skos/core#>)\n")
+        with open(owl_path, 'w') as f:
+            f.writelines(lines)
+
     # needs owltools in path
     if os.path.exists("tmp.ttl"):
         os.remove("tmp.ttl")
@@ -38,9 +46,9 @@ def add_xref(owl_path, doid, ext_id, relation="oboInOwl:hasDbXref"):
     @prefix skos:   <http://www.w3.org/2004/02/skos/core#> .
     """
     ttl = 'obo:DOID_{}  {}  "{}"^^xsd:string .'.format(doid.split(":")[1], relation, ext_id)
-    if relation == "skos:exactMatch":
-        # to maintain backward compatibility with hasDbXref, add this also if the relation is an exact match
-        ttl += '\nobo:DOID_{}  {}  "{}"^^xsd:string .'.format(doid.split(":")[1], "oboInOwl:hasDbXref", ext_id)
+    # if relation == "skos:exactMatch":
+    #     # to maintain backward compatibility with hasDbXref, add this also if the relation is an exact match
+    #     ttl += '\nobo:DOID_{}  {}  "{}"^^xsd:string .'.format(doid.split(":")[1], "oboInOwl:hasDbXref", ext_id)
     with open("tmp.ttl", "w") as f:
         print(prefix, file=f)
         print(ttl, file=f)
@@ -86,8 +94,8 @@ if __name__ == "__main__":
     df, df_fmt = main("2017-11-28")
     df.to_csv('df_2017-11-28.csv')
     df_fmt.to_csv('df_fmt_2017-11-28.csv')
-    # df = pd.read_csv('df_2017-11-28.csv')
-    # df_fmt = pd.read_csv('df_fmt_2017-11-28.csv')
+    # df = pd.read_csv('df_2017-11-28.csv', index_col=0)
+    # df_fmt = pd.read_csv('df_fmt_2017-11-28.csv', index_col=0)
 
     df_fmt = df_fmt.rename(columns={'doid': 'DOID', 'do_label': 'DOID Label',
                                     'do_def': 'DOID Description', 'mesh': 'MeSH ID',
@@ -101,6 +109,9 @@ if __name__ == "__main__":
         row = df.iloc[idx]
         doid = row.doid
         ext_id = "MESH:" + row.mesh
+        # if row.relation == "oboInOwl:hasDbXref":
+        #    row.relation = "skos:exactMatch"
+        #    df_fmt.iloc[idx:idx + 1].Relation = "skos:exactMatch"
         relation = row.relation
         branch_id = "_".join([doid, ext_id, relation])
         branch_id = branch_id.replace(":", "_")  # can't have : in branch names

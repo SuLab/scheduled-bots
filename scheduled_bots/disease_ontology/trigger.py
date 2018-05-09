@@ -28,7 +28,7 @@ def get_release_obographs(d):
     return version
 
 
-if __name__ == "__main__":
+def main():
     # expects a file in the current folder called 'doid.json'
     # if not found, will always trigger
     if os.path.exists("TRIGGER"):
@@ -51,3 +51,7 @@ if __name__ == "__main__":
         os.system("touch TRIGGER")
     else:
         print("not running job")
+
+
+if __name__ == "__main__":
+    main()

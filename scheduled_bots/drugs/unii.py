@@ -14,6 +14,22 @@ import wikidataintegrator.wdi_core as wdi_core
 data_folder = "unii_data"
 
 
+def load_unii():
+    url = 'http://fdasis.nlm.nih.gov/srs/download/srs/UNII_Data.zip'
+    if not os.path.exists(data_folder):
+        os.makedirs(data_folder)
+
+    subprocess.check_call(["wget", "-N", "-P", data_folder, url])
+
+    with zipfile.ZipFile(os.path.join(data_folder, 'UNII_Data.zip'), 'r') as zf:
+        zf.extractall(data_folder)
+
+    for file in os.listdir(data_folder):
+        if 'Records' in file:
+            full_file_name = os.path.join(data_folder, file)
+            os.rename(full_file_name, os.path.join(data_folder, 'unii_data.txt'))
+
+
 class UNIIMolecule(object):
     unii_path = os.path.join(data_folder, 'unii_data.txt')
     if not os.path.exists(unii_path):
@@ -193,19 +209,3 @@ class UNIIMolecule(object):
         splits = label.split(', ')
         splits.reverse()
         return ''.join(splits)
-
-
-def load_unii():
-    url = 'http://fdasis.nlm.nih.gov/srs/download/srs/UNII_Data.zip'
-    if not os.path.exists(data_folder):
-        os.makedirs(data_folder)
-
-    subprocess.check_call(["wget", "-N", "-P", data_folder, url])
-
-    with zipfile.ZipFile(os.path.join(data_folder, 'UNII_Data.zip'), 'r') as zf:
-        zf.extractall(data_folder)
-
-    for file in os.listdir(data_folder):
-        if 'Records' in file:
-            full_file_name = os.path.join(data_folder, file)
-            os.rename(full_file_name, os.path.join(data_folder, 'unii_data.txt'))

@@ -4,13 +4,18 @@ from wikidataintegrator import wdi_login, wdi_core
 JSON_PATH = "go.json"
 GRAPH_URI = 'http://purl.obolibrary.org/obo/go.owl'
 
-# from scheduled_bots.local import WDUSER, WDPASS
-# login = wdi_login.WDLogin(WDUSER, WDPASS)
 from scheduled_bots import PROPS
 
 mediawiki_api_url = "http://localhost:7171/w/api.php"
 sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
 login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
+
+if False:
+    mediawiki_api_url = 'https://www.wikidata.org/w/api.php'
+    sparql_endpoint_url = 'https://query.wikidata.org/sparql'
+    from scheduled_bots.local import WDUSER, WDPASS
+
+    login = wdi_login.WDLogin(WDUSER, WDPASS)
 
 from wikidataintegrator.wdi_helpers import WikibaseHelper
 
@@ -58,8 +63,7 @@ class GOGraph(Graph):
             return super(GOGraph, self).make_statement_from_edge(edge)
 
 
-g = GOGraph(mediawiki_api_url=mediawiki_api_url,
-            sparql_endpoint_url=sparql_endpoint_url)
+g = GOGraph(mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
 g.parse_graph(JSON_PATH, GRAPH_URI)
 
 g.create_release(login)

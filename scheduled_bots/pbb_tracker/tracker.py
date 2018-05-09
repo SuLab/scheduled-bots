@@ -431,7 +431,7 @@ def main(pid, weeks, idfilter, force_update, filter_user):
     extid_qid = id_mapper(pid, idfilter)
     qid_extid = {v: k for k, v in extid_qid.items()}
     qids = extid_qid.values()
-
+    """
     # what are the date extents of these items?
     # get the most recent timestamp and figure out how many weeks ago it was
     # warning, only checks the most recent timestamp!
@@ -480,6 +480,7 @@ def main(pid, weeks, idfilter, force_update, filter_user):
         lda_df = lda_df[["revid", "url", "timestamp", "user", "change_type", "comment",
                          "merge", "qid", "qid_label", "value"]]
     lda_df.to_excel(writer, sheet_name="labels")
+    """
     
     print("Getting redirects")
     redirect_df = get_merges(qids, weeks)

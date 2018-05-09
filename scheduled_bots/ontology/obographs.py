@@ -18,6 +18,7 @@ from datetime import datetime
 from scheduled_bots import utils
 from wikidataintegrator import wdi_core, wdi_property_store, wdi_helpers, wdi_login
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
+
 update_retrieved_if_new_P11 = partial(update_retrieved_if_new, retrieved_pid="P11")
 
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
@@ -110,6 +111,7 @@ class Node:
 
         for xref in self.xrefs:
             if xref.split(":")[0] not in cu.curie_map:
+                # todo: log this curie prefix not being found
                 continue
             pid, ext_id = cu.parse_curie(xref)
             pid = self.helper.get_pid(pid)
@@ -171,6 +173,9 @@ class Graph:
     # the following must be overriden if a custom node type is being used
     NODE_CLASS = Node
 
+    # the following is optional
+    NAMESPACE_URI = None  # if set, self.parse_namespace is not run
+
     def __init__(self, mediawiki_api_url='https://www.wikidata.org/w/api.php',
                  sparql_endpoint_url='https://query.wikidata.org/sparql'):
         assert self.NAME, "Must initialize subclass"
@@ -209,7 +214,10 @@ class Graph:
         self.filter_nodes()
         self.parse_edges()
         self.filter_edges()
-        self.parse_namespace()
+        if self.NAMESPACE_URI:
+            self.namespace_uri = self.NAMESPACE_URI
+        else:
+            self.parse_namespace()
         self.nodes = sorted(self.nodes, key=lambda x: x.id_uri)
 
     def parse_namespace(self):
@@ -262,7 +270,8 @@ class Graph:
     def create_nodes_par(self, login, write=True):
         pool = multiprocessing.Pool(processes=4)
         create_node_f = partial(create_node, login=login, write=write)
-        for _ in tqdm(pool.imap(create_node_f, self.nodes, chunksize=1000), total=len(self.nodes), desc="creating items"):
+        for _ in tqdm(pool.imap(create_node_f, self.nodes, chunksize=1000), total=len(self.nodes),
+                      desc="creating items"):
             pass
 
     def create_nodes(self, login, write=True):
@@ -301,31 +310,36 @@ class Graph:
             # set instance of using the namespace
             if node.namespace in self.namespace_uri:
                 ref = node.create_ref_statement()
-                ss.append(wdi_core.WDItemID(self.uri_node_map[self.namespace_uri[node.namespace]].qid,
-                                            self.helper.get_pid('P31'), references=[ref]))
+                value_qid = self.uri_node_map[self.namespace_uri[node.namespace]].qid
+                if value_qid:
+                    ss.append(wdi_core.WDItemID(value_qid, self.helper.get_pid('P31'), references=[ref]))
+
+            if not ss:
+                # there are no statements for this node
+                continue
+
             # print("{}".format([(x.get_value(), x.get_prop_nr()) for x in ss]))
-            if ss:
-                item = wdi_core.WDItemEngine(
-                    wd_item_id=node.qid, data=ss, domain="fake news",
-                    append_value=self.APPEND_PROPS,
-                    fast_run=self.FAST_RUN,
-                    fast_run_base_filter=self.FAST_RUN_FILTER,
-                    fast_run_use_refs=True,
-                    global_ref_mode='CUSTOM',
-                    ref_handler=self.ref_handler,
-                    sparql_endpoint_url=self.sparql_endpoint_url,
-                    mediawiki_api_url=self.mediawiki_api_url
-                )
-                this_pid, this_value = cu.parse_curie(uri_to_curie(this_uri))
-                this_pid = self.helper.get_pid(this_pid)
-                wdi_helpers.try_write(item, record_id=this_value, record_prop=this_pid,
-                                      login=login, write=write)
+            item = wdi_core.WDItemEngine(
+                wd_item_id=node.qid, data=ss, domain="fake news",
+                append_value=self.APPEND_PROPS,
+                fast_run=self.FAST_RUN,
+                fast_run_base_filter=self.FAST_RUN_FILTER,
+                fast_run_use_refs=True,
+                global_ref_mode='CUSTOM',
+                ref_handler=self.ref_handler,
+                sparql_endpoint_url=self.sparql_endpoint_url,
+                mediawiki_api_url=self.mediawiki_api_url
+            )
+            this_pid, this_value = cu.parse_curie(uri_to_curie(this_uri))
+            this_pid = self.helper.get_pid(this_pid)
+            wdi_helpers.try_write(item, record_id=this_value, record_prop=this_pid,
+                                  login=login, write=write)
 
     def make_statement_from_edge(self, edge):
         # we can override this to define a custom statement creator that makes a specific
         # statement depending on the edge or whatever else
-        print("edge: {}".format(edge))
 
+        #  print("edge: {}".format(edge))
         # the predicate has to be defined explicitly
         pred_pid = self.PRED_PID_MAP[edge['pred']]
 
@@ -338,25 +352,29 @@ class Graph:
         if obj_qid:
             return wdi_core.WDItemID(obj_qid, pred_pid, references=[subj_node.create_ref_statement()])
 
-
     def get_object_qid(self, edge_obj):
         # object in an edge could be anything. it doesn't have to be a URI that exists within this graph
         # for example, we could be running the DO, and it have an object that is an UBERON class
 
         # first. check if this URI exists in our graph
-        obj_qid = None
         if edge_obj in self.uri_node_map:
             return self.uri_node_map[edge_obj].qid
 
         # if not, check if the prefix exists in wikidata
-        obj_pid, obj_value = cu.parse_curie(uri_to_curie(edge_obj))
-        # todo: this will throw an error if not found
+        try:
+            obj_pid, obj_value = cu.parse_curie(uri_to_curie(edge_obj))
+        except ValueError as e:
+            print(e)
+            return None
+
         obj_pid = self.helper.get_pid(obj_pid)
         # if this property exists, get all of the values for this property
         if obj_pid not in self.pid_id_mapper:
-            self.pid_id_mapper[obj_pid] = wdi_helpers.id_mapper(obj_pid, return_as_set=True,
-                                                                prefer_exact_match=True,
-                                                                endpoint=self.sparql_endpoint_url)
+            print("loading: {}".format(obj_pid))
+            id_map = wdi_helpers.id_mapper(obj_pid, return_as_set=True,
+                                           prefer_exact_match=True,
+                                           endpoint=self.sparql_endpoint_url)
+            self.pid_id_mapper[obj_pid] = id_map if id_map else dict()
 
         # look up by the value
         if obj_value in self.pid_id_mapper[obj_pid]:

@@ -12,7 +12,7 @@ from time import gmtime, strftime, sleep
 import requests
 from tqdm import tqdm
 
-from scheduled_bots import utils
+from scheduled_bots import utils, PROPS
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login, wdi_property_store
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
 from wikidataintegrator.wdi_helpers import id_mapper
@@ -26,22 +26,7 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-PROPS = {'subclass of': 'P279',
-         'has cause': 'P828',
-         'instance of': 'P31',
-         'exact match': 'P2888',
-         'Orphanet ID': 'P1550',
-         'UMLS CUI': 'P2892',
-         'Disease Ontology ID': 'P699',
-         'ICD-10': 'P494',
-         'ICD-10-CM': 'P4229',
-         'ICD-9': 'P493',
-         'ICD-9-CM': 'P1692',
-         'MeSH ID': 'P486',
-         'NCI Thesaurus ID': 'P1748',
-         'OMIM ID': 'P492',
-         'location': 'P276'
-         }
+
 
 wdi_property_store.wd_properties[PROPS['OMIM ID']]['core_id'] = False
 wdi_property_store.wd_properties[PROPS['MeSH ID']]['core_id'] = False

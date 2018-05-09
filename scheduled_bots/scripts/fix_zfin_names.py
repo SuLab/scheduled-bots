@@ -53,7 +53,7 @@ def genes():
 
     cb = ChromosomeBot()
     chr_num_wdid = cb.get_or_create(organism_info, login=login)
-    bot = GeneBot.MammalianGeneBot(organism_info, chr_num_wdid, login)
+    bot = GeneBot.ChromosomalGeneBot(organism_info, chr_num_wdid, login)
     bot.filter = lambda x: iter(x)
     bot.run(records, total=total, fast_run=True, write=True)
 

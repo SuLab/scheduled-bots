@@ -85,3 +85,17 @@ def _scratch():
     vc = df.topLevel.value_counts()
     df['vc'] = df.topLevel.map(vc)
     df[df.treeNum.isin(df.topLevel[df.vc>5])]
+
+
+def get_analogs_derivatives():
+    """
+    SELECT distinct ?a ?al ?d ?dl FROM <http://id.nlm.nih.gov/mesh> WHERE {
+      ?a meshv:preferredMappedTo ?m .
+      ?m meshv:hasDescriptor ?d .
+      ?m meshv:hasQualifier mesh:Q000031 .
+      ?d rdfs:label ?dl .
+      ?a rdfs:label ?al .
+      FILTER(STRSTARTS(STR(?treeNum), "http://id.nlm.nih.gov/mesh/D"))
+      ?d meshv:treeNumber ?treeNum .
+    }
+    """
