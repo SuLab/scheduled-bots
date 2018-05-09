@@ -24,6 +24,11 @@ uri_to_curie = lambda s: s.split("/")[-1].replace("_", ":")
 curie_map = default_curie_map.copy()
 cu = CurieUtil(curie_map)
 
+# reset core properties
+# we only want the core props specified in Graph.CORE_PROPS
+# todo: this WILL be an issue if we have two Graphs with different CORE_PROPS loaded.
+# will have to modify WDI to accept the core_props on WDItemEngine instanciation and not set globally like it is now..
+wdi_property_store.wd_properties = dict()
 
 class Node:
     def __init__(self, json_node, graph):
@@ -93,7 +98,8 @@ class Node:
 
     def set_aliases(self, wd_item):
         if self.synonyms is not None:
-            wd_item.set_aliases(aliases=self.synonyms, append=True)
+            synonyms = {x for x in self.synonyms if x.lower() != self.label.lower()}
+            wd_item.set_aliases(aliases=synonyms, append=True)
 
     def create_statements(self):
         ref = self.create_ref_statement()
@@ -126,6 +132,7 @@ class Node:
 
         primary_ext_id_pid, primary_ext_id = cu.parse_curie(self.id_curie)
         primary_ext_id_pid = self.helper.get_pid(primary_ext_id_pid)
+        assert primary_ext_id_pid in self.graph.APPEND_PROPS
 
         try:
             self.item = wdi_core.WDItemEngine(
@@ -147,6 +154,7 @@ class Node:
         self.set_label(self.item)
         self.set_descr(self.item)
         self.set_aliases(self.item)
+        # todo: I want to avoid this from happening: https://www.wikidata.org/w/index.php?title=Q4553565&diff=676750840&oldid=647941942
 
         wdi_helpers.try_write(self.item, record_id=primary_ext_id, record_prop=primary_ext_id_pid,
                               login=login, write=write)
@@ -234,6 +242,7 @@ class Graph:
 
     # the following is optional
     NAMESPACE_URI = None  # if set, self.parse_namespace is not run
+    CORE_PROPS = set()
 
     def __init__(self, json_path, graph_uri, mediawiki_api_url='https://www.wikidata.org/w/api.php',
                  sparql_endpoint_url='https://query.wikidata.org/sparql'):
@@ -251,6 +260,9 @@ class Graph:
         self.deprecated_nodes = None
         self.edges = None
         self.release = None  # the wdi_helper.Release instance
+
+        for core_prop in self.CORE_PROPS:
+            wdi_property_store.wd_properties[core_prop] = {'core_id': True}
 
         # str: the QID of the release item. e.g.:
         self.release_qid = None
@@ -434,6 +446,7 @@ class Graph:
             obj_pid, obj_value = cu.parse_curie(uri_to_curie(edge_obj))
         except ValueError as e:
             print(e)
+            # todo: log
             return None
 
         obj_pid = self.helper.get_pid(obj_pid)
@@ -451,8 +464,10 @@ class Graph:
             if len(obj_qids) == 1:
                 return list(obj_qids)[0]
             else:
+                # todo: log
                 print("oh no: {} {}".format(obj_pid, obj_value))
         else:
+            # todo: log
             print("oh no: {} {}".format(obj_pid, obj_value))
 
     def check_for_existing_deprecated_nodes(self):
@@ -474,6 +489,7 @@ class Graph:
                 obj_qids = self.pid_id_mapper[pid][value]
                 dep_qid.update(obj_qids)
         print("the following QID should be checked and deleted: {}".format(dep_qid))
+        # todo: log
         return dep_qid
 
     def remove_deprecated_statements(self, login):

@@ -10,7 +10,7 @@ mediawiki_api_url = "http://localhost:7171/w/api.php"
 sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
 login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
 
-if False:
+if True:
     mediawiki_api_url = 'https://www.wikidata.org/w/api.php'
     sparql_endpoint_url = 'https://query.wikidata.org/sparql'
     from scheduled_bots.local import WDUSER, WDPASS
@@ -41,7 +41,8 @@ class DOGraph(Graph):
                                            PROPS['MeSH ID'], PROPS['ICD-10-CM'],
                                            PROPS['ICD-10'], PROPS['ICD-9-CM'],
                                            PROPS['ICD-9'], PROPS['NCI Thesaurus ID'],
-                                           PROPS['UMLS CUI']}}
+                                           PROPS['UMLS CUI'], PROPS['Disease Ontology ID']}}
+    CORE_PROPS = {h.get_pid(x) for x in {PROPS['Disease Ontology ID']}}
     FAST_RUN = True
     FAST_RUN_FILTER = {h.get_pid(PROPS['Disease Ontology ID']): ''}
 

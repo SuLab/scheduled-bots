@@ -29,6 +29,7 @@ class GOGraph(Graph):
     APPEND_PROPS = {h.get_pid(x) for x in {PROPS['subclass of'], PROPS['instance of'],
                                            PROPS['has cause'], PROPS['location'], PROPS['part of'],
                                            PROPS['has part'], PROPS['regulates (molecular biology)']}}
+    CORE_PROPS = {h.get_pid(x) for x in {PROPS['Gene Ontology ID']}}
     FAST_RUN = True
     FAST_RUN_FILTER = {h.get_pid(PROPS['Gene Ontology ID']): ''}
 
