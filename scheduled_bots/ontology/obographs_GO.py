@@ -10,7 +10,7 @@ mediawiki_api_url = "http://localhost:7171/w/api.php"
 sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
 login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
 
-if False:
+if True:
     mediawiki_api_url = 'https://www.wikidata.org/w/api.php'
     sparql_endpoint_url = 'https://query.wikidata.org/sparql'
     from scheduled_bots.local import WDUSER, WDPASS
@@ -64,11 +64,11 @@ class GOGraph(Graph):
         else:
             return super(GOGraph, self).make_statement_from_edge(edge)
 
-
-g = GOGraph(JSON_PATH, GRAPH_URI, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
-g.parse_graph()
-g.create_release(login)
-g.create_nodes(login)
-g.create_edges(login)
-g.check_for_existing_deprecated_nodes()
-#g.remove_deprecated_statements(login)
+if __name__ == "__main__":
+    g = GOGraph(JSON_PATH, GRAPH_URI, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
+    g.parse_graph()
+    g.create_release(login)
+    g.create_nodes(login)
+    g.create_edges(login)
+    g.check_for_existing_deprecated_nodes()
+    #g.remove_deprecated_statements(login)

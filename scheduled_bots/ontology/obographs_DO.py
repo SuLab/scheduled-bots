@@ -60,14 +60,14 @@ class DOGraph(Graph):
         super(DOGraph, self).filter_nodes()
         self.nodes = [x for x in self.nodes if "DOID:" in x.id_curie]
 
+if __name__ == "__main__":
+    g = DOGraph(JSON_PATH, GRAPH_URI, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
 
-g = DOGraph(JSON_PATH, GRAPH_URI, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
+    g.create_release(login)
 
-g.create_release(login)
+    g.create_nodes(login)
 
-g.create_nodes(login)
+    g.create_edges(login)
 
-g.create_edges(login)
-
-g.check_for_existing_deprecated_nodes()
-g.remove_deprecated_statements(login)
+    g.check_for_existing_deprecated_nodes()
+    g.remove_deprecated_statements(login)

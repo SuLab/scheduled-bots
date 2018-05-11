@@ -5,6 +5,7 @@ Requires a obographs JSON file made from an owl file
 """
 
 import traceback
+from collections import defaultdict
 from functools import partial
 from itertools import repeat, chain
 from time import strftime, gmtime
@@ -34,6 +35,7 @@ wdi_property_store.wd_properties = dict()
 
 class Node:
     def __init__(self, json_node, graph):
+        self.json_node = json_node
         self.id_uri = json_node['id']  # e.g. http://purl.obolibrary.org/obo/DOID_8718
         self.id_curie = uri_to_curie(self.id_uri)
         self.label = json_node.get("lbl")
@@ -48,27 +50,33 @@ class Node:
         self.qid = None
         self.xrefs = set()
         self.item = None
+        self.bpv = defaultdict(set)
 
-        meta = json_node.get("meta", dict())
+        self.namespace = None
+        self.descr = ''
+        self.deprecated = None
+        self.synonyms = set()
+        self.qid = None
 
+        self.parse_meta()
+
+    def parse_meta(self):
+        meta = self.json_node.get("meta", dict())
+        if 'basicPropertyValues' in meta:
+            for basicPropertyValue in meta['basicPropertyValues']:
+                self.bpv[basicPropertyValue['pred']].add(basicPropertyValue['val'])
         if 'xrefs' in meta:
             self.xrefs = set([x['val'] for x in meta['xrefs']])
-
-        namespaces = [x['val'] for x in meta['basicPropertyValues'] if
-                      x['pred'] == 'http://www.geneontology.org/formats/oboInOwl#hasOBONamespace'] if \
-            'basicPropertyValues' in meta else []
+        namespaces = self.bpv.get('http://www.geneontology.org/formats/oboInOwl#hasOBONamespace', set())
         if namespaces:
-            self.namespace = namespaces[0]
+            self.namespace = list(namespaces)[0]
         else:
-            self.namespace = graph.default_namespace
-
+            self.namespace = self.graph.default_namespace
         self.descr = meta.get('definition', dict()).get('val')
         self.deprecated = meta.get('deprecated', False)
         self.synonyms = set(x['val'] for x in meta.get('synonyms', list()))
         # filter out the label from the synonyms
         self.synonyms.discard(self.label)
-
-        self.qid = None
 
     def create_ref_statement(self):
         assert self.graph.release_qid, "create the release first (on the graph class)"
@@ -462,7 +470,7 @@ class Graph:
 
     def check_for_existing_deprecated_nodes(self):
         # check in wikidata if there are items with the primary ID of deprecated nodes
-        dep_qid = set()
+        dep_uri_qid = dict()  # key is uri, value is QID
         dep_uri = [x.id_uri for x in self.deprecated_nodes]
         for uri in dep_uri:
             pid, value = cu.parse_curie(uri_to_curie(uri))
@@ -470,19 +478,16 @@ class Graph:
 
             if pid not in self.pid_id_mapper:
                 print("loading: {}".format(pid))
-                id_map = wdi_helpers.id_mapper(pid, return_as_set=True,
-                                               prefer_exact_match=True,
-                                               endpoint=self.sparql_endpoint_url)
+                id_map = wdi_helpers.id_mapper(pid, endpoint=self.sparql_endpoint_url)
                 self.pid_id_mapper[pid] = id_map if id_map else dict()
 
             if value in self.pid_id_mapper[pid]:
-                obj_qids = self.pid_id_mapper[pid][value]
-                dep_qid.update(obj_qids)
-        print("the following QID should be checked and deleted: {}".format(dep_qid))
+                dep_uri_qid[uri] = self.pid_id_mapper[pid][value]
+        print("the following should be checked and deleted: {}".format(dep_uri_qid))
         # todo: log
-        return dep_qid
+        return dep_uri_qid
 
-    def remove_deprecated_statements(self, login):
+    def _get_old_releases(self):
         # get all editions and filter out the current (i.e. latest release)
         if not self.release:
             print("create release item first")
@@ -492,12 +497,17 @@ class Graph:
         releases = set(relaeses_d.values())
         releases.discard(self.release_qid)
         print(releases)
+        return releases
 
+    def _get_all_pids_used(self):
         # get all the props we used
         all_pids = set(chain(*[x.pids for x in self.nodes]))
         all_pids.update(self.pids)
         print(all_pids)
+        return all_pids
 
+    def _get_fastrun_container(self):
+        all_pids = self._get_all_pids_used()
         # get a fastrun container
         frc = self.nodes[0].item.fast_run_container
         if not frc:
@@ -508,6 +518,12 @@ class Graph:
         # populate the frc using all PIDs we've touched
         for prop in all_pids:
             frc.write_required([wdi_core.WDString("fake value", prop)])
+
+        return frc
+
+    def remove_deprecated_statements(self, login):
+        releases = self._get_old_releases()
+        frc = self._get_fastrun_container()
 
         for node in self.nodes:
             node.remove_deprecated_statements(releases, frc, login)
@@ -531,8 +547,34 @@ class Graph:
 
         self.root_node = root
 
+    def find_replaced_nodes(self, login):
+        # in GO atleast, some deprecated nodes are denoted as replaced by some other node
+        # find these, so that the statements can be removed and then merge them into the new node
+        # "http://purl.obolibrary.org/obo/IAO_0100001" : "term replaced by"
 
+        dep_uri_qid = self.check_for_existing_deprecated_nodes()
+        to_merge = dict()  # from: to
+        for node in self.deprecated_nodes:
+            if node.id_uri in dep_uri_qid:
+                node.qid = dep_uri_qid[node.id_uri]
+                if 'http://purl.obolibrary.org/obo/IAO_0100001' in node.bpv:
+                    to_node = node.bpv['http://purl.obolibrary.org/obo/IAO_0100001']
+                    assert len(to_node) == 1
+                    to_merge[node.id_uri] = list(to_node)[0]
 
+        # first remove the old statements off this node, then merge it
+        releases = self._get_old_releases()
+        frc = self._get_fastrun_container()
+        for node_uri in to_merge:
+            node = self.uri_node_map[node_uri]
+            node.remove_deprecated_statements(releases, frc, login)
+
+            # need to remove description or you get errors..,, 
+            item = wdi_core.WDItemEngine(wd_item_id=node.qid)
+            item.set_description("")
+            item.write(login)
+
+            wdi_core.WDItemEngine.merge_items(node.qid, self.uri_node_map[to_merge[node_uri]].qid, login)
 
     def __str__(self):
         return "{} {} #nodes:{} #edges:{}".format(self.default_namespace, self.version, len(self.nodes),
