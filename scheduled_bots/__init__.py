@@ -19,5 +19,7 @@ PROPS = {
     'part of': 'P361',
     'has part': 'P527',
     'regulates (molecular biology)': 'P128',
-    'subject has role': 'P2868'
+    'subject has role': 'P2868',
+    'UBERON ID': 'P1554',
+    'develops from': 'P3094'
 }

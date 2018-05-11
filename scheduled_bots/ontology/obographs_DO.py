@@ -10,7 +10,7 @@ mediawiki_api_url = "http://localhost:7171/w/api.php"
 sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
 login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
 
-if True:
+if False:
     mediawiki_api_url = 'https://www.wikidata.org/w/api.php'
     sparql_endpoint_url = 'https://query.wikidata.org/sparql'
     from scheduled_bots.local import WDUSER, WDPASS
@@ -53,8 +53,6 @@ class DOGraph(Graph):
                     # 'http://purl.obolibrary.org/obo/RO_0002451': PROPS[],  # transmitted by
                     # 'http://purl.obolibrary.org/obo/RO_0001020': PROPS[],  # is allergic trigger for
                     'is_a': h.get_pid(PROPS['subclass of'])}
-
-    NAMESPACE_URI = {'disease_ontology': 'http://purl.obolibrary.org/obo/DOID_4'}
 
     NODE_CLASS = DONode
 

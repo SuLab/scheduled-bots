@@ -28,7 +28,8 @@ class GOGraph(Graph):
     DEFAULT_DESCRIPTION = ""
     APPEND_PROPS = {h.get_pid(x) for x in {PROPS['subclass of'], PROPS['instance of'],
                                            PROPS['has cause'], PROPS['location'], PROPS['part of'],
-                                           PROPS['has part'], PROPS['regulates (molecular biology)']}}
+                                           PROPS['has part'], PROPS['regulates (molecular biology)'],
+                                           PROPS['Gene Ontology ID']}}
     CORE_PROPS = {h.get_pid(x) for x in {PROPS['Gene Ontology ID']}}
     FAST_RUN = True
     FAST_RUN_FILTER = {h.get_pid(PROPS['Gene Ontology ID']): ''}
@@ -70,4 +71,4 @@ g.create_release(login)
 g.create_nodes(login)
 g.create_edges(login)
 g.check_for_existing_deprecated_nodes()
-g.remove_deprecated_statements(login)
+#g.remove_deprecated_statements(login)

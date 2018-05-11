@@ -14,6 +14,7 @@ from tqdm import tqdm
 from wikicurie.wikicurie import CurieUtil, default_curie_map
 import json
 from datetime import datetime
+import networkx as nx
 
 from scheduled_bots import utils
 from wikidataintegrator import wdi_core, wdi_property_store, wdi_helpers, wdi_login
@@ -29,6 +30,7 @@ cu = CurieUtil(curie_map)
 # todo: this WILL be an issue if we have two Graphs with different CORE_PROPS loaded.
 # will have to modify WDI to accept the core_props on WDItemEngine instanciation and not set globally like it is now..
 wdi_property_store.wd_properties = dict()
+
 
 class Node:
     def __init__(self, json_node, graph):
@@ -241,7 +243,6 @@ class Graph:
     NODE_CLASS = Node
 
     # the following is optional
-    NAMESPACE_URI = None  # if set, self.parse_namespace is not run
     CORE_PROPS = set()
 
     def __init__(self, json_path, graph_uri, mediawiki_api_url='https://www.wikidata.org/w/api.php',
@@ -260,6 +261,7 @@ class Graph:
         self.deprecated_nodes = None
         self.edges = None
         self.release = None  # the wdi_helper.Release instance
+        self.root_node = None
 
         for core_prop in self.CORE_PROPS:
             wdi_property_store.wd_properties[core_prop] = {'core_id': True}
@@ -270,8 +272,6 @@ class Graph:
         self.pid_id_mapper = dict()
         # URIs from this owl file mapping to the node python object
         self.uri_node_map = dict()
-        # dict[str, str]: mapping of the hasOBONamespace value to its URI (to be used as 'instance of')
-        self.namespace_uri = dict()
         # we want to save all of the properties we used
         self.pids = set()
 
@@ -293,22 +293,8 @@ class Graph:
         self.filter_nodes()
         self.parse_edges()
         self.filter_edges()
-        if self.NAMESPACE_URI:
-            self.namespace_uri = self.NAMESPACE_URI
-        else:
-            self.parse_namespace()
+        self.calculate_root_nodes()
         self.nodes = sorted(self.nodes, key=lambda x: x.id_uri)
-
-    def parse_namespace(self):
-        # get all of the namespaces used
-        namespaces = set(x.namespace for x in self.nodes)
-
-        # get the label to ID map
-        label_uri = {x.label: x.id_uri for x in self.nodes}
-
-        # look up the ID for this namespace
-        self.namespace_uri = {namespace: label_uri[namespace] for namespace in namespaces}
-        print(self.namespace_uri)
 
     def parse_meta(self):
         meta = self.json_graph['meta']
@@ -387,12 +373,16 @@ class Graph:
                 if s and s.get_value():
                     ss.append(s)
 
-            # set instance of using the namespace
-            if node.namespace in self.namespace_uri:
-                ref = node.create_ref_statement()
-                value_qid = self.uri_node_map[self.namespace_uri[node.namespace]].qid
-                if value_qid:
-                    ss.append(wdi_core.WDItemID(value_qid, self.helper.get_pid('P31'), references=[ref]))
+            # set instance of using the root node
+            root_nodes = self.root_node[node.id_uri]
+            for root_node in root_nodes:
+                # don't add instance of self!
+                if root_node in self.uri_node_map and root_node != node.id_uri:
+                    # print("{} root node {}".format(node.id_uri, root_node))
+                    ref = node.create_ref_statement()
+                    value_qid = self.uri_node_map[root_node].qid
+                    if value_qid:
+                        ss.append(wdi_core.WDItemID(value_qid, self.helper.get_pid('P31'), references=[ref]))
 
             if not ss:
                 # there are no statements for this node
@@ -521,6 +511,28 @@ class Graph:
 
         for node in self.nodes:
             node.remove_deprecated_statements(releases, frc, login)
+
+    def calculate_root_nodes(self):
+        # build a directed graph in networkx using all is_a edges
+        # for each node, get the descendants with an out_degree of 0
+        # which are the root nodes for that node
+        node_uris = [x.id_uri for x in self.nodes]
+
+        G = nx.DiGraph()
+        for node in node_uris:
+            G.add_node(node)
+        G.add_edges_from([(e['sub'], e['obj']) for e in self.edges if e['pred'] == 'is_a'])
+
+        root_nodes = set([node for node in G.nodes if G.out_degree(node) == 0])
+
+        root = dict()
+        for node in node_uris:
+            root[node] = root_nodes & nx.descendants(G, node)
+
+        self.root_node = root
+
+
+
 
     def __str__(self):
         return "{} {} #nodes:{} #edges:{}".format(self.default_namespace, self.version, len(self.nodes),
