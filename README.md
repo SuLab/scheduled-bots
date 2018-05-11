@@ -13,3 +13,9 @@ Data used by a bot, that is regularly updated by an external source, should be h
 
 ## Bots
 See [Bot Status](https://www.wikidata.org/w/index.php?title=User:ProteinBoxBot/Bot_Status)
+
+
+## Wikidata - Disease Ontology Feedback Loop
+
+Code for detecting changes and creating robot templates is located here:
+https://github.com/SuLab/scheduled-bots/blob/master/scheduled_bots/disease_ontology/robot/run.py
