@@ -262,7 +262,7 @@ def main(taxon, file, retrieved, log_dir="./logs", fast_run=True, write=True):
                                            fast_run_base_filter={UNIPROT: "", "P703": organism_wdid},
                                            fast_run_use_refs=True,
                                            ref_handler=update_retrieved_if_new,
-                                           global_ref_mode="STRICT_OVERWRITE"
+                                           append_value=['P680', 'P681', 'P682']
                                            )
             wdi_helpers.try_write(wditem, record_id=uniprot_id, record_prop=UNIPROT, edit_summary="update GO terms",
                                   login=login, write=write)
