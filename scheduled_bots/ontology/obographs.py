@@ -22,7 +22,6 @@ from wikidataintegrator import wdi_core, wdi_property_store, wdi_helpers, wdi_lo
 from wikidataintegrator.ref_handlers import update_retrieved_if_new, update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers import WikibaseHelper
 
-uri_to_curie = lambda s: s.split("/")[-1].replace("_", ":")
 curie_map = default_curie_map.copy()
 cu = CurieUtil(curie_map)
 
@@ -37,7 +36,10 @@ class Node:
     def __init__(self, json_node, graph):
         self.json_node = json_node
         self.id_uri = json_node['id']  # e.g. http://purl.obolibrary.org/obo/DOID_8718
-        self.id_curie = uri_to_curie(self.id_uri)
+        try:
+            self.id_curie = cu.uri_to_curie(self.id_uri)
+        except AssertionError:
+            self.id_curie = None
         self.label = json_node.get("lbl")
         self.type = json_node.get("type")
         self.graph = graph
@@ -138,6 +140,7 @@ class Node:
         # create or get qid
         # creates the primary external ID, the xrefs, instance of (if set), checks label, description, and aliases
         # not other properties (i.e. subclass), as these may require items existing that may not exist yet
+        assert self.id_curie
         s = self.create_statements()
 
         primary_ext_id_pid, primary_ext_id = cu.parse_curie(self.id_curie)
@@ -252,6 +255,7 @@ class Graph:
 
     # the following is optional
     CORE_PROPS = set()
+    EXCLUDE_NODES = set()
 
     def __init__(self, json_path, graph_uri, mediawiki_api_url='https://www.wikidata.org/w/api.php',
                  sparql_endpoint_url='https://query.wikidata.org/sparql'):
@@ -340,6 +344,7 @@ class Graph:
     def filter_nodes(self):
         self.deprecated_nodes = [x for x in self.nodes if x.deprecated and x.type == "CLASS"]
         self.nodes = [x for x in self.nodes if not x.deprecated and x.type == "CLASS"]
+        self.nodes = [x for x in self.nodes if x.id_uri not in self.EXCLUDE_NODES]
 
     def create_nodes_par(self, login, write=True):
         pool = multiprocessing.Pool(processes=4)
@@ -408,7 +413,7 @@ class Graph:
                 sparql_endpoint_url=self.sparql_endpoint_url,
                 mediawiki_api_url=self.mediawiki_api_url
             )
-            this_pid, this_value = cu.parse_curie(uri_to_curie(this_uri))
+            this_pid, this_value = cu.parse_curie(cu.uri_to_curie(this_uri))
             this_pid = self.helper.get_pid(this_pid)
             wdi_helpers.try_write(item, record_id=this_value, record_prop=this_pid,
                                   login=login, write=write)
@@ -441,8 +446,8 @@ class Graph:
 
         # if not, check if the prefix exists in wikidata
         try:
-            obj_pid, obj_value = cu.parse_curie(uri_to_curie(edge_obj))
-        except ValueError as e:
+            obj_pid, obj_value = cu.parse_curie(cu.uri_to_curie(edge_obj))
+        except Exception as e:
             print(e)
             # todo: log
             return None
@@ -473,7 +478,10 @@ class Graph:
         dep_uri_qid = dict()  # key is uri, value is QID
         dep_uri = [x.id_uri for x in self.deprecated_nodes]
         for uri in dep_uri:
-            pid, value = cu.parse_curie(uri_to_curie(uri))
+            try:
+                pid, value = cu.parse_curie(cu.uri_to_curie(uri))
+            except Exception:
+                continue
             pid = self.helper.get_pid(pid)
 
             if pid not in self.pid_id_mapper:
@@ -532,12 +540,16 @@ class Graph:
         # build a directed graph in networkx using all is_a edges
         # for each node, get the descendants with an out_degree of 0
         # which are the root nodes for that node
-        node_uris = [x.id_uri for x in self.nodes]
+        node_uris = set([x.id_uri for x in self.nodes])
 
         G = nx.DiGraph()
         for node in node_uris:
             G.add_node(node)
-        G.add_edges_from([(e['sub'], e['obj']) for e in self.edges if e['pred'] == 'is_a'])
+        # only use the edges for nodes in self.nodes
+        edges = [e for e in self.edges if (e['sub'] in node_uris) or (e['obj'] in node_uris)]
+        # is_a edges
+        edges = [e for e in edges if e['pred'] == 'is_a']
+        G.add_edges_from([(e['sub'], e['obj']) for e in edges])
 
         root_nodes = set([node for node in G.nodes if G.out_degree(node) == 0])
 
@@ -569,7 +581,7 @@ class Graph:
             node = self.uri_node_map[node_uri]
             node.remove_deprecated_statements(releases, frc, login)
 
-            # need to remove description or you get errors..,, 
+            # need to remove description or you get errors....
             item = wdi_core.WDItemEngine(wd_item_id=node.qid)
             item.set_description("")
             item.write(login)

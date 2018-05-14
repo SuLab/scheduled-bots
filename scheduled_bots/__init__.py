@@ -21,5 +21,6 @@ PROPS = {
     'regulates (molecular biology)': 'P128',
     'subject has role': 'P2868',
     'UBERON ID': 'P1554',
-    'develops from': 'P3094'
+    'develops from': 'P3094',
+    'Human Phenotype Ontology ID': 'P3841'
 }
