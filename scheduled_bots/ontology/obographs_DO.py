@@ -1,26 +1,9 @@
 import argparse
-
-from tqdm import tqdm
+import os
 
 from scheduled_bots.ontology.obographs import Graph, Node
 from wikidataintegrator import wdi_login
-
-GRAPH_URI = 'http://purl.obolibrary.org/obo/doid.owl'
-
-mediawiki_api_url = "http://localhost:7171/w/api.php"
-sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
-login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
-
-if True:
-    mediawiki_api_url = 'https://www.wikidata.org/w/api.php'
-    sparql_endpoint_url = 'https://query.wikidata.org/sparql'
-    from scheduled_bots.local import WDUSER, WDPASS
-    login = wdi_login.WDLogin(WDUSER, WDPASS)
-
 from scheduled_bots import PROPS
-from wikidataintegrator.wdi_helpers import WikibaseHelper
-
-h = WikibaseHelper(sparql_endpoint_url)
 
 
 class DONode(Node):
@@ -33,32 +16,31 @@ class DONode(Node):
 
     def _pre_create(self):
         # remove SNOMEDCT_US_2016_03_01 xrefs
-        prefixes = {'SNOMED', 'EFO', 'KEGG', 'MEDDRA', 'CSP'}
-        self.xrefs = set(x for x in self.xrefs if all(prefix not in x for prefix in prefixes))
+        prefixes = {'SNOMED', 'EFO:', 'KEGG:', 'MEDDRA:', 'CSP:'}
+        self.xrefs = set(x for x in self.xrefs if all(not x.lower().startswith(prefix.lower()) for prefix in prefixes))
 
 
 class DOGraph(Graph):
     NAME = "Disease Ontology"
-    QID = h.get_qid("Q5282129")
+    GRAPH_URI = 'http://purl.obolibrary.org/obo/doid.owl'
+    QID = "Q5282129"
     DEFAULT_DESCRIPTION = "human disease"
-    APPEND_PROPS = {h.get_pid(x) for x in {PROPS['subclass of'], PROPS['instance of'],
-                                           PROPS['has cause'], PROPS['location'],
-                                           PROPS['OMIM ID'], PROPS['Orphanet ID'],
-                                           PROPS['MeSH ID'], PROPS['ICD-10-CM'],
-                                           PROPS['ICD-10'], PROPS['ICD-9-CM'],
-                                           PROPS['ICD-9'], PROPS['NCI Thesaurus ID'],
-                                           PROPS['UMLS CUI'], PROPS['Disease Ontology ID']}}
-    CORE_PROPS = {h.get_pid(x) for x in {PROPS['Disease Ontology ID']}}
+    APPEND_PROPS = {PROPS['subclass of'], PROPS['instance of'],
+                    PROPS['has cause'], PROPS['location'],
+                    PROPS['OMIM ID'], PROPS['Orphanet ID'],
+                    PROPS['MeSH ID'], PROPS['ICD-10-CM'],
+                    PROPS['ICD-10'], PROPS['ICD-9-CM'],
+                    PROPS['ICD-9'], PROPS['NCI Thesaurus ID'],
+                    PROPS['UMLS CUI'], PROPS['Disease Ontology ID']}
     FAST_RUN = True
-    FAST_RUN_FILTER = {h.get_pid(PROPS['Disease Ontology ID']): ''}
 
-    PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': h.get_pid(PROPS['location']),
+    PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': PROPS['location'],
                     # 'http://purl.obolibrary.org/obo/RO_0002200': PROPS[],  # has phenotype
                     # 'http://purl.obolibrary.org/obo/IDO_0000664': PROPS[],  # has_material_basis_in
                     # 'http://purl.obolibrary.org/obo/RO_0003304': PROPS[],  # contributes to condition
                     # 'http://purl.obolibrary.org/obo/RO_0002451': PROPS[],  # transmitted by
                     # 'http://purl.obolibrary.org/obo/RO_0001020': PROPS[],  # is allergic trigger for
-                    'is_a': h.get_pid(PROPS['subclass of'])}
+                    'is_a': PROPS['subclass of']}
 
     NODE_CLASS = DONode
 
@@ -66,25 +48,45 @@ class DOGraph(Graph):
         super(DOGraph, self).filter_nodes()
         self.nodes = [x for x in self.nodes if "DOID:" in x.id_curie]
 
-def main():
-    JSON_PATH = "doid.json"
-    g = DOGraph(JSON_PATH, GRAPH_URI, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
-    g.create_release(login)
-    g.set_ref_handler()
-    g.create_nodes(login)
-    g.create_edges(login)
-    g.check_for_existing_deprecated_nodes()
-    g.remove_deprecated_statements(login)
+    def _post_parse_graph(self):
+        # we need to get edges out of the logicalDefinitionAxioms, and im not sure how this will generalize ...
+        # also, this is not going to work on, for example: http://purl.obolibrary.org/obo/DOID_5520
+        # which has multiple values. will have to do with sparql at some point # todo
+
+        # location
+        edges_location = []
+        for axiom in self.json_graph['logicalDefinitionAxioms']:
+            for restriction in axiom['restrictions']:
+                if restriction and (restriction['propertyId'] == "http://purl.obolibrary.org/obo/RO_0001025"):
+                    edges_location.append({'sub': axiom['definedClassId'],
+                                           'pred': restriction['propertyId'],
+                                           'obj': restriction['fillerId']})
+        self.edges.extend(edges_location)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata disease ontology bot')
     parser.add_argument("json_path", help="Path to json file")
+    parser.add_argument("--local", help="preconfigured local wikibase port 7171 and 7272", action='store_true')
     args = parser.parse_args()
 
-    g = DOGraph(args.json_path, GRAPH_URI, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
-    g.setup_logging()
-    g.create_release(login)
-    g.create_nodes(login)
-    g.create_edges(login)
-    g.check_for_existing_deprecated_nodes()
-    g.remove_deprecated_statements(login)
+    if args.local:
+        mediawiki_api_url = "http://localhost:7171/w/api.php"
+        sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
+        login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
+    else:
+        try:
+            from scheduled_bots.local import WDUSER, WDPASS
+        except ImportError:
+            if "WDUSER" in os.environ and "WDPASS" in os.environ:
+                WDUSER = os.environ['WDUSER']
+                WDPASS = os.environ['WDPASS']
+            else:
+                raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
+
+        mediawiki_api_url = 'https://www.wikidata.org/w/api.php'
+        sparql_endpoint_url = 'https://query.wikidata.org/sparql'
+        login = wdi_login.WDLogin(WDUSER, WDPASS)
+
+    g = DOGraph(args.json_path, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
+    g.run(login)
