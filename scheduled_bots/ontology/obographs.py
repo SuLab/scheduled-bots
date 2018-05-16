@@ -3,7 +3,8 @@ This is a generic OWL -> Wikidata importer
 Requires a obographs JSON file made from an owl file
 
 """
-
+import os
+import subprocess
 import traceback
 from collections import defaultdict
 from functools import partial
@@ -11,6 +12,8 @@ from itertools import repeat, chain
 from time import strftime, gmtime
 
 import multiprocessing
+
+import requests
 from tqdm import tqdm
 from wikicurie.wikicurie import CurieUtil, default_curie_map
 import json
@@ -19,7 +22,7 @@ import networkx as nx
 
 from scheduled_bots import utils
 from wikidataintegrator import wdi_core, wdi_property_store, wdi_helpers, wdi_login
-from wikidataintegrator.ref_handlers import update_retrieved_if_new, update_retrieved_if_new_multiple_refs
+from wikidataintegrator.ref_handlers import update_release
 from wikidataintegrator.wdi_helpers import WikibaseHelper
 
 curie_map = default_curie_map.copy()
@@ -40,6 +43,12 @@ class Node:
             self.id_curie = cu.uri_to_curie(self.id_uri)
         except AssertionError:
             self.id_curie = None
+        try:
+            # the wikidata property id for this node's id
+            self.id_pid, _ = cu.parse_curie(self.id_curie)
+            self.id_pid = graph.helper.get_pid(self.id_pid)
+        except Exception:
+            self.id_pid = None
         self.label = json_node.get("lbl")
         self.type = json_node.get("type")
         self.graph = graph
@@ -127,7 +136,10 @@ class Node:
 
         for xref in self.xrefs:
             if xref.split(":")[0] not in cu.curie_map:
-                # todo: log this curie prefix not being found
+                # log this curie prefix not being found
+                m = wdi_helpers.format_msg(self.id_curie, self.id_pid, self.qid, "curie prefix not found: {}".format(xref.split(":")[0]))
+                print(m)
+                wdi_core.WDItemEngine.log("WARNING", m)
                 continue
             pid, ext_id = cu.parse_curie(xref)
             pid = self.helper.get_pid(pid)
@@ -136,10 +148,15 @@ class Node:
 
         return s
 
+    def _pre_create(self):
+        # override in subclass to do something before the node is created
+        pass
+
     def create(self, login, write=True):
         # create or get qid
         # creates the primary external ID, the xrefs, instance of (if set), checks label, description, and aliases
         # not other properties (i.e. subclass), as these may require items existing that may not exist yet
+        self._pre_create()
         assert self.id_curie
         s = self.create_statements()
 
@@ -260,7 +277,7 @@ class Graph:
     def __init__(self, json_path, graph_uri, mediawiki_api_url='https://www.wikidata.org/w/api.php',
                  sparql_endpoint_url='https://query.wikidata.org/sparql'):
         assert self.NAME, "Must initialize subclass"
-        self.json_path = json_path
+        self.json_path = self.handle_file(json_path)
         self.graph_uri = graph_uri
         self.mediawiki_api_url = mediawiki_api_url
         self.sparql_endpoint_url = sparql_endpoint_url
@@ -288,16 +305,78 @@ class Graph:
         self.pids = set()
 
         self.helper = WikibaseHelper(sparql_endpoint_url)
-        self.ref_handler = partial(update_retrieved_if_new_multiple_refs, retrieved_pid=self.helper.get_pid("P813"))
+        self.ref_handler = None
 
         self.load_graph()
         self.parse_graph()
+
+    def run(self, login):
+        self.create_release(login)
+        self.set_ref_handler()
+        self.create_nodes(login)
+        self.create_edges(login)
+        self.check_for_existing_deprecated_nodes()
+        self.remove_deprecated_statements(login)
 
     def load_graph(self):
         with open(self.json_path) as f:
             d = json.load(f)
         graphs = {g['id']: g for g in d['graphs']}
         self.json_graph = graphs[self.graph_uri]
+
+    def set_ref_handler(self):
+        self.ref_handler = partial(update_release, retrieved_pid=self.helper.get_pid("P813"),
+                                   stated_in_pid=self.helper.get_pid("P248"),
+                                   old_stated_in=self._get_old_releases())
+        for node in self.nodes:
+            node.ref_handler = self.ref_handler
+
+    @staticmethod
+    def generate_obograph_from_owl(owl_file_path):
+        # assumes `ogger` is in your path
+        # See: https://github.com/geneontology/obographs
+        json_file_path = owl_file_path.replace(".owl", ".json")
+        print("generating obographs file: {}".format(json_file_path))
+        with open(json_file_path, 'w') as f:
+            c = subprocess.check_call(['ogger', owl_file_path], stdout=f)
+        if c == 0:
+            return json_file_path
+
+    @staticmethod
+    def download_file(file_path):
+        file_name = os.path.split(file_path)[1]
+        print("Downloading")
+        response = requests.get(file_path)
+        download_path = os.path.join('/tmp/', file_name)
+        with open(download_path, 'wb') as f:
+            f.write(response.content)
+        print("Done downloading: {}".format(download_path))
+        return download_path
+
+    @staticmethod
+    def handle_file(file_path):
+        # is this a URL?
+        if file_path.startswith("http") or file_path.startswith("ftp"):
+            file_path = Graph.download_file(file_path)
+
+        # if its an owl file, try to convert
+        if file_path.endswith(".owl"):
+            file_path = Graph.generate_obograph_from_owl(file_path)
+
+        return file_path
+
+
+    def setup_logging(self, log_dir="./logs"):
+        metadata = {
+            'name': self.NAME,
+            'run_id': datetime.now().strftime('%Y%m%d_%H:%M')
+        }
+        log_name = '{}-{}.log'.format(metadata['name'], metadata['run_id'])
+        if wdi_core.WDItemEngine.logger is not None:
+            wdi_core.WDItemEngine.logger.handles = []
+        wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(metadata),
+                                            logger_name=metadata['name'])
+
 
     def parse_graph(self):
         self.parse_meta()
@@ -372,11 +451,17 @@ class Graph:
             raise ValueError("unable to create release")
 
     def create_edges(self, login, write=True):
-        # get all the edges for a single subject
-        # TODO: this skips edges where the subject is not one of our nodes
+
+        # skip edges where the subject is not one of our nodes
+        all_uris = set(node.id_uri for node in self.nodes)
+        skipped_edges = [e for e in self.edges if e['sub'] not in all_uris]
+        print("skipping {} edges where the subject is a node that is being skipped".format(len(skipped_edges)))
+
         for node in tqdm(self.nodes, desc="creating edges"):
             if not node.qid:
-                # todo: log this
+                m = wdi_helpers.format_msg(node.id_curie, node.id_pid, None, "QID not found, skipping edges")
+                print(m)
+                wdi_core.WDItemEngine.log("WARNING", m)
                 continue
             this_uri = node.id_uri
             this_edges = [edge for edge in self.edges if edge['sub'] == this_uri]
@@ -448,8 +533,9 @@ class Graph:
         try:
             obj_pid, obj_value = cu.parse_curie(cu.uri_to_curie(edge_obj))
         except Exception as e:
-            print(e)
-            # todo: log
+            m = wdi_helpers.format_msg(None, None, None, "edge object not found: {}".format(edge_obj))
+            print(m)
+            wdi_core.WDItemEngine.log("WARNING", m)
             return None
 
         obj_pid = self.helper.get_pid(obj_pid)
@@ -467,11 +553,13 @@ class Graph:
             if len(obj_qids) == 1:
                 return list(obj_qids)[0]
             else:
-                # todo: log
-                print("oh no: {} {}".format(obj_pid, obj_value))
+                m = wdi_helpers.format_msg(None, None, None, "multiple qids ({}) found for: {}".format(obj_qids, edge_obj))
+                print(m)
+                wdi_core.WDItemEngine.log("WARNING", m)
         else:
-            # todo: log
-            print("oh no: {} {}".format(obj_pid, obj_value))
+            m = wdi_helpers.format_msg(None, None, None, "no qids found for: {}".format(edge_obj))
+            print(m)
+            wdi_core.WDItemEngine.log("WARNING", m)
 
     def check_for_existing_deprecated_nodes(self):
         # check in wikidata if there are items with the primary ID of deprecated nodes
@@ -498,8 +586,7 @@ class Graph:
     def _get_old_releases(self):
         # get all editions and filter out the current (i.e. latest release)
         if not self.release:
-            print("create release item first")
-            return None
+            raise ValueError("create release item first")
         relaeses_d = self.release.get_all_releases()
         print(relaeses_d)
         releases = set(relaeses_d.values())

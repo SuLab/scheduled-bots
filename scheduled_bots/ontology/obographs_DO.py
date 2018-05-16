@@ -1,16 +1,17 @@
+import argparse
+
 from tqdm import tqdm
 
 from scheduled_bots.ontology.obographs import Graph, Node
 from wikidataintegrator import wdi_login
 
-JSON_PATH = "doid.json"
 GRAPH_URI = 'http://purl.obolibrary.org/obo/doid.owl'
 
 mediawiki_api_url = "http://localhost:7171/w/api.php"
 sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
 login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
 
-if False:
+if True:
     mediawiki_api_url = 'https://www.wikidata.org/w/api.php'
     sparql_endpoint_url = 'https://query.wikidata.org/sparql'
     from scheduled_bots.local import WDUSER, WDPASS
@@ -29,6 +30,11 @@ class DONode(Node):
         if self.synonyms is not None:
             aliases = [x for x in self.synonyms if all(y not in x for y in bad_things)]
             wd_item.set_aliases(aliases=aliases, append=True)
+
+    def _pre_create(self):
+        # remove SNOMEDCT_US_2016_03_01 xrefs
+        prefixes = {'SNOMED', 'EFO', 'KEGG', 'MEDDRA', 'CSP'}
+        self.xrefs = set(x for x in self.xrefs if all(prefix not in x for prefix in prefixes))
 
 
 class DOGraph(Graph):
@@ -60,14 +66,25 @@ class DOGraph(Graph):
         super(DOGraph, self).filter_nodes()
         self.nodes = [x for x in self.nodes if "DOID:" in x.id_curie]
 
-if __name__ == "__main__":
+def main():
+    JSON_PATH = "doid.json"
     g = DOGraph(JSON_PATH, GRAPH_URI, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
-
     g.create_release(login)
-
+    g.set_ref_handler()
     g.create_nodes(login)
-
     g.create_edges(login)
+    g.check_for_existing_deprecated_nodes()
+    g.remove_deprecated_statements(login)
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='run wikidata disease ontology bot')
+    parser.add_argument("json_path", help="Path to json file")
+    args = parser.parse_args()
+
+    g = DOGraph(args.json_path, GRAPH_URI, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
+    g.setup_logging()
+    g.create_release(login)
+    g.create_nodes(login)
+    g.create_edges(login)
     g.check_for_existing_deprecated_nodes()
     g.remove_deprecated_statements(login)
