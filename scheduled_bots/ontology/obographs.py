@@ -9,10 +9,11 @@ import traceback
 from collections import defaultdict
 from functools import partial
 from itertools import repeat, chain
-from time import strftime, gmtime
+from time import strftime, gmtime, sleep
 
 import multiprocessing
 
+import itertools
 import requests
 from tqdm import tqdm
 from wikicurie.wikicurie import CurieUtil, default_curie_map
@@ -29,7 +30,7 @@ curie_map = default_curie_map.copy()
 cu = CurieUtil(curie_map)
 
 # reset core properties
-# we only want the core props specified in Graph.CORE_PROPS
+# core props gets set by the node's primary ID
 # todo: this WILL be an issue if we have two Graphs with different CORE_PROPS loaded.
 # will have to modify WDI to accept the core_props on WDItemEngine instanciation and not set globally like it is now..
 wdi_property_store.wd_properties = dict()
@@ -44,11 +45,12 @@ class Node:
         except AssertionError:
             self.id_curie = None
         try:
-            # the wikidata property id for this node's id
-            self.id_pid, _ = cu.parse_curie(self.id_curie)
+            # the wikidata property id for this node's id, and the value to be used in wikidata
+            self.id_pid, self.id_value = cu.parse_curie(self.id_curie)
             self.id_pid = graph.helper.get_pid(self.id_pid)
         except Exception:
             self.id_pid = None
+            self.id_value = None
         self.label = json_node.get("lbl")
         self.type = json_node.get("type")
         self.graph = graph
@@ -92,12 +94,9 @@ class Node:
     def create_ref_statement(self):
         assert self.graph.release_qid, "create the release first (on the graph class)"
 
-        primary_ext_id_pid, primary_ext_id = cu.parse_curie(self.id_curie)
-        primary_ext_id_pid = self.helper.get_pid(primary_ext_id_pid)
-
         stated_in = wdi_core.WDItemID(value=self.graph.release_qid, prop_nr=self.helper.get_pid('P248'),
                                       is_reference=True)
-        ref_extid = wdi_core.WDExternalID(value=primary_ext_id, prop_nr=primary_ext_id_pid, is_reference=True)
+        ref_extid = wdi_core.WDExternalID(value=self.id_value, prop_nr=self.id_pid, is_reference=True)
         ref_retrieved = wdi_core.WDTime(strftime("+%Y-%m-%dT00:00:00Z", gmtime()),
                                         prop_nr=self.helper.get_pid('P813'), is_reference=True)
         reference = [stated_in, ref_retrieved, ref_extid]
@@ -124,15 +123,12 @@ class Node:
 
     def create_statements(self):
         ref = self.create_ref_statement()
+        self.pids.add(self.id_pid)
 
-        primary_ext_id_pid, primary_ext_id = cu.parse_curie(self.id_curie)
-        primary_ext_id_pid = self.helper.get_pid(primary_ext_id_pid)
-        self.pids.add(primary_ext_id_pid)
-
-        # kind of hacky way to make sure this ID is unique
-        wdi_property_store.wd_properties[primary_ext_id_pid] = {'core_id': True}
-
-        s = [wdi_core.WDExternalID(primary_ext_id, primary_ext_id_pid, references=[ref])]
+        # make sure this ID is unique in wikidata
+        wdi_property_store.wd_properties[self.id_pid] = {'core_id': True}
+        # this node's primary id
+        s = [wdi_core.WDExternalID(self.id_value, self.id_pid, references=[ref])]
 
         for xref in self.xrefs:
             if xref.split(":")[0] not in cu.curie_map:
@@ -169,7 +165,7 @@ class Node:
                 item_name=self.label, data=s, domain="this doesn't do anything",
                 append_value=self.graph.APPEND_PROPS,
                 fast_run=self.graph.FAST_RUN,
-                fast_run_base_filter=self.graph.FAST_RUN_FILTER,
+                fast_run_base_filter={primary_ext_id_pid: ''},
                 fast_run_use_refs=True,
                 global_ref_mode='CUSTOM',
                 ref_handler=self.ref_handler,
@@ -261,24 +257,22 @@ class Graph:
     # the following MUST be overridden in a subclass !!!
     NAME = None
     QID = None
+    GRAPH_URI = None
     DEFAULT_DESCRIPTION = None
     APPEND_PROPS = None
     FAST_RUN = None
-    FAST_RUN_FILTER = None
     PRED_PID_MAP = None
 
     # the following must be overriden if a custom node type is being used
     NODE_CLASS = Node
 
     # the following is optional
-    CORE_PROPS = set()
     EXCLUDE_NODES = set()
 
-    def __init__(self, json_path, graph_uri, mediawiki_api_url='https://www.wikidata.org/w/api.php',
+    def __init__(self, json_path, mediawiki_api_url='https://www.wikidata.org/w/api.php',
                  sparql_endpoint_url='https://query.wikidata.org/sparql'):
         assert self.NAME, "Must initialize subclass"
         self.json_path = self.handle_file(json_path)
-        self.graph_uri = graph_uri
         self.mediawiki_api_url = mediawiki_api_url
         self.sparql_endpoint_url = sparql_endpoint_url
 
@@ -292,9 +286,6 @@ class Graph:
         self.release = None  # the wdi_helper.Release instance
         self.root_node = None
 
-        for core_prop in self.CORE_PROPS:
-            wdi_property_store.wd_properties[core_prop] = {'core_id': True}
-
         # str: the QID of the release item. e.g.:
         self.release_qid = None
         # dict[str, dict[str, str]]: use for mapping URIs from external ontologies. e.g. {'UBERON': {'1234': 'Q5453'}}
@@ -304,8 +295,13 @@ class Graph:
         # we want to save all of the properties we used
         self.pids = set()
 
-        self.helper = WikibaseHelper(sparql_endpoint_url)
         self.ref_handler = None
+        self.helper = WikibaseHelper(sparql_endpoint_url)
+
+        # get the localized version of these pids and qids
+        self.QID = self.helper.get_qid(self.QID)
+        self.PRED_PID_MAP = {k:self.helper.get_pid(v) for k,v in self.PRED_PID_MAP.items()}
+        self.APPEND_PROPS = {self.helper.get_pid(v) for v in self.APPEND_PROPS}
 
         self.load_graph()
         self.parse_graph()
@@ -315,14 +311,17 @@ class Graph:
         self.set_ref_handler()
         self.create_nodes(login)
         self.create_edges(login)
+        last_edit_time = datetime.utcnow()
         self.check_for_existing_deprecated_nodes()
+        entity = "http://www.wikidata.org" if self.sparql_endpoint_url == 'https://query.wikidata.org/sparql' else 'http://wikibase.svc'
+        wdi_helpers.wait_for_last_modified(last_edit_time, endpoint=self.sparql_endpoint_url, entity=entity)
         self.remove_deprecated_statements(login)
 
     def load_graph(self):
         with open(self.json_path) as f:
             d = json.load(f)
         graphs = {g['id']: g for g in d['graphs']}
-        self.json_graph = graphs[self.graph_uri]
+        self.json_graph = graphs[self.GRAPH_URI]
 
     def set_ref_handler(self):
         self.ref_handler = partial(update_release, retrieved_pid=self.helper.get_pid("P813"),
@@ -386,6 +385,11 @@ class Graph:
         self.filter_edges()
         self.calculate_root_nodes()
         self.nodes = sorted(self.nodes, key=lambda x: x.id_uri)
+        self._post_parse_graph()
+
+    def _post_parse_graph(self):
+        # this gets called after self.parse_graph
+        pass
 
     def parse_meta(self):
         meta = self.json_graph['meta']
@@ -424,6 +428,7 @@ class Graph:
         self.deprecated_nodes = [x for x in self.nodes if x.deprecated and x.type == "CLASS"]
         self.nodes = [x for x in self.nodes if not x.deprecated and x.type == "CLASS"]
         self.nodes = [x for x in self.nodes if x.id_uri not in self.EXCLUDE_NODES]
+        self.nodes = [x for x in self.nodes if x.id_pid]
 
     def create_nodes_par(self, login, write=True):
         pool = multiprocessing.Pool(processes=4)
@@ -491,7 +496,7 @@ class Graph:
                 wd_item_id=node.qid, data=ss, domain="fake news",
                 append_value=self.APPEND_PROPS,
                 fast_run=self.FAST_RUN,
-                fast_run_base_filter=self.FAST_RUN_FILTER,
+                fast_run_base_filter={node.id_pid: ''},
                 fast_run_use_refs=True,
                 global_ref_mode='CUSTOM',
                 ref_handler=self.ref_handler,
