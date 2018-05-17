@@ -307,6 +307,7 @@ class Graph:
         self.parse_graph()
 
     def run(self, login):
+        self.setup_logging()
         self.create_release(login)
         self.set_ref_handler()
         self.create_nodes(login)
