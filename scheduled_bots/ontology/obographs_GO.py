@@ -21,10 +21,8 @@ class GONode(Node):
         self.xrefs = list(self.xrefs)
         for n, xref in enumerate(self.xrefs):
             if xref.startswith("EC:"):
-                print(xref)
                 prefix, ec_number = xref.split(":")
                 self.xrefs[n] = ":".join([prefix, ec_formatter(ec_number)])
-                print(xref)
         self.xrefs = set(self.xrefs)
 
 
