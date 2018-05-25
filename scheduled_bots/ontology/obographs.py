@@ -300,7 +300,7 @@ class Graph:
 
         # get the localized version of these pids and qids
         self.QID = self.helper.get_qid(self.QID)
-        self.PRED_PID_MAP = {k:self.helper.get_pid(v) for k,v in self.PRED_PID_MAP.items()}
+        self.PRED_PID_MAP = {k:self.helper.get_pid(v) if v else None for k,v in self.PRED_PID_MAP.items()}
         self.APPEND_PROPS = {self.helper.get_pid(v) for v in self.APPEND_PROPS}
 
         self.load_graph()
