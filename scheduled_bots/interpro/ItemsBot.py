@@ -3,8 +3,7 @@ import os
 from datetime import datetime
 import time
 
-from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
-from pymongo import MongoClient
+from wikidataintegrator import wdi_core
 from tqdm import tqdm
 
 from scheduled_bots.interpro import remove_deprecated_statements
@@ -19,11 +18,9 @@ __metadata__ = {'name': 'InterproBot_Items',
 
 # todo: make sure the old instance of statements get removed also https://www.wikidata.org/wiki/Q24724550
 
-def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb://localhost:27017",
-         mongo_db="wikidata_src", mongo_coll="interpro", run_one=False, write=True):
+def main(login, release_wdid, log_dir="./logs", run_id=None, run_one=False, write=True):
     # data sources
-    db = MongoClient(mongo_uri)[mongo_db]
-    interpro_coll = db[mongo_coll]
+    interpro_coll = json.load(open("interpro.json"))
 
     if run_id is None:
         run_id = datetime.now().strftime('%Y%m%d_%H:%M')
@@ -41,8 +38,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
 
     # create/update all interpro items
     terms = []
-    cursor = interpro_coll.find().batch_size(20)
-    for n, doc in tqdm(enumerate(cursor), total=cursor.count(), mininterval=2.0):
+    for n, doc in tqdm(enumerate(interpro_coll.values()), mininterval=2.0):
         doc['release_wdid'] = release_wdid
         term = IPRTerm(**doc)
         term.create_item(login, write=write)

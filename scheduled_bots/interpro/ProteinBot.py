@@ -1,8 +1,8 @@
 import json
 import os
+import shelve
 from datetime import datetime
 import time
-from pymongo import MongoClient
 from tqdm import tqdm
 from wikidataintegrator import wdi_core, wdi_helpers
 
@@ -27,8 +27,7 @@ PROPS = {
 }
 
 
-def create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_filter, write=True):
-    uniprot_id = doc['_id']
+def create_for_one_protein(login, uniprot_id, doc, release_wdid, uniprot2wd, fast_run_base_filter, write=True):
     try:
         statements = []
         # uniprot ID. needed for PBB_core to find uniprot item
@@ -82,10 +81,13 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
         uniprot2wd = wdi_helpers.id_mapper(UNIPROT)
         fast_run_base_filter = {UNIPROT: ""}
 
-    cursor = collection.find({'_id': {'$in': list(uniprot2wd.keys())}}).batch_size(20)
+    uniprotids = list(uniprot2wd.keys())
     qids = []
-    for n, doc in tqdm(enumerate(cursor), total=cursor.count(), mininterval=10.0):
-        wd_item = create_for_one_protein(login, doc, release_wdid, uniprot2wd, fast_run_base_filter, write=write)
+    for n, key in tqdm(enumerate(uniprotids), mininterval=10.0, total=len(uniprotids)):
+        if key not in collection:
+            continue
+        doc = collection[key]
+        wd_item = create_for_one_protein(login, key, doc, release_wdid, uniprot2wd, fast_run_base_filter, write=write)
         if wd_item and not wd_item.create_new_item:
             qids.append(wd_item.wd_item_id)
         if run_one:
@@ -93,11 +95,9 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
     return qids
 
 
-def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb://localhost:27017",
-         mongo_db="wikidata_src", mongo_coll="interpro_protein", taxon=None, run_one=False, write=True):
+def main(login, release_wdid, log_dir="./logs", run_id=None, taxon=None, run_one=False, write=True):
     # data sources
-    db = MongoClient(mongo_uri)[mongo_db]
-    collection = db[mongo_coll]
+    collection = shelve.open("interpro_protein.shelve")
 
     if run_id is None:
         run_id = datetime.now().strftime('%Y%m%d_%H:%M')
@@ -123,9 +123,11 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, mongo_uri="mongodb:
         return os.path.join(log_dir, log_name)
     time.sleep(10 * 60)  # sleep for 10 min so (hopefully) the wd sparql endpoint updates
 
-    frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter={UNIPROT: "", "P703": taxon}, use_refs=True)
+    frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter={UNIPROT: "", "P703": taxon},
+                           use_refs=True)
     for qid in qids:
         # the old subclass of statements should get removed here (see: https://github.com/SuLab/GeneWikiCentral/issues/68)
-        remove_deprecated_statements(qid, frc, release_wdid, [PROPS[x] for x in ['subclass of', 'has part', 'part of']], login)
+        remove_deprecated_statements(qid, frc, release_wdid, [PROPS[x] for x in ['subclass of', 'has part', 'part of']],
+                                     login)
 
     return os.path.join(log_dir, log_name)

@@ -18,7 +18,6 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run interpro wikidata import bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
@@ -29,15 +28,10 @@ if __name__ == "__main__":
     parser.add_argument('--interpro-date', help="format example: '03-NOV-16'", type=str)
     parser.add_argument('--protein', help='run protein ipr bot', action='store_true')
     parser.add_argument('--items', help='run item ipr bot', action='store_true')
-    parser.add_argument('--mongo-uri', type=str, default="mongodb://localhost:27017")
-    parser.add_argument('--mongo-db', type=str, default="wikidata_src")
 
     args = parser.parse_args()
     if not (args.protein or args.items):
         args.protein = args.items = True
-
-    mongo_db = args.mongo_db
-    mongo_uri = args.mongo_uri
 
     log_dir = args.log_dir if args.log_dir else "./logs"
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
@@ -56,8 +50,7 @@ if __name__ == "__main__":
 
     if args.items:
         print("running item bot")
-        ItemsBot.main(login, release_wdid, mongo_db=mongo_db, mongo_uri=mongo_uri,
-                      log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
+        ItemsBot.main(login, release_wdid, log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
 
     if args.protein:
         print("protein ipr bot")
@@ -68,12 +61,11 @@ if __name__ == "__main__":
 
         for taxon in taxa:
             print("running protein ipr bot on taxon: {}".format(taxon))
-            ProteinBot.main(login, release_wdid, taxon=taxon, mongo_db=mongo_db, mongo_uri=mongo_uri,
-                            log_dir=log_dir, run_one=args.run_one, write=not args.dummy)
+            ProteinBot.main(login, release_wdid, taxon=taxon, log_dir=log_dir, run_one=args.run_one,
+                            write=not args.dummy)
             for frc in wdi_core.WDItemEngine.fast_run_store:
                 frc.clear()
             wdi_core.WDItemEngine.fast_run_store = []
             gc.collect()
-
 
     print("DONE")
