@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 
-# assume the following files exist
-# interpro_release.json, interpro.json
+# assumes the 3 files below exist
 # see interpro_parser.py for details
+
+INTERPRO_RELEASE_FILE="/var/lib/jenkins/workspace/InterproTrigger/interpro_release.json"
+INTERPRO_ITEMS_FILE="/var/lib/jenkins/workspace/InterproTrigger/interpro.json"
+INTERPRO_PROTEIN_FILE="/var/lib/jenkins/workspace/InterproTrigger/interpro_protein.shelve"
 
 pwd
 echo $WDUSER
@@ -22,10 +25,13 @@ python3 setup.py install
 pip install -r requirements.txt
 cd ..
 
+cd scheduled-bots/scheduled_bots/interpro/
+ln -s $INTERPRO_RELEASE_FILE
+ln -s $INTERPRO_ITEMS_FILE
+ln -s $INTERPRO_PROTEIN_FILE
+
 INTERPROVERSION=$(jq -r '.INTERPRO.version' interpro_release.json)
 INTERPRODATE=$(jq -r '.INTERPRO.file_date' interpro_release.json)
-
-cd scheduled-bots/scheduled_bots/interpro/
 
 python3 bot.py --items --interpro-version $INTERPROVERSION --interpro-date $INTERPRODATE
 python3 DeleteBot.py $INTERPROVERSION
