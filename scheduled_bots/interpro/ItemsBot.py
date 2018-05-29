@@ -10,11 +10,13 @@ from scheduled_bots.interpro import remove_deprecated_statements
 from scheduled_bots.interpro.IPRTerm import IPRTerm, INTERPRO
 from wikidataintegrator.wdi_fastrun import FastRunContainer
 
-__metadata__ = {'name': 'InterproBot_Items',
-                'maintainer': 'GSS',
-                'tags': ['interpro'],
-                'properties': ["P279", "P2926", 'P527', 'P361']
-                }
+__metadata__ = {
+    'name': 'InterproBot_Items',
+    'maintainer': 'GSS',
+    'tags': ['interpro'],
+    'properties': ["P279", "P2926", 'P527', 'P361']
+}
+
 
 # todo: make sure the old instance of statements get removed also https://www.wikidata.org/wiki/Q24724550
 
@@ -38,7 +40,9 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, run_one=False, writ
 
     # create/update all interpro items
     terms = []
-    for n, doc in tqdm(enumerate(interpro_coll.values()), mininterval=2.0):
+    interpro_ids = sorted(list(interpro_coll.keys()))
+    for interpro_id in tqdm(interpro_ids, mininterval=2.0):
+        doc = interpro_coll[interpro_id]
         doc['release_wdid'] = release_wdid
         term = IPRTerm(**doc)
         term.create_item(login, write=write)
@@ -46,7 +50,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, run_one=False, writ
         if run_one:
             break
 
-    time.sleep(10*60)  # sleep for 10 min so (hopefully) the wd sparql endpoint updates
+    time.sleep(10 * 60)  # sleep for 10 min so (hopefully) the wd sparql endpoint updates
 
     # create/update interpro item relationships
     IPRTerm.refresh_ipr_wd()
@@ -61,6 +65,7 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, run_one=False, writ
         term.wd_item.fast_run_container.clear()
     frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter={INTERPRO: ''}, use_refs=True)
     for term in tqdm(terms, mininterval=2.0):
-        remove_deprecated_statements(term.wd_item.wd_item_id, frc, release_wdid, ["P31", "P279", "P2926", 'P527', 'P361'], login)
+        remove_deprecated_statements(term.wd_item.wd_item_id, frc, release_wdid,
+                                     ["P31", "P279", "P2926", 'P527', 'P361'], login)
 
     return os.path.join(log_dir, log_name)

@@ -81,7 +81,7 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
         uniprot2wd = wdi_helpers.id_mapper(UNIPROT)
         fast_run_base_filter = {UNIPROT: ""}
 
-    uniprotids = list(uniprot2wd.keys())
+    uniprotids = sorted(list(uniprot2wd.keys()))
     qids = []
     for n, key in tqdm(enumerate(uniprotids), mininterval=10.0, total=len(uniprotids)):
         if key not in collection:
