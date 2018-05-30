@@ -6,7 +6,8 @@ protein2ipr.dat.gz: mapping of individual proteins to family and domains, etc
 creates:
 interpro_release.json: release info
 interpro.json: same as interpro.xml.gz (see parse_interpro_xml)
-interpro_protein.shelve: key is uniprot ID, value is {'part_of': list(specific_families), 'has_part': list(has_part)}
+protein2ipr.csv.gz: uniprot ID; 'part_of' (comma separated); 'has_part' (comma separated)
+e.g.: A0A001;IPR036640,IPR027417;IPR003593,IPR003439,IPR011527,IPR017871
 
 """
 
@@ -66,11 +67,10 @@ def parse_interpro_xml(file_path):
 
 def parse_protein_ipr(protein2ipr_path, interpro):
     p = subprocess.Popen(["zcat", protein2ipr_path], stdout=subprocess.PIPE).stdout
-    # f = open('protein2ipr.csv.gz', 'w', encoding='utf8')
-    # pipe = subprocess.Popen('gzip', stdin=subprocess.PIPE, stdout=f)
-    d = shelve.open("interpro_protein.shelve")
+    f = open('protein2ipr.csv.gz', 'w', encoding='utf8')
+    pipe = subprocess.Popen('gzip', stdin=subprocess.PIPE, stdout=f)
     p2ipr = map(lambda x: x.decode('utf-8').strip().split('\t', 2), p)
-    for key, lines in tqdm(groupby(p2ipr, key=lambda x: x[0]), total=80362872, miniters=1000000):
+    for key, lines in tqdm(groupby(p2ipr, key=lambda x: x[0]), total=80362872):
         # the total is just for a time estimate. Nothing bad happens if the total is wrong
         ipr_ids = set([x[1] for x in lines])
         # group list of domain in a protein by ipr
@@ -82,11 +82,9 @@ def parse_protein_ipr(protein2ipr_path, interpro):
         # A protein be in multiple families. ex: http://www.ebi.ac.uk/interpro/protein/A0A0B5J454
         specific_families = families_id - parents
         has_part = [x['id'] for x in prot_items if x['type'] not in {"Family", "Homologous_superfamily"}]
-        d[key] = {'part_of': list(specific_families), 'has_part': list(has_part)}
-        #s = ",".join([key, "|".join(specific_families), "|".join(has_part)]) + "\n"
-        #pipe.stdin.write(s.encode())
-    d.close()
-    #pipe.communicate()
+        s = ";".join([key, ",".join(specific_families), ",".join(has_part)]) + "\n"
+        pipe.stdin.write(s.encode())
+    pipe.communicate()
 
 
 if __name__ == "__main__":

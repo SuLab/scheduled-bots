@@ -5,7 +5,7 @@
 
 INTERPRO_RELEASE_FILE="/var/lib/jenkins/workspace/InterproTrigger/interpro_release.json"
 INTERPRO_ITEMS_FILE="/var/lib/jenkins/workspace/InterproTrigger/interpro.json"
-INTERPRO_PROTEIN_FILE="/var/lib/jenkins/workspace/InterproTrigger/interpro_protein.shelve"
+INTERPRO_PROTEIN_FILE="/var/lib/jenkins/workspace/InterproTrigger/protein2ipr.csv.gz"
 
 pwd
 echo $WDUSER

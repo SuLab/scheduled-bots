@@ -3,6 +3,8 @@ import os
 import shelve
 from datetime import datetime
 import time
+
+import pandas as pd
 from tqdm import tqdm
 from wikidataintegrator import wdi_core, wdi_helpers
 
@@ -95,10 +97,7 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
     return qids
 
 
-def main(login, release_wdid, log_dir="./logs", run_id=None, taxon=None, run_one=False, write=True):
-    # data sources
-    collection = shelve.open("interpro_protein.shelve")
-
+def main(login, release_wdid, taxon, log_dir="./logs", run_id=None, run_one=False, write=True):
     if run_id is None:
         run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     if log_dir is None:
@@ -114,17 +113,26 @@ def main(login, release_wdid, log_dir="./logs", run_id=None, taxon=None, run_one
     wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
                                         logger_name='ipr{}'.format(taxon))
 
-    qids = create_uniprot_relationships(login, release_wdid, collection, taxon=taxon, write=write, run_one=run_one)
+    uniprot2wd = wdi_helpers.id_mapper(UNIPROT, (("P703", taxon),))
+    uniprot_ids = sorted(list(uniprot2wd.keys()))
+
+    print("loading data")
+    df_iter = pd.read_csv("protein2ipr.csv.gz", iterator=True, chunksize=100000, sep=";", names=['part_of', 'has_part'])
+    df = pd.concat([x[x.index.isin(uniprot_ids)] for x in tqdm(df_iter, total=93075570/100000)])
+    df.fillna("", inplace=True)
+    collection = {x[0]: {'_id': x[0], 'part_of': x[1].part_of.split(","), 'has_part': x[1].has_part.split(",")} for x in
+                  df.iterrows()}
+
+    # """
+    create_uniprot_relationships(login, release_wdid, collection, taxon=taxon, write=write, run_one=run_one)
     for frc in wdi_core.WDItemEngine.fast_run_store:
         frc.clear()
 
-    if not taxon:
-        print("cant remove deprecated statements without specifying taxon")
-        return os.path.join(log_dir, log_name)
     time.sleep(10 * 60)  # sleep for 10 min so (hopefully) the wd sparql endpoint updates
-
+    # """
     frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter={UNIPROT: "", "P703": taxon},
                            use_refs=True)
+    qids = sorted(list(uniprot2wd.values()))
     for qid in qids:
         # the old subclass of statements should get removed here (see: https://github.com/SuLab/GeneWikiCentral/issues/68)
         remove_deprecated_statements(qid, frc, release_wdid, [PROPS[x] for x in ['subclass of', 'has part', 'part of']],
