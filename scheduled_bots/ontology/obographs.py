@@ -8,8 +8,8 @@ import subprocess
 import traceback
 from collections import defaultdict
 from functools import partial
-from itertools import repeat, chain
-from time import strftime, gmtime, sleep
+from itertools import chain
+from time import strftime, gmtime
 
 import multiprocessing
 
@@ -27,6 +27,7 @@ from wikidataintegrator.ref_handlers import update_release
 from wikidataintegrator.wdi_helpers import WikibaseHelper
 
 curie_map = default_curie_map.copy()
+
 cu = CurieUtil(curie_map)
 
 # reset core properties
@@ -65,7 +66,6 @@ class Node:
         self.item = None
         self.bpv = defaultdict(set)
 
-        self.namespace = None
         self.descr = ''
         self.deprecated = None
         self.synonyms = set()
@@ -80,11 +80,6 @@ class Node:
                 self.bpv[basicPropertyValue['pred']].add(basicPropertyValue['val'])
         if 'xrefs' in meta:
             self.xrefs = set([x['val'] for x in meta['xrefs']])
-        namespaces = self.bpv.get('http://www.geneontology.org/formats/oboInOwl#hasOBONamespace', set())
-        if namespaces:
-            self.namespace = list(namespaces)[0]
-        else:
-            self.namespace = self.graph.default_namespace
         self.descr = meta.get('definition', dict()).get('val')
         self.deprecated = meta.get('deprecated', False)
         self.synonyms = set(x['val'] for x in meta.get('synonyms', list()))
@@ -133,7 +128,8 @@ class Node:
         for xref in self.xrefs:
             if xref.split(":")[0] not in cu.curie_map:
                 # log this curie prefix not being found
-                m = wdi_helpers.format_msg(self.id_curie, self.id_pid, self.qid, "curie prefix not found: {}".format(xref.split(":")[0]))
+                m = wdi_helpers.format_msg(self.id_curie, self.id_pid, self.qid,
+                                           "curie prefix not found: {}".format(xref.split(":")[0]))
                 print(m)
                 wdi_core.WDItemEngine.log("WARNING", m)
                 continue
@@ -268,6 +264,7 @@ class Graph:
 
     # the following is optional
     EXCLUDE_NODES = set()
+    CORE_IDS = set()
 
     def __init__(self, json_path, mediawiki_api_url='https://www.wikidata.org/w/api.php',
                  sparql_endpoint_url='https://query.wikidata.org/sparql'):
@@ -278,7 +275,6 @@ class Graph:
 
         self.version = None
         self.date = None
-        self.default_namespace = None
         self.json_graph = None
         self.nodes = None
         self.deprecated_nodes = None
@@ -297,10 +293,12 @@ class Graph:
 
         self.ref_handler = None
         self.helper = WikibaseHelper(sparql_endpoint_url)
+        for core_id in self.CORE_IDS:
+            wdi_property_store.wd_properties[self.helper.get_pid(core_id)] = {'core_id': True}
 
         # get the localized version of these pids and qids
         self.QID = self.helper.get_qid(self.QID)
-        self.PRED_PID_MAP = {k:self.helper.get_pid(v) if v else None for k,v in self.PRED_PID_MAP.items()}
+        self.PRED_PID_MAP = {k: self.helper.get_pid(v) if v else None for k, v in self.PRED_PID_MAP.items()}
         self.APPEND_PROPS = {self.helper.get_pid(v) for v in self.APPEND_PROPS}
 
         self.load_graph()
@@ -322,6 +320,8 @@ class Graph:
         with open(self.json_path) as f:
             d = json.load(f)
         graphs = {g['id']: g for g in d['graphs']}
+        if self.GRAPH_URI not in graphs:
+            raise ValueError("{} not found. Available graphs: {}".format(self.GRAPH_URI, list(graphs.keys())))
         self.json_graph = graphs[self.GRAPH_URI]
 
     def set_ref_handler(self):
@@ -365,7 +365,6 @@ class Graph:
 
         return file_path
 
-
     def setup_logging(self, log_dir="./logs"):
         metadata = {
             'name': self.NAME,
@@ -376,7 +375,6 @@ class Graph:
             wdi_core.WDItemEngine.logger.handles = []
         wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(metadata),
                                             logger_name=metadata['name'])
-
 
     def parse_graph(self):
         self.parse_meta()
@@ -402,9 +400,6 @@ class Graph:
         self.edition = self.version.rsplit("/", 2)[1]
         # date is for the release item as well
         self.date = datetime.strptime(self.edition, '%Y-%m-%d')
-
-        self.default_namespace = [x['val'] for x in meta['basicPropertyValues'] if
-                                  x['pred'] == 'http://www.geneontology.org/formats/oboInOwl#default-namespace'][0]
 
     def parse_nodes(self):
         self.nodes = [self.NODE_CLASS(json_node, self) for json_node in
@@ -559,7 +554,8 @@ class Graph:
             if len(obj_qids) == 1:
                 return list(obj_qids)[0]
             else:
-                m = wdi_helpers.format_msg(None, None, None, "multiple qids ({}) found for: {}".format(obj_qids, edge_obj))
+                m = wdi_helpers.format_msg(None, None, None,
+                                           "multiple qids ({}) found for: {}".format(obj_qids, edge_obj))
                 print(m)
                 wdi_core.WDItemEngine.log("WARNING", m)
         else:
@@ -593,11 +589,10 @@ class Graph:
         # get all editions and filter out the current (i.e. latest release)
         if not self.release:
             raise ValueError("create release item first")
-        relaeses_d = self.release.get_all_releases()
-        print(relaeses_d)
-        releases = set(relaeses_d.values())
+        releases_d = self.release.get_all_releases()
+        releases_d = releases_d if releases_d else dict()
+        releases = set(releases_d.values())
         releases.discard(self.release_qid)
-        print(releases)
         return releases
 
     def _get_all_pids_used(self):
@@ -682,5 +677,5 @@ class Graph:
             wdi_core.WDItemEngine.merge_items(node.qid, self.uri_node_map[to_merge[node_uri]].qid, login)
 
     def __str__(self):
-        return "{} {} #nodes:{} #edges:{}".format(self.default_namespace, self.version, len(self.nodes),
+        return "{} {} #nodes:{} #edges:{}".format(self.NAME, self.version, len(self.nodes),
                                                   len(self.edges))
