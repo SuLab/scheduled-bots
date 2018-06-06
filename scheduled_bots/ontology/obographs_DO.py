@@ -9,14 +9,14 @@ from scheduled_bots import PROPS
 class DONode(Node):
     def set_aliases(self, wd_item):
         # filter out aliases containing these strings
-        bad_things = {'(disorder)', '[obs]'}
+        bad_things = {'(disorder)', '[obs]', '(finding)', 'subac.', 'morphologic abnormality', '(qualifier value)', '[dup]'}
         if self.synonyms is not None:
             aliases = [x for x in self.synonyms if all(y not in x for y in bad_things)]
             wd_item.set_aliases(aliases=aliases, append=True)
 
     def _pre_create(self):
         # remove SNOMEDCT_US_2016_03_01 xrefs
-        prefixes = {'SNOMED', 'EFO:', 'KEGG:', 'MEDDRA:', 'CSP:'}
+        prefixes = {'SNOMED', 'EFO:', 'KEGG:', 'MEDDRA:', 'CSP:', 'URL:'}
         self.xrefs = set(x for x in self.xrefs if all(not x.lower().startswith(prefix.lower()) for prefix in prefixes))
 
 
