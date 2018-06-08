@@ -27,7 +27,13 @@ from wikidataintegrator.ref_handlers import update_release
 from wikidataintegrator.wdi_helpers import WikibaseHelper
 
 curie_map = default_curie_map.copy()
-
+# this is a temporary hack #todo remove
+curie_map['MONDO'] = {
+    'pid': 'Pxxx',
+    'uri': 'http://purl.obolibrary.org/obo/MONDO_',
+    'formatter': 'MONDO:{}',
+    'reverse_formatter': lambda s: s.replace("MONDO:", "")
+}
 cu = CurieUtil(curie_map)
 
 # reset core properties
@@ -125,20 +131,30 @@ class Node:
         # this node's primary id
         s = [wdi_core.WDExternalID(self.id_value, self.id_pid, references=[ref])]
 
-        for xref in self.xrefs:
-            if xref.split(":")[0] not in cu.curie_map:
-                # log this curie prefix not being found
-                m = wdi_helpers.format_msg(self.id_curie, self.id_pid, self.qid,
-                                           "curie prefix not found: {}".format(xref.split(":")[0]))
-                print(m)
-                wdi_core.WDItemEngine.log("WARNING", m)
-                continue
-            pid, ext_id = cu.parse_curie(xref)
-            pid = self.helper.get_pid(pid)
-            self.pids.add(pid)
-            s.append(wdi_core.WDExternalID(ext_id, pid, references=[ref]))
+        s.extend(self.create_xref_statements())
 
         return s
+
+    def create_xref_statements(self):
+        ss = []
+        for xref in self.xrefs:
+            s = self.create_xref_statement(xref)
+            if s:
+                ss.append(s)
+        return ss
+
+    def create_xref_statement(self, xref):
+        ref = self.create_ref_statement()
+        if xref.split(":")[0] not in cu.curie_map:
+            # log this curie prefix not being found
+            m = wdi_helpers.format_msg(self.id_curie, self.id_pid, self.qid,
+                                       "curie prefix not found: {}".format(xref.split(":")[0]))
+            wdi_core.WDItemEngine.log("WARNING", m)
+            return None
+        pid, ext_id = cu.parse_curie(xref)
+        pid = self.helper.get_pid(pid)
+        self.pids.add(pid)
+        return wdi_core.WDExternalID(ext_id, pid, references=[ref])
 
     def _pre_create(self):
         # override in subclass to do something before the node is created
