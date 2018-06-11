@@ -26,15 +26,7 @@ from wikidataintegrator import wdi_core, wdi_property_store, wdi_helpers, wdi_lo
 from wikidataintegrator.ref_handlers import update_release
 from wikidataintegrator.wdi_helpers import WikibaseHelper
 
-curie_map = default_curie_map.copy()
-# this is a temporary hack #todo remove
-curie_map['MONDO'] = {
-    'pid': 'Pxxx',
-    'uri': 'http://purl.obolibrary.org/obo/MONDO_',
-    'formatter': 'MONDO:{}',
-    'reverse_formatter': lambda s: s.replace("MONDO:", "")
-}
-cu = CurieUtil(curie_map)
+cu = CurieUtil()
 
 # reset core properties
 # core props gets set by the node's primary ID

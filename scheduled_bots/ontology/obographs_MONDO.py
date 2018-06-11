@@ -80,26 +80,21 @@ class MondoNode(Node):
         current_descr = wd_item.get_description()
         # print(wd_item.fast_run_container.loaded_langs['en']['label'])
         self.descr = self.descr if self.descr else ''
-        """
-        print(wd_item.__dict__)
-        print(current_descr)
-        print(self.descr)
-        print(len(self.descr))
-        return None
-        """
-        if current_descr == "":
+        # print(wd_item.__dict__)
+        # print(current_descr)
+        # print(self.descr)
+        # print(len(self.descr))
+        if current_descr in {"", "human disease"}:
             if self.descr == "":
                 wd_item.set_description(self.graph.DEFAULT_DESCRIPTION)
-            else:
-                wd_item.set_description(utils.clean_description(self.descr))
-        else:
-            if self.descr and self.descr.lower() != "human disease" and len(self.descr) < 250:
+            elif len(self.descr) < 250:
                 wd_item.set_description(utils.clean_description(self.descr))
 
 
 class MondoGraph(Graph):
     NAME = "Monarch Disease Ontology"
     GRAPH_URI = 'http://purl.obolibrary.org/obo/mondo/subsets/mondo-minimal.owl'
+    # GRAPH_URI = 'http://purl.obolibrary.org/obo/mondo.owl'
     QID = "Q27468140"
     DEFAULT_DESCRIPTION = "human disease"
     APPEND_PROPS = {PROPS['subclass of'], PROPS['instance of'],
@@ -108,8 +103,8 @@ class MondoGraph(Graph):
                     PROPS['MeSH ID'], PROPS['ICD-10-CM'],
                     PROPS['ICD-10'], PROPS['ICD-9-CM'],
                     PROPS['ICD-9'], PROPS['NCI Thesaurus ID'],
-                    PROPS['UMLS CUI'], "Pxxx"}
-    CORE_IDS = {PROPS['Disease Ontology ID'], "Pxxx"}
+                    PROPS['UMLS CUI'], PROPS['Mondo ID']}
+    CORE_IDS = {PROPS['Disease Ontology ID'], PROPS['Mondo ID']}
     FAST_RUN = True
 
     PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': PROPS['location'],
@@ -125,7 +120,7 @@ class MondoGraph(Graph):
     def filter_nodes(self):
         super(MondoGraph, self).filter_nodes()
         # self.nodes = self.nodes[:20]
-        # self.nodes = [x for x in self.nodes if x.id_curie == "MONDO:0000804"]
+        # self.nodes = [x for x in self.nodes if x.id_curie == "MONDO:0000048"]
 
 
 if __name__ == "__main__":
