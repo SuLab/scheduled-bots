@@ -31,7 +31,8 @@ class DOGraph(Graph):
                     PROPS['MeSH ID'], PROPS['ICD-10-CM'],
                     PROPS['ICD-10'], PROPS['ICD-9-CM'],
                     PROPS['ICD-9'], PROPS['NCI Thesaurus ID'],
-                    PROPS['UMLS CUI'], PROPS['Disease Ontology ID']}
+                    PROPS['UMLS CUI'], PROPS['Disease Ontology ID'],
+                    PROPS['GARD rare disease ID']}
     FAST_RUN = True
 
     PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': PROPS['location'],
