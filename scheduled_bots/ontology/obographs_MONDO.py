@@ -35,8 +35,8 @@ class MondoNode(Node):
         Special handling of xrefs to include mapping relation type
         """
 
-        if not self.mrh:
-            self.mrh = wdi_helpers.MappingRelationHelper(sparql_endpoint_url=self.graph.sparql_endpoint_url)
+        if not MondoNode.mrh:
+            MondoNode.mrh = wdi_helpers.MappingRelationHelper(sparql_endpoint_url=self.graph.sparql_endpoint_url)
 
         # need a way to get from "http://linkedlifedata.com/resource/umls/id/C0265218" to UMLS:C0265218, for example
         # ignoring meddra and snomed
