@@ -44,7 +44,7 @@ class MondoNode(Node):
             "http://identifiers.org/omim/": "OMIM:",
             "http://identifiers.org/mesh/": "MESH:",
             "http://linkedlifedata.com/resource/umls/id/": "UMLS:",
-            "http://www.orpha.net/ORDO/Orphanet_": "ORDO:",
+            "http://www.orpha.net/ORDO/Orphanet_": "Orphanet:",
             "http://purl.obolibrary.org/obo/DOID_": "DOID:",
             "http://purl.obolibrary.org/obo/NCIT_": "NCIT:"
         }
@@ -93,8 +93,8 @@ class MondoNode(Node):
 
 class MondoGraph(Graph):
     NAME = "Monarch Disease Ontology"
-    GRAPH_URI = 'http://purl.obolibrary.org/obo/mondo/subsets/mondo-minimal.owl'
-    # GRAPH_URI = 'http://purl.obolibrary.org/obo/mondo.owl'
+    # GRAPH_URI = 'http://purl.obolibrary.org/obo/mondo/subsets/mondo-minimal.owl'
+    GRAPH_URI = 'http://purl.obolibrary.org/obo/mondo.owl'
     QID = "Q27468140"
     DEFAULT_DESCRIPTION = "human disease"
     APPEND_PROPS = {PROPS['subclass of'], PROPS['instance of'],
@@ -103,8 +103,9 @@ class MondoGraph(Graph):
                     PROPS['MeSH ID'], PROPS['ICD-10-CM'],
                     PROPS['ICD-10'], PROPS['ICD-9-CM'],
                     PROPS['ICD-9'], PROPS['NCI Thesaurus ID'],
-                    PROPS['UMLS CUI'], PROPS['Mondo ID']}
-    CORE_IDS = {PROPS['Disease Ontology ID'], PROPS['Mondo ID']}
+                    PROPS['UMLS CUI'], PROPS['Mondo ID'],
+                    PROPS['GARD rare disease ID'], PROPS['Disease Ontology ID']}
+    CORE_IDS = {PROPS['Disease Ontology ID'], PROPS['Mondo ID'], PROPS['MeSH ID']}
     FAST_RUN = True
 
     PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': PROPS['location'],
@@ -120,7 +121,7 @@ class MondoGraph(Graph):
     def filter_nodes(self):
         super(MondoGraph, self).filter_nodes()
         # self.nodes = self.nodes[:20]
-        # self.nodes = [x for x in self.nodes if x.id_curie == "MONDO:0000048"]
+        # self.nodes = [x for x in self.nodes if x.id_curie == "MONDO:0010278"]
 
 
 if __name__ == "__main__":
