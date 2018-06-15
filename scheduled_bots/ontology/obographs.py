@@ -282,6 +282,7 @@ class Graph:
         self.sparql_endpoint_url = sparql_endpoint_url
 
         self.version = None
+        self.edition = None
         self.date = None
         self.json_graph = None
         self.nodes = None
@@ -683,6 +684,18 @@ class Graph:
             item.write(login)
 
             wdi_core.WDItemEngine.merge_items(node.qid, self.uri_node_map[to_merge[node_uri]].qid, login)
+
+    def print_prop_usage(self):
+        from collections import Counter
+        from pprint import pprint
+        pprint(Counter([e['pred'] for e in self.edges]).most_common())
+
+    def print_xref_usage(self):
+        from collections import Counter
+        from pprint import pprint
+        from itertools import chain
+        xrefs = set(chain(*[x.xrefs for x in self.nodes]))
+        pprint(Counter(x.split(":")[0] for x in xrefs).most_common())
 
     def __str__(self):
         return "{} {} #nodes:{} #edges:{}".format(self.NAME, self.version, len(self.nodes),
