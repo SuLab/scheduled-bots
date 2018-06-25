@@ -22,5 +22,7 @@ PROPS = {
     'subject has role': 'P2868',
     'UBERON ID': 'P1554',
     'develops from': 'P3094',
-    'Human Phenotype Ontology ID': 'P3841'
+    'Human Phenotype Ontology ID': 'P3841',
+    'Mondo ID': 'P5270',
+    'Sequence Ontology ID': 'P3986'
 }
