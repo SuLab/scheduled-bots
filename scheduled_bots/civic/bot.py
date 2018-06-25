@@ -240,7 +240,8 @@ def run_one(variant_id, retrieved, fast_run, write, login):
 
         ## Reference
         pmid = evidence_item["source"]["pubmed_id"]
-        pmid_qid = wdi_helpers.PubmedItem(pmid).get_or_create(login if write else None)
+        pmid_qid = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
+                                                 source="europepmc").get_or_create(login if write else None)
         if pmid_qid is None:
             return panic(variant_id, "not found: {}".format(pmid), "pmid")
         refStatedIn = wdi_core.WDItemID(value=pmid_qid, prop_nr=PROPS['stated in'], is_reference=True)

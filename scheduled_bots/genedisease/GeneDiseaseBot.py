@@ -144,7 +144,8 @@ class GeneDiseaseBot(object):
         self.pmid_qid_map = get_values("P698", pmids)
         print("Found {} pmids".format(len(self.pmid_qid_map)))
         for pmid in pmids - set(self.pmid_qid_map.keys()):
-            self.pmid_qid_map[pmid] = wdi_helpers.PubmedItem(pmid).get_or_create(self.login)
+            self.pmid_qid_map[pmid] = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
+                                                                    source="europepmc").get_or_create(self.login)
 
         print("Building relationships & references")
         for gdr in tqdm(gdrs):

@@ -157,7 +157,7 @@ def create_articles(pmids: Set[str], login: object, write: bool = True) -> Dict[
     """
     pmid_map = dict()
     for pmid in pmids:
-        p = wdi_helpers.PubmedItem(pmid)
+        p = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid", source="europepmc")
         if write:
             try:
                 pmid_wdid = p.get_or_create(login)

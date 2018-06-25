@@ -152,7 +152,7 @@ def create_variant_annotation(variant_qid, association, drug_qid, prim_tt_qid, s
         reference.append(wdi_core.WDTime(t, prop_nr=PROPS['retrieved'], is_reference=True))
         for source in source_str.split(";"):
             if source.startswith("PMID:"):
-                qid = wdi_helpers.PubmedItem(source.replace("PMID:", "")).get_or_create(login)
+                qid = wdi_helpers.PublicationHelper(source.replace("PMID:", ""), id_type="pmid", source="europepmc").get_or_create(login)
                 reference.append(wdi_core.WDItemID(qid, PROPS['stated in'], is_reference=True))
             elif source in source_map:
                 reference.append(wdi_core.WDItemID(source_map[source], PROPS['stated in'], is_reference=True))
