@@ -30,7 +30,7 @@ class GOGraph(Graph):
     NAME = "Gene Ontology"
     GRAPH_URI = 'http://purl.obolibrary.org/obo/go.owl'
     QID = "Q135085"
-    DEFAULT_DESCRIPTION = ""
+    DEFAULT_DESCRIPTION = "gene ontology term"
     APPEND_PROPS = {PROPS['subclass of'], PROPS['instance of'],
                     PROPS['has cause'], PROPS['location'], PROPS['part of'],
                     PROPS['has part'], PROPS['regulates (molecular biology)'],

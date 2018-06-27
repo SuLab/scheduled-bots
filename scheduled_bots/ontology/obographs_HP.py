@@ -1,8 +1,15 @@
 from scheduled_bots import PROPS
 import argparse
 import os
-from scheduled_bots.ontology.obographs import Graph
+from scheduled_bots.ontology.obographs import Graph, Node
 from wikidataintegrator import wdi_login
+
+
+class HPNode(Node):
+    def _pre_create(self):
+        # keep only these
+        prefixes = {'SNOMED:', 'UMLS:', 'MSH:', 'ICD-10:', 'NCIT:', 'ORPHA:'}
+        self.xrefs = set(x for x in self.xrefs if any(x.lower().startswith(prefix.lower()) for prefix in prefixes))
 
 
 class HPGraph(Graph):
@@ -22,6 +29,7 @@ class HPGraph(Graph):
     PRED_PID_MAP = {
         'is_a': PROPS['subclass of'],
     }
+    NODE_CLASS = HPNode
 
 
 if __name__ == "__main__":
