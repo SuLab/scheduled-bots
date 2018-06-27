@@ -26,7 +26,7 @@ class DOGraph(Graph):
     QID = "Q5282129"
     DEFAULT_DESCRIPTION = "human disease"
     APPEND_PROPS = {PROPS['subclass of'], PROPS['instance of'],
-                    PROPS['has cause'], PROPS['location'],
+                    PROPS['has cause'], PROPS['anatomical location'],
                     PROPS['OMIM ID'], PROPS['Orphanet ID'],
                     PROPS['MeSH ID'], PROPS['ICD-10-CM'],
                     PROPS['ICD-10'], PROPS['ICD-9-CM'],
@@ -35,7 +35,7 @@ class DOGraph(Graph):
                     PROPS['GARD rare disease ID']}
     FAST_RUN = True
 
-    PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': PROPS['location'],
+    PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': PROPS['anatomical location'],
                     # 'http://purl.obolibrary.org/obo/RO_0002200': PROPS[],  # has phenotype
                     # 'http://purl.obolibrary.org/obo/IDO_0000664': PROPS[],  # has_material_basis_in
                     # 'http://purl.obolibrary.org/obo/RO_0003304': PROPS[],  # contributes to condition
