@@ -643,7 +643,7 @@ class Graph:
         for node in node_uris:
             G.add_node(node)
         # only use the edges for nodes in self.nodes
-        edges = [e for e in self.edges if (e['sub'] in node_uris) or (e['obj'] in node_uris)]
+        edges = [e for e in self.edges if (e['sub'] in node_uris) and (e['obj'] in node_uris)]
         # is_a edges
         edges = [e for e in edges if e['pred'] == 'is_a']
         G.add_edges_from([(e['sub'], e['obj']) for e in edges])
