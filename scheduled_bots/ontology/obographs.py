@@ -290,6 +290,7 @@ class Graph:
         self.edges = None
         self.release = None  # the wdi_helper.Release instance
         self.root_node = None
+        self.G = None  # a networkx directed graph using is_a relationships. built in calculate_root_nodes
 
         # str: the QID of the release item. e.g.:
         self.release_qid = None
@@ -655,6 +656,7 @@ class Graph:
             root[node] = root_nodes & nx.descendants(G, node)
 
         self.root_node = root
+        self.G = G
 
     def find_replaced_nodes(self, login):
         # in GO atleast, some deprecated nodes are denoted as replaced by some other node
