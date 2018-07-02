@@ -28,7 +28,7 @@ class MondoNode(Node):
         prefixes = {'SNOMED', 'EFO:', 'KEGG:', 'MEDDRA:', 'CSP:'}
         self.xrefs = set(x for x in self.xrefs if all(not x.lower().startswith(prefix.lower()) for prefix in prefixes))
         # change ICD10 to ICD10CM
-        self.xrefs = set([x.replace("ICD10:", "ICD10CM:").replace("ICD9:", "ICD19CM:") for x in self.xrefs])
+        self.xrefs = set([x.replace("ICD10:", "ICD10CM:").replace("ICD9:", "ICD9CM:") for x in self.xrefs])
 
     def create_xref_statements(self):
         """
