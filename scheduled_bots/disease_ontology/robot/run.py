@@ -5,7 +5,7 @@ Figure out what the differences are
 Generate a ROBOT file to implement all changes
 """
 import os
-from collections import defaultdict
+from collections import defaultdict, Counter
 import requests
 from itertools import chain
 import csv
@@ -16,6 +16,9 @@ from tqdm import tqdm
 from functools import lru_cache
 
 from wikidataintegrator.wdi_core import WDItemEngine
+from wikicurie import wikicurie
+
+cu = wikicurie.CurieUtil()
 
 BIOPORTAL_KEY = "a1ac23bb-23cb-44cf-bf5e-bcdd7446ef37"
 DO_OWL_PATH = "doid.owl"
@@ -66,32 +69,36 @@ def get_wikidata_do_xrefs():
          } GROUP BY ?disease ?doid
       }
     } """
-    results = WDItemEngine.execute_sparql_query(query)['results']['bindings']
-    results = [{k: v['value'].replace("http://www.wikidata.org/entity/", "") for k, v in item.items()} for item in
-               results]
+    df = WDItemEngine.execute_sparql_query(query, as_dataframe=True)
+    df.disease = df.disease.str.replace("http://www.wikidata.org/entity/", "")
+    assert len(df.doid) == len(set(df.doid)), "{}".format(df[df.doid.duplicated(keep=False)])
 
-    df = pd.DataFrame(results)
-    assert len(df.doid) == len(set(df.doid))
+    rs = df.to_dict("records")
+    newrs = []
+    for r in rs:
+        s = set()
+        newr = dict()
+        for k, v in r.items():
+            if k.endswith("G") and v:
+                s.update(k[:-1] + ":" + vv for vv in v.split(","))
+            elif not k.endswith("G"):
+                newr[k] = v
+        newr['xref'] = s
+        newrs.append(newr)
 
-    r = df.to_dict("records")
-    r = [{k[:-1] if k.endswith("G") else k: set(v.split(",")) if k.endswith("G") and v else v for k, v in x.items()} for
-         x in r]
-    r = [{k: v for k, v in x.items() if v} for x in r]
-    d = {x['doid']: x for x in r}
+    d = {x['doid']: x for x in newrs}
     return d
 
 
-def parse_xrefs(xrefs):
-    # turns a list of xref curies into a dict: {'prefix': {'set of values'}, ... }
-    d = defaultdict(set)
-    for xref in xrefs:
-        prefix, value = xref.split(":", 1)
-        prefix = prefix.strip()
-        value = value.strip()
-        if prefix in PREFIXES:
-            d[prefix].add(value)
-    d = dict(d)
-    return d
+def get_duplicated_xrefs(d):
+    # from the output of get_wikidata_do_xrefs
+    # check if some are duplicated
+    xref_count = defaultdict(set)
+    for doid, dd in d.items():
+        for xref in dd['xref']:
+            xref_count[xref].add(doid)
+    xref_count = {k: vv for k, vv in xref_count.items() if len(vv) > 1}
+    return xref_count
 
 
 def parse_do_owl():
@@ -125,15 +132,9 @@ def parse_do_owl():
     df = df[df.doid.str.startswith("DOID:")]
     df.xref = df.xref.replace("", pd.np.nan)
     df.descr = df.descr.fillna("")
-    # df.dropna(subset=['xref'], inplace=True)
-    df = df.merge(df.groupby("id").xref.apply(lambda x: set(x.dropna())).reset_index(), on="id", how="outer")
-    del df['xref_x']
-    df.rename(columns={'xref_y': 'xref'}, inplace=True)
-    df.drop_duplicates("id", inplace=True)
+    df = df.groupby(["id", "label", "descr", "doid"]).xref.apply(lambda x: set(x.dropna())).reset_index()
     r = df.to_dict("records")
     do = {x['doid']: x for x in r}
-    for k, v in do.items():
-        v.update(parse_xrefs(v['xref']))
     return do
 
 
@@ -146,22 +147,25 @@ def compare(wd, do):
     missing_in_wd = set(do.keys()) - set(wd.keys())
     print("Items missing in wikidata: {}".format(missing_in_wd))
     print("Items missing in DO: {}".format(missing_in_do))
-    for doid in doids:
-        leftover_in_wd[doid] = dict()
-        leftover_in_do[doid] = dict()
-        for prefix in PREFIXES:
-            leftover_in_wd[doid][prefix] = wd[doid].get(prefix, set()) - do[doid].get(prefix, set())
-            leftover_in_do[doid][prefix] = do[doid].get(prefix, set()) - wd[doid].get(prefix, set())
+    for k in doids:
         # get rid of the OMIM PS ids
-        leftover_in_do[doid]['OMIM'] = {x for x in leftover_in_do[doid]['OMIM'] if not x.startswith("PS")}
+        wd[k]['xref'] = {x for x in wd[k]['xref'] if not x.startswith("OMIM:PS")}
+        do[k]['xref'] = {x for x in do[k]['xref'] if not x.startswith("OMIM:PS")}
         # get rid of GARD because we didn't add those
-        del leftover_in_do[doid]['GARD']
-        # remove icd9 and 10 because something is weird with a couple of those
-        del leftover_in_do[doid]['ICD10CM']
-        del leftover_in_do[doid]['ICD9CM']
+        wd[k]['xref'] = {x for x in wd[k]['xref'] if not x.startswith("GARD")}
+        do[k]['xref'] = {x for x in do[k]['xref'] if not x.startswith("GARD")}
+        # remove icd9 and 10 for now
+        wd[k]['xref'] = {x for x in wd[k]['xref'] if not x.startswith("ICD")}
+        do[k]['xref'] = {x for x in do[k]['xref'] if not x.startswith("ICD")}
+        # remove snomed because not in wd
+        wd[k]['xref'] = {x for x in wd[k]['xref'] if not x.startswith("SNOMED")}
+        do[k]['xref'] = {x for x in do[k]['xref'] if not x.startswith("SNOMED")}
+        # replace NCI2004_11_17:C5453 with NCI
+        do[k]['xref'] = {x.replace("NCI2004_11_17:", "NCI:") for x in do[k]['xref']}
 
-        leftover_in_wd[doid] = {k: v for k, v in leftover_in_wd[doid].items() if v}
-        leftover_in_do[doid] = {k: v for k, v in leftover_in_do[doid].items() if v}
+    for doid in doids:
+        leftover_in_wd[doid] = wd[doid].get('xref', set()) - do[doid].get('xref', set())
+        leftover_in_do[doid] = do[doid].get('xref', set()) - wd[doid].get('xref', set())
 
     leftover_in_wd = {k: v for k, v in leftover_in_wd.items() if v}
     leftover_in_do = {k: v for k, v in leftover_in_do.items() if v}
@@ -169,56 +173,16 @@ def compare(wd, do):
     return leftover_in_wd, leftover_in_do
 
 
-first_line = ["ID", "Label", "Class Type", "DbXref", "QID"]
-second_line = ["ID", "A rdfs:label", "CLASS_TYPE", "A oboInOwl:hasDbXref SPLIT=|", ""]
-
-
-def make_robot_xref_additions(do, wd, leftover_in_wd):
-    # make robot file
-    # robot template docs: https://github.com/ontodev/robot/blob/master/docs/template.md
-    with open("xref additions.csv", 'w') as f:
-        # f = open("test.csv", 'w')
-        w = csv.writer(f)
-        w.writerow(first_line)
-        w.writerow(second_line)
-        for ID in leftover_in_wd:
-            # ID = "DOID:0060330"
-            Label = do[ID]['label']
-            xrefs = set(chain(*[[":".join([k, vv]) for vv in v] for k, v in leftover_in_wd[ID].items()]))
-            DbXref = "|".join(xrefs)
-            class_type = "equivalent"
-            qid = wd[ID]['disease']
-            qid_url = "https://www.wikidata.org/wiki/{}".format(qid)
-            line = [ID, Label, class_type, DbXref, qid_url]
-            w.writerow(line)
-
-
-def make_robot_xref_subtractions(do, wd, leftover_in_do):
-    # make robot file
-    # robot template docs: https://github.com/ontodev/robot/blob/master/docs/template.md
-    with open("xref subs.csv", 'w') as f:
-        # f = open("test.csv", 'w')
-        w = csv.writer(f)
-        w.writerow(first_line)
-        w.writerow(second_line)
-        for ID in leftover_in_do:
-            # ID = "DOID:0060330"
-            Label = do[ID]['label']
-            xrefs = set(chain(*[[":".join([k, vv]) for vv in v] for k, v in leftover_in_do[ID].items()]))
-            DbXref = "|".join(xrefs)
-            class_type = "equivalent"
-            qid = wd[ID]['doid']
-            qid_url = "https://www.wikidata.org/wiki/{}".format(qid)
-            line = [ID, Label, class_type, DbXref, qid_url]
-            w.writerow(line)
-
-
-def make_robot_xref_additions_records(wd, records, filename):
+def make_robot_xref_additions_records(wd, do, records, filename):
     # make robot file
     # robot template docs: https://github.com/ontodev/robot/blob/master/docs/template.md
     # records is a list of dicts with keys: 'doid', 'doid_label', 'ext_descr', 'ext_id', 'ext_label', 'ext_synonyms'
-    first_line = ["ID", "Label", "Class Type", "DbXref", "QID", "ext_label", "ext_descr", "ext_synonyms", "ext_url"]
-    second_line = ["ID", "A rdfs:label", "CLASS_TYPE", "A oboInOwl:hasDbXref SPLIT=|", "", "", "", "", ""]
+    first_line = ["ID", "Label", "Class Type", "DbXref", "QID", "ext_label", "ext_descr", "ext_synonyms", "ext_url",
+                  "also_on_do", "also_on_wd"]
+    second_line = ["ID", "A rdfs:label", "CLASS_TYPE", "A oboInOwl:hasDbXref SPLIT=|", "", "", "", "", "", ""]
+    dupe_xrefs_wd = get_duplicated_xrefs(wd)
+    dupe_xrefs_do = get_duplicated_xrefs(do)
+
     with open(filename, 'w') as f:
         # f = open("test.csv", 'w')
         w = csv.writer(f)
@@ -232,8 +196,11 @@ def make_robot_xref_additions_records(wd, records, filename):
             class_type = "equivalent"
             qid = wd[ID]['disease']
             qid_url = "https://www.wikidata.org/wiki/{}".format(qid)
+            namespace, value = DbXref.split(":")
+            also_on_wd = ";".join(dupe_xrefs_wd.get(DbXref, set()))
+            also_on_do = ";".join(dupe_xrefs_do.get(DbXref, set()))
             line = [ID, Label, class_type, DbXref, qid_url, record['ext_label'],
-                    record['ext_descr'], record['ext_synonyms'], record['ext_url']]
+                    record['ext_descr'], record['ext_synonyms'], record['ext_url'], also_on_do, also_on_wd]
             w.writerow(line)
 
 
@@ -283,109 +250,109 @@ def get_omim_info(omim_id):
     return d
 
 
-wd = get_wikidata_do_xrefs()
-do = parse_do_owl()
-
-leftover_in_wd, leftover_in_do = compare(wd, do)
-print(leftover_in_do)
-
-make_robot_xref_additions(do, wd, leftover_in_wd)
-make_robot_xref_subtractions(do, wd, leftover_in_do)
-
-## get only the mesh changes
-records = []
-url = "https://meshb.nlm.nih.gov/record/ui?ui={}"
-for k, v in leftover_in_wd.items():
-    if 'MESH' in v:
+def run_mesh(wd, do, leftover_in_wd):
+    ## get only the mesh changes
+    records = []
+    url = "https://meshb.nlm.nih.gov/record/ui?ui={}"
+    for k, v in leftover_in_wd.items():
         records.extend([{'doid': k, 'doid_label': do[k]['label'],
-                         'mesh_id': x, 'mesh_url': url.format(x)} for x in v['MESH']])
-# get mesh labels
-for record in tqdm(records):
-    record.update(get_mesh_info(record['mesh_id']))
-# classify match by exact sring match on title or one of the aliases
-for record in tqdm(records):
-    if record['doid_label'].lower() == record['mesh_label'].lower():
-        record['match_type'] = 'exact'
-    elif record['doid_label'].lower() in map(str.lower, record['mesh_synonyms'].split(";")):
-        record['match_type'] = 'exact_syn'
-    else:
-        record['match_type'] = 'not'
-# rename keys
-records = [{k.replace("mesh", "ext"): v for k, v in record.items()} for record in records]
-# curie-ize ext id
-for record in records:
-    record['ext_id'] = "MESH:" + record['ext_id']
-records = sorted(records, key=lambda x: x['doid'])
+                         'mesh_id': x, 'mesh_url': url.format(x)} for x in v if x.startswith("MESH:")])
+    # get mesh labels
+    for record in tqdm(records):
+        record.update(get_mesh_info(record['mesh_id'].split(":")[1]))
+    # classify match by exact sring match on title or one of the aliases
+    for record in tqdm(records):
+        if record['doid_label'].lower() == record['mesh_label'].lower():
+            record['match_type'] = 'exact'
+        elif record['doid_label'].lower() in map(str.lower, record['mesh_synonyms'].split(";")):
+            record['match_type'] = 'exact_syn'
+        else:
+            record['match_type'] = 'not'
+    # rename keys
+    records = [{k.replace("mesh", "ext"): v for k, v in record.items()} for record in records]
+    records = sorted(records, key=lambda x: x['doid'])
 
-make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact'],
-                                  "mesh xref additions exact.csv")
-make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact_syn'],
-                                  "mesh xref additions exact_syn.csv")
-make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'not'],
-                                  "mesh xref additions notexact.csv")
-
-## get only the OMIM changes
-records = []
-url = "https://omim.org/entry/{}"
-for k, v in leftover_in_wd.items():
-    if 'OMIM' in v:
-        records.extend([{'doid': k, 'doid_label': do[k]['label'],
-                         'omim_id': x, 'omim_url': url.format(x)} for x in v['OMIM']])
-# get omim labels
-for record in tqdm(records):
-    record.update(get_omim_info(record['omim_id']))
-# classify match by exact sring match on title or one of the aliases
-for record in tqdm(records):
-    if record['doid_label'].lower() == record['omim_label'].lower():
-        record['match_type'] = 'exact'
-    elif record['doid_label'].lower() in map(str.lower, record['omim_synonyms'].split(";")):
-        record['match_type'] = 'exact_syn'
-    else:
-        record['match_type'] = 'not'
-# rename keys
-records = [{k.replace("omim", "ext"): v for k, v in record.items()} for record in records]
-# curie-ize ext id
-for record in records:
-    record['ext_id'] = "OMIM:" + record['ext_id']
-    record['ext_descr'] = record['ext_prefix']
-records = sorted(records, key=lambda x: x['doid'])
-
-make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact'],
-                                  "omim xref additions exact.csv")
-make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact_syn'],
-                                  "omim xref additions exact_syn.csv")
-make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'not'],
-                                  "omim xref additions notexact.csv")
+    make_robot_xref_additions_records(wd, do, [x for x in records if x['match_type'] in {'exact', 'exact_syn'}],
+                                      "mesh xref additions exact.csv")
+    make_robot_xref_additions_records(wd, do, [x for x in records if x['match_type'] == 'not'],
+                                      "mesh xref additions notexact.csv")
 
 
-## get only the ORDO changes
-records = []
-url = "http://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=EN&Expert={}"
-for k, v in leftover_in_wd.items():
-    if 'ORDO' in v:
-        records.extend([{'doid': k, 'doid_label': do[k]['label'],
-                         'ordo_id': x, 'ordo_url': url.format(x)} for x in v['ORDO']])
-# get ordo labels
-for record in tqdm(records):
-    record.update(get_ordo_info(record['ordo_id']))
-# classify match by exact sring match on title or one of the aliases
-for record in tqdm(records):
-    if record['doid_label'].lower() == record['ordo_label'].lower():
-        record['match_type'] = 'exact'
-    elif record['doid_label'].lower() in map(str.lower, record['ordo_synonyms'].split(";")):
-        record['match_type'] = 'exact_syn'
-    else:
-        record['match_type'] = 'not'
-# rename keys
-records = [{k.replace("ordo", "ext"): v for k, v in record.items()} for record in records]
-# curie-ize ext id
-for record in records:
-    record['ext_id'] = "ORDO:" + record['ext_id']
-records = sorted(records, key=lambda x: x['doid'])
+def run():
+    wd = get_wikidata_do_xrefs()
+    do = parse_do_owl()
 
-make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact'],
-                                  "ordo xref additions exact.csv")
-make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact_syn'],
-                                  "ordo xref additions exact_syn.csv")
-make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'not'],
-                                  "ordo xref additions notexact.csv")
+    leftover_in_wd, leftover_in_do = compare(wd, do)
+    # print(leftover_in_do)
+
+    run_mesh(wd, do, leftover_in_wd)
+
+    if False:
+        ## get only the OMIM changes
+        records = []
+        url = "https://omim.org/entry/{}"
+        for k, v in leftover_in_wd.items():
+            if 'OMIM' in v:
+                records.extend([{'doid': k, 'doid_label': do[k]['label'],
+                                 'omim_id': x, 'omim_url': url.format(x)} for x in v['OMIM']])
+        # get omim labels
+        for record in tqdm(records):
+            record.update(get_omim_info(record['omim_id']))
+        # classify match by exact sring match on title or one of the aliases
+        for record in tqdm(records):
+            if record['doid_label'].lower() == record['omim_label'].lower():
+                record['match_type'] = 'exact'
+            elif record['doid_label'].lower() in map(str.lower, record['omim_synonyms'].split(";")):
+                record['match_type'] = 'exact_syn'
+            else:
+                record['match_type'] = 'not'
+        # rename keys
+        records = [{k.replace("omim", "ext"): v for k, v in record.items()} for record in records]
+        # curie-ize ext id
+        for record in records:
+            record['ext_id'] = "OMIM:" + record['ext_id']
+            record['ext_descr'] = record['ext_prefix']
+        records = sorted(records, key=lambda x: x['doid'])
+
+        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact'],
+                                          "omim xref additions exact.csv")
+        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact_syn'],
+                                          "omim xref additions exact_syn.csv")
+        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'not'],
+                                          "omim xref additions notexact.csv")
+
+        ## get only the ORDO changes
+        records = []
+        url = "http://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=EN&Expert={}"
+        for k, v in leftover_in_wd.items():
+            if 'ORDO' in v:
+                records.extend([{'doid': k, 'doid_label': do[k]['label'],
+                                 'ordo_id': x, 'ordo_url': url.format(x)} for x in v['ORDO']])
+        # get ordo labels
+        for record in tqdm(records):
+            record.update(get_ordo_info(record['ordo_id']))
+        # classify match by exact sring match on title or one of the aliases
+        for record in tqdm(records):
+            if record['doid_label'].lower() == record['ordo_label'].lower():
+                record['match_type'] = 'exact'
+            elif record['doid_label'].lower() in map(str.lower, record['ordo_synonyms'].split(";")):
+                record['match_type'] = 'exact_syn'
+            else:
+                record['match_type'] = 'not'
+        # rename keys
+        records = [{k.replace("ordo", "ext"): v for k, v in record.items()} for record in records]
+        # curie-ize ext id
+        for record in records:
+            record['ext_id'] = "ORDO:" + record['ext_id']
+        records = sorted(records, key=lambda x: x['doid'])
+
+        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact'],
+                                          "ordo xref additions exact.csv")
+        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact_syn'],
+                                          "ordo xref additions exact_syn.csv")
+        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'not'],
+                                          "ordo xref additions notexact.csv")
+
+
+if __name__ == "__main__":
+    run()
