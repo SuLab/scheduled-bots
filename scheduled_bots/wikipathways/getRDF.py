@@ -28,7 +28,6 @@ for link in BeautifulSoup(page , "lxml", parse_only=SoupStrainer('a')):
             if filename not in files:
                 if filename != "./":
                     files.append(url+filename)
-
 temp = Graph()
 wdi_property_store.wd_properties['P2410'] = {
         'datatype': 'string',

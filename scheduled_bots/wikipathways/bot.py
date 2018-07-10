@@ -13,10 +13,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 import pprint
 import sys
 
-import pandas as pd
 import requests
-from cachetools import cached, TTLCache
-from tqdm import tqdm
 # from scheduled_bots.wikipathways import CHROMOSOME, IGNORE_SYNONYMS, DrugCombo, EVIDENCE_LEVEL, TRUST_RATING
 from wikidataintegrator import wdi_core, wdi_login, wdi_property_store, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
