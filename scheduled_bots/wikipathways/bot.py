@@ -48,9 +48,9 @@ ITEMS = {
     'Homo sapiens': 'Q15978631'
 }
 
-wdi_property_store.wd_properties['P3329'] = {
+wdi_property_store.wd_properties['P2410'] = {
     'datatype': 'string',
-    'name': 'Wikipathways ID ID',
+    'name': 'Wikipathways ID',
     'domain': ['pathways'],
     'core_id': True
 }
