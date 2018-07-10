@@ -37,6 +37,8 @@ wdi_property_store.wd_properties['P2410'] = {
         'core_id': True
     }
 
+fast_run_base_filter = {'P2410': ''}
+
 wpids = []
 for file in set(files):
     if "rdf-wp" in file:  # get the most accurate file
@@ -92,16 +94,11 @@ def get_PathwayElements(pathway="", datatype="GeneProduct"):
                    dcterms:identifier
             """
     query += "\"" + pathway +"\"^^xsd:string .}"
-
-
     qres2 = temp.query(query)
-
 
     ids = []
     for row in qres2:
         ids.append("\"" + str(row[2]).replace("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID", "").replace("http://identifiers.org/ncbigene/", "") + "\"")
-    #pprint.pprint(ids)
-
 
     # Check for existence of the ids in wikidata
     wd_query = "SELECT DISTINCT * WHERE {VALUES ?id {"
@@ -121,7 +118,6 @@ def get_PathwayElements(pathway="", datatype="GeneProduct"):
         if "P527" not in prep.keys():
             prep["P527"] = []
         prep["P527"].append(wdi_core.WDItemID(result["item"]["value"].replace("http://www.wikidata.org/entity/", ""), prop_nr='P527', references=[copy.deepcopy(wikipathways_reference)]))
-    #pprint.pprint(results)
 
 for pwid in wpids:
   try:
@@ -165,9 +161,6 @@ for pwid in wpids:
         print(str(row[2]))
         # P31 = instance of
         prep["P31"] = [wdi_core.WDItemID(value="Q4915012",prop_nr="P31", references=[copy.deepcopy(wikipathways_reference)])]
-
-        # P577 = Publication date
-        # prep["P577"] = [wdi_core.WDTime(value=wresult["lastModified"]["value"], prop_nr="P577", references=[copy.deepcopy(wikipathways_reference)])]
 
         # P2410 = WikiPathways ID
         prep["P2410"] = [wdi_core.WDString(pwid, prop_nr='P2410', references=[copy.deepcopy(wikipathways_reference)])]
@@ -216,7 +209,7 @@ for pwid in wpids:
                 print(statement.prop_nr, statement.value)
         # wdPage = wdi_core.WDItemEngine( item_name=result["pwLabel"]["value"], data=data2add, server="www.wikidata.org", domain="genes", fast_run=fast_run, fast_run_base_filter=fast_run_base_filter)
         wdPage = wdi_core.WDItemEngine(item_name=row[2], data=data2add, server="www.wikidata.org",
-                                       domain="pathways")
+                                       domain="pathways", fast_run_base_filter=fast_run_base_filter, fast_run_use_refs=True)
 
         wdPage.set_label(str(row[2]), lang="en")
         wdPage.set_description("biological pathway in human", lang="en")
@@ -235,7 +228,7 @@ for pwid in wpids:
           duration=''))
 
 
-# temp.serialize("/tmp/wikipathways.ttl", format="turtle")
+
 
 
 
