@@ -19,6 +19,8 @@ from scheduled_bots import PROPS
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
 from wikicurie import wikicurie
 from scheduled_bots.local import WDUSER, WDPASS
+from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
+
 wd_login = wdi_login.WDLogin(WDUSER, WDPASS)
 WIKIBASE = True
 if WIKIBASE:
@@ -126,5 +128,6 @@ for gene_symbol, thisdf in tqdm(gb):
         s = wdi_core.WDItemID(disease_qid, PROPS['genetic association'], references=[ref])
         data.append(s)
 
-    item = item_engine(wd_item_id=gene_qid, data=data, append_value=PROPS['genetic association'])
+    item = item_engine(wd_item_id=gene_qid, data=data, append_value=PROPS['genetic association'],
+                       global_ref_mode='CUSTOM', ref_handler=update_retrieved_if_new_multiple_refs)
     item.write(login)

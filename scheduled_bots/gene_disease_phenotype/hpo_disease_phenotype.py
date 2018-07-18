@@ -19,6 +19,7 @@ from scheduled_bots import PROPS
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
 from wikicurie import wikicurie
 
+from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers.publication import PublicationHelper
 
 from scheduled_bots.local import WDUSER, WDPASS
@@ -136,7 +137,8 @@ for disease_curie, thisdf in tqdm(gb[7113:]):
                               qualifiers=qualifiers, references=[ref])
         data.append(s)
 
-    item = item_engine(wd_item_id=disease_qid, data=data, append_value=PROPS['symptoms'])
+    item = item_engine(wd_item_id=disease_qid, data=data, append_value=PROPS['symptoms'],
+                       global_ref_mode='CUSTOM', ref_handler=update_retrieved_if_new_multiple_refs)
     item.write(login)
 
 
