@@ -97,16 +97,16 @@ class Node:
 
     def set_label(self, wd_item):
         # only setting the label if its currently blank or a new item is being created
-        if wd_item.get_label() == "":
+        if not wd_item.get_label():
             wd_item.set_label(self.label)
 
     def set_descr(self, wd_item):
         # if the current description is blank and the new description
         # is something else (and not over 250 characters), use it
         current_descr = wd_item.get_description()
-        if current_descr.lower() in {""} and self.descr and len(self.descr) < 250:
+        if (not current_descr) and self.descr and len(self.descr) < 250:
             wd_item.set_description(utils.clean_description(self.descr))
-        elif current_descr.lower() == "":
+        elif not current_descr:
             wd_item.set_description(self.graph.DEFAULT_DESCRIPTION)
 
     def set_aliases(self, wd_item):
