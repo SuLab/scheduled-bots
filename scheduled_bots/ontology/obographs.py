@@ -3,36 +3,28 @@ This is a generic OWL -> Wikidata importer
 Requires a obographs JSON file made from an owl file
 
 """
+import json
+import multiprocessing
 import os
 import subprocess
 import traceback
 from collections import defaultdict
+from datetime import datetime
 from functools import partial
 from itertools import chain
 from time import strftime, gmtime
 
-import multiprocessing
-
-import itertools
+import networkx as nx
 import requests
 from tqdm import tqdm
-from wikicurie.wikicurie import CurieUtil, default_curie_map
-import json
-from datetime import datetime
-import networkx as nx
+from wikicurie.wikicurie import CurieUtil
 
 from scheduled_bots import utils
-from wikidataintegrator import wdi_core, wdi_property_store, wdi_helpers, wdi_login
+from wikidataintegrator import wdi_core, wdi_helpers
 from wikidataintegrator.ref_handlers import update_release
 from wikidataintegrator.wdi_helpers import WikibaseHelper
 
 cu = CurieUtil()
-
-# reset core properties
-# core props gets set by the node's primary ID
-# todo: this WILL be an issue if we have two Graphs with different CORE_PROPS loaded.
-# will have to modify WDI to accept the core_props on WDItemEngine instanciation and not set globally like it is now..
-wdi_property_store.wd_properties = dict()
 
 
 class Node:
@@ -119,7 +111,7 @@ class Node:
         self.pids.add(self.id_pid)
 
         # make sure this ID is unique in wikidata
-        wdi_property_store.wd_properties[self.id_pid] = {'core_id': True}
+        self.graph.CORE_IDS.update({self.id_pid})
         # this node's primary id
         s = [wdi_core.WDExternalID(self.id_value, self.id_pid, references=[ref])]
 
@@ -174,7 +166,8 @@ class Node:
                 global_ref_mode='CUSTOM',
                 ref_handler=self.ref_handler,
                 mediawiki_api_url=self.mediawiki_api_url,
-                sparql_endpoint_url=self.sparql_endpoint_url
+                sparql_endpoint_url=self.sparql_endpoint_url,
+                core_props=self.graph.CORE_IDS
             )
         except Exception as e:
             traceback.print_exc()
@@ -303,8 +296,6 @@ class Graph:
 
         self.ref_handler = None
         self.helper = WikibaseHelper(sparql_endpoint_url)
-        for core_id in self.CORE_IDS:
-            wdi_property_store.wd_properties[self.helper.get_pid(core_id)] = {'core_id': True}
 
         # get the localized version of these pids and qids
         self.QID = self.helper.get_qid(self.QID)
@@ -507,7 +498,8 @@ class Graph:
                 global_ref_mode='CUSTOM',
                 ref_handler=self.ref_handler,
                 sparql_endpoint_url=self.sparql_endpoint_url,
-                mediawiki_api_url=self.mediawiki_api_url
+                mediawiki_api_url=self.mediawiki_api_url,
+                core_props=self.CORE_IDS
             )
             this_pid, this_value = cu.parse_curie(cu.uri_to_curie(this_uri))
             this_pid = self.helper.get_pid(this_pid)
