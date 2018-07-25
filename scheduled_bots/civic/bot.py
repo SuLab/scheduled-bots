@@ -1,17 +1,17 @@
-import json
 import argparse
 import copy
+import json
+import os
 import traceback
 from datetime import datetime
-import os
-from pprint import pprint
 
 import pandas as pd
 import requests
-from cachetools import cached, TTLCache
 from tqdm import tqdm
+
+from scheduled_bots import PROPS, ITEMS, get_default_core_props
 from scheduled_bots.civic import CHROMOSOME, IGNORE_SYNONYMS, DrugCombo, EVIDENCE_LEVEL, TRUST_RATING
-from wikidataintegrator import wdi_core, wdi_login, wdi_property_store, wdi_helpers
+from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers import try_write
 
@@ -27,52 +27,13 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-PROPS = {
-    'CIViC Variant ID': 'P3329',
-    'instance of': 'P31',
-    'stated in': 'P248',
-    'reference URL': 'P854',
-    'Entrez Gene ID ': 'P351',
-    'found in taxon': 'P703',
-    'biological variant of': 'P3433',
-    'Sequence Ontology ID': 'P3986',
-    'Disease Ontology ID': 'P699',
-    'PubMed ID': 'P698',
-    'positive therapeutic predictor': 'P3354',
-    'negative therapeutic predictor': 'P3355',
-    'positive diagnostic predictor': 'P3356',
-    'negative diagnostic predictor': 'P3357',
-    'positive prognostic predictor': 'P3358',
-    'negative prognostic predictor': 'P3359',
-    'HGVS nomenclature': 'P3331',
-    'chromosome': 'P1057',
-    'genomic start': 'P644',
-    'genomic end': 'P645',
-    'determination method': 'P459',
-    'rating': 'P4271',
-    'medical condition treated': 'P2175',
-    'curator': 'P1640',
-    'statement disputed by': 'P1310',
-    'retrieved': 'P813'
-}
-
-ITEMS = {
-    'CIViC database': 'Q27612411',
-    'Homo sapiens': 'Q15978631'
-}
-
-wdi_property_store.wd_properties['P3329'] = {
-    'datatype': 'string',
-    'name': 'CIViC Variant ID',
-    'domain': ['genes'],
-    'core_id': True
-}
+core_props = get_default_core_props()
+core_props.update({'P3329'})
 
 __metadata__ = {
     'name': 'ProteinBoxBot',
     'maintainer': 'Andra',
     'tags': ['variant'],
-    'properties': list(PROPS.values())
 }
 
 fast_run_base_filter = {'P3329': ''}
@@ -240,8 +201,8 @@ def run_one(variant_id, retrieved, fast_run, write, login):
 
         ## Reference
         pmid = evidence_item["source"]["pubmed_id"]
-        pmid_qid = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
-                                                 source="europepmc").get_or_create(login if write else None)
+        pmid_qid, _, _ = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
+                                                       source="europepmc").get_or_create(login if write else None)
         if pmid_qid is None:
             return panic(variant_id, "not found: {}".format(pmid), "pmid")
         refStatedIn = wdi_core.WDItemID(value=pmid_qid, prop_nr=PROPS['stated in'], is_reference=True)
@@ -381,7 +342,7 @@ def run_one(variant_id, retrieved, fast_run, write, login):
     # pprint([x.get_json_representation() for x in data2add])
     item = wdi_core.WDItemEngine(data=data2add, domain="genes", fast_run=fast_run, item_name=label,
                                  fast_run_base_filter=fast_run_base_filter, fast_run_use_refs=True,
-                                 ref_handler=update_retrieved_if_new_multiple_refs)
+                                 ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props)
     synonyms = []
     if name not in IGNORE_SYNONYMS:
         synonyms.append(name)
