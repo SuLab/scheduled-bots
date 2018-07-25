@@ -3,10 +3,11 @@ import json
 import os
 from datetime import datetime
 from time import gmtime, strftime
+
 import pandas as pd
-import requests
 from tqdm import tqdm
 
+from scheduled_bots import PROPS, get_default_core_props
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login, ref_handlers
 from wikidataintegrator.wdi_helpers import id_mapper
 
@@ -19,13 +20,9 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-PROPS = {'IEDB Epitope ID': 'P4168',
-         'ChEBI-ID': 'P683',
-         'stated in': 'P248',
-         'retrieved': 'P813',
-         }
+__metadata__ = {'name': 'IEDB Epitope Bot', 'tags': ['drugs']}
 
-__metadata__ = {'name': 'IEDB Epitope Bot', 'tags': ['drugs'], 'properties': list(PROPS.values())}
+core_props = get_default_core_props()
 
 
 def create_references(iedb_id):
@@ -45,14 +42,16 @@ def main(chebi_iedb_map, log_dir="./logs", fast_run=False, write=True):
 
     for chebi, iedb in tqdm(chebi_iedb_map.items()):
         if chebi not in chebi_qid_map:
-            msg = wdi_helpers.format_msg(iedb, PROPS['IEDB Epitope ID'], None, "ChEBI:{} not found".format(chebi), "ChEBI not found")
+            msg = wdi_helpers.format_msg(iedb, PROPS['IEDB Epitope ID'], None, "ChEBI:{} not found".format(chebi),
+                                         "ChEBI not found")
             print(msg)
             wdi_core.WDItemEngine.log("WARNING", msg)
             continue
         s = [wdi_core.WDExternalID(iedb, PROPS['IEDB Epitope ID'], references=create_references(iedb))]
         item = wdi_core.WDItemEngine(wd_item_id=chebi_qid_map[chebi], data=s, domain="drugs", fast_run=fast_run,
                                      fast_run_base_filter={PROPS['ChEBI-ID']: ''}, fast_run_use_refs=True,
-                                     ref_handler=ref_handlers.update_retrieved_if_new, global_ref_mode="CUSTOM")
+                                     ref_handler=ref_handlers.update_retrieved_if_new, global_ref_mode="CUSTOM",
+                                     core_props=core_props)
         wdi_helpers.try_write(item, iedb, PROPS['IEDB Epitope ID'], login, edit_summary="Add IEDB Epitope ID",
                               write=write)
 

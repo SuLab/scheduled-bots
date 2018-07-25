@@ -2,6 +2,7 @@ PROPS = {
     'ATC code': 'P267',
     'Archive url': 'P1065',
     'CAS registry number': 'P231',
+    'CIViC Variant ID': 'P3329',
     'CIViC variant ID': 'P3329',
     'ChEBI ID': 'P683',
     'ChEMBL ID': 'P592',
@@ -15,6 +16,7 @@ PROPS = {
     'Ensembl Protein ID': 'P705',
     'Ensembl Transcript ID': 'P704',
     'Entrez Gene ID': 'P351',
+    'Entrez Gene ID ': 'P351',
     'GARD rare disease ID': 'P4317',
     'Gene Ontology ID': 'P686',
     'Genomic end position': 'P645',
@@ -90,20 +92,30 @@ PROPS = {
     'miRBase pre-miRNA ID': 'P2870',
     'mirTarBase ID': 'P2646',
     'molecular function': 'P680',
+    'negative diagnostic predictor': 'P3357',
+    'negative prognostic predictor': 'P3359',
+    'negative therapeutic predictor': 'P3355',
     'offical website': 'P856',
     'ortholog': 'P684',
     'parent taxon': 'P171',
     'part of': 'P361',
+    'positive diagnostic predictor': 'P3356',
+    'positive prognostic predictor': 'P3358',
+    'positive therapeutic predictor': 'P3354',
+    'rating': 'P4271',
     'reference URL': 'P854',
     'regulates (molecular biology)': 'P128',
     'retrieved': 'P813',
     'route of administration': 'P636',
     'stated in': 'P248',
+    'statement disputed by': 'P1310',
     'subclass of': 'P279',
     'subject has role': 'P2868',
     'symptoms': 'P780',
     'taxon name': 'P225',
-    'uberon id': 'P1554'
+    'uberon id': 'P1554',
+    'IEDB Epitope ID': 'P4168',
+    'ChEBI-ID': 'P683',
 }
 
 ITEMS = {
@@ -117,7 +129,9 @@ ITEMS = {
     'CGI Evidence Clinical Trials I-II': 'Q38145727',
     'CGI Evidence Case Reports': 'Q38145865',
     'CGI Evidence Pre-Clinical Data': 'Q38145925',
-    'combination therapy': 'Q1304270'
+    'combination therapy': 'Q1304270',
+    'CIViC database': 'Q27612411',
+    'Homo sapiens': 'Q15978631'
 }
 
 DEFAULT_CORE_PROPS = ['NCBI Taxonomy ID', 'National Cancer Thesaurus ID', 'UNII', 'MeSH Code', 'IUPHAR ID',
@@ -127,11 +141,11 @@ DEFAULT_CORE_PROPS = ['NCBI Taxonomy ID', 'National Cancer Thesaurus ID', 'UNII'
                       'miRBase mature miRNA ID', 'OMIM', 'Disease Ontology ID', 'PubChem ID (CID)', 'HGNC symbol',
                       'RTECS Number', 'NDF-RT NUI', 'Gene Ontology ID', 'Drugbank ID', 'miRBase pre-miRNA ID',
                       'KEGG ID', 'Word Health Organisation International Nonproprietary Name', 'InChI', 'MeSH ID',
-                      'Human Gene symbol', 'ChEMBL ID', 'Orphanet ID']
+                      'Human Gene symbol', 'ChEMBL ID', 'Orphanet ID', 'CIViC Variant ID']
 DEFAULT_CORE_PROPS_PIDS = set(PROPS[x] for x in DEFAULT_CORE_PROPS)
 
 
-def get_default_core_props(sparql_endpoint_url='https://query.wikidata.org/sparql'):
+def get_default_core_props(sparql_endpoint_url='https://query.wikidata.org/sparql') -> set:
     # get the distinct value props from wikidata, and merge that list with the default_core_props listed here
     from wikidataintegrator import wdi_core, wdi_helpers
     h = wdi_helpers.WikibaseHelper(sparql_endpoint_url)
