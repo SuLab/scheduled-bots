@@ -116,6 +116,20 @@ PROPS = {
     'uberon id': 'P1554',
     'IEDB Epitope ID': 'P4168',
     'ChEBI-ID': 'P683',
+    'encoded by': 'P702',
+    'RefSeq Protein ID': 'P637',
+    'UniProt ID': 'P352',
+    'strand orientation': 'P2548',
+    'HGNC ID': 'P354',
+    'HGNC Gene Symbol': 'P353',
+    'HomoloGene ID': 'P593',
+    'Mouse Genome Informatics ID': 'P671',
+    'MGI Gene Symbol': 'P2394',
+    'Wormbase Gene ID': 'P3860',
+    'FlyBase Gene ID': 'P3852',
+    'ZFIN Gene ID': 'P3870',
+    'Rat Genome Database ID': 'P3853',
+    'cytogenetic location': 'P4196',
 }
 
 ITEMS = {
