@@ -1,22 +1,19 @@
-import sys
 import argparse
 import json
 import os
-import traceback
 from datetime import datetime
 from time import gmtime, strftime
 from urllib.parse import quote
 
-import pandas as pd
-import requests
-from tqdm import tqdm
 import myvariant
+import pandas as pd
+from tqdm import tqdm
 
+from scheduled_bots import PROPS, ITEMS, get_default_core_props
+from scheduled_bots.geneprotein import human_chromosome_map
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
-from wikidataintegrator.wdi_core import WDItemEngine
 from wikidataintegrator.wdi_helpers import id_mapper
-from scheduled_bots.geneprotein import human_chromosome_map
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -26,40 +23,6 @@ except ImportError:
         WDPASS = os.environ['WDPASS']
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
-
-PROPS = {
-    'CIViC variant ID': 'P3329',
-    'HGVS nomenclature': 'P3331',
-    'stated in': 'P248',
-    'retrieved': 'P813',
-    'HGNC gene symbol': 'P353',
-    'biological variant of': 'P3433',
-    'genomic start': 'P644',
-    'genomic end': 'P645',
-    'chromosome': 'P1057',
-    'genomic assembly': 'P659',
-    'instance of': 'P31',
-    'subclass of': 'P279',
-    'reference URL': 'P854',
-    'curator': 'P1640',
-    'determination method': 'P459',
-    'medical condition treated': 'P2175',
-    'has part': 'P527'
-}
-
-ITEMS = {
-    'Cancer Biomarkers database': 'Q38100115',
-    'Genome assembly GRCh37': 'Q21067546',
-    'sequence variant': 'Q15304597',
-    'Missense Variant': 'Q27429979',
-    'MyVariant.info': 'Q38104308',
-    'CGI Evidence Clinical Practice': 'Q38145055',
-    'CGI Evidence Clinical Trials III-IV': 'Q38145539',
-    'CGI Evidence Clinical Trials I-II': 'Q38145727',
-    'CGI Evidence Case Reports': 'Q38145865',
-    'CGI Evidence Pre-Clinical Data': 'Q38145925',
-    'combination therapy': 'Q1304270'
-}
 
 # map association column
 association_map = {
@@ -86,9 +49,11 @@ source_map = {
     'EMA': 'Q130146',
     'NCCN': 'Q6971741'
 }
-__metadata__ = {'name': 'CGI_Variant_Bot', 'tags': ['variant'], 'properties': list(PROPS.values())}
+__metadata__ = {'name': 'CGI_Variant_Bot', 'tags': ['variant']}
 
 hgnc_qid = {k.upper(): v for k, v in id_mapper(PROPS['HGNC gene symbol']).items()}
+
+core_props = get_default_core_props()
 
 
 def create_missense_variant_item(hgvs, label, login, fast_run=True):
@@ -119,7 +84,7 @@ def create_missense_variant_item(hgvs, label, login, fast_run=True):
 
     item = wdi_core.WDItemEngine(item_name=label, data=s, domain="variant", fast_run=fast_run,
                                  fast_run_base_filter={PROPS['HGVS nomenclature']: ''}, fast_run_use_refs=True,
-                                 ref_handler=update_retrieved_if_new_multiple_refs)
+                                 ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props)
     item.set_label(label)
     item.set_description("genetic variant")
     wdi_helpers.try_write(item, hgvs, PROPS['HGVS nomenclature'], login)
@@ -146,14 +111,15 @@ def create_variant_annotation(variant_qid, association, drug_qid, prim_tt_qid, s
         stated in: links to pmid items
         no reference URL
         """
-        reference = [
-            wdi_core.WDItemID(value=ITEMS['Cancer Biomarkers database'], prop_nr=PROPS['curator'], is_reference=True)]
+        reference = [wdi_core.WDItemID(ITEMS['Cancer Biomarkers database'], PROPS['curator'], is_reference=True)]
         t = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
         reference.append(wdi_core.WDTime(t, prop_nr=PROPS['retrieved'], is_reference=True))
         for source in source_str.split(";"):
             if source.startswith("PMID:"):
-                qid = wdi_helpers.PublicationHelper(source.replace("PMID:", ""), id_type="pmid", source="europepmc").get_or_create(login)
-                reference.append(wdi_core.WDItemID(qid, PROPS['stated in'], is_reference=True))
+                qid, _, success = wdi_helpers.PublicationHelper(source.replace("PMID:", ""), id_type="pmid",
+                                                                source="europepmc").get_or_create(login)
+                if success:
+                    reference.append(wdi_core.WDItemID(qid, PROPS['stated in'], is_reference=True))
             elif source in source_map:
                 reference.append(wdi_core.WDItemID(source_map[source], PROPS['stated in'], is_reference=True))
             else:
@@ -176,7 +142,7 @@ def create_variant_annotation(variant_qid, association, drug_qid, prim_tt_qid, s
                                  append_value=list(association_map.values()),
                                  fast_run=False, fast_run_use_refs=True,
                                  fast_run_base_filter={PROPS['HGVS nomenclature']: ''}, global_ref_mode='CUSTOM',
-                                 ref_handler=update_retrieved_if_new_multiple_refs)
+                                 ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props)
 
     wdi_helpers.try_write(item, variant_qid, '', login)
 
