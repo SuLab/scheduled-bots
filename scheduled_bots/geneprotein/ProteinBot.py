@@ -21,26 +21,28 @@ https://mygene.info/v3/gene/7150837
 
 import argparse
 import json
-import time
 import os
 import sys
+import time
 import traceback
 from datetime import datetime
 from itertools import chain
 
 from tqdm import tqdm
 
+from scheduled_bots import get_default_core_props, PROPS
+from scheduled_bots.geneprotein import HelperBot, descriptions_by_type
+from scheduled_bots.geneprotein import organisms_info
+from scheduled_bots.geneprotein.Downloader import MyGeneDownloader
+from scheduled_bots.geneprotein.GeneBot import remove_deprecated_statements
+from scheduled_bots.geneprotein.HelperBot import make_ref_source, parse_mygene_src_version, source_items
+from scheduled_bots.geneprotein.MicrobeBotResources import get_all_taxa, get_organism_info
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
 from wikidataintegrator.wdi_fastrun import FastRunContainer
 from wikidataintegrator.wdi_helpers import id_mapper, format_msg
 
-from scheduled_bots.geneprotein.Downloader import MyGeneDownloader
-from scheduled_bots.geneprotein import HelperBot, descriptions_by_type
-from scheduled_bots.geneprotein import organisms_info
-from scheduled_bots.geneprotein.HelperBot import make_ref_source, parse_mygene_src_version, source_items
-from scheduled_bots.geneprotein.MicrobeBotResources import get_all_taxa, get_organism_info
-from scheduled_bots.geneprotein.GeneBot import remove_deprecated_statements
+core_props = get_default_core_props()
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -51,25 +53,10 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-PROPS = {
-    'found in taxon': 'P703',
-    'instance of': 'P31',
-    'encoded by': 'P702',
-    'RefSeq Protein ID': 'P637',
-    'UniProt ID': 'P352',
-    'Ensembl Protein ID': 'P705',
-    'OMIM ID': 'P492',
-    'Entrez Gene ID': 'P351',
-    'encodes': 'P688',
-    'Saccharomyces Genome Database ID': 'P3406',
-    'Mouse Genome Informatics ID': 'P671',
-}
-
 __metadata__ = {
     'name': 'ProteinBot',
     'maintainer': 'GSS',
     'tags': ['protein'],
-    'properties': list(PROPS.values())
 }
 
 # If the source is "entrez", the reference identifier to be used is "Ensembl Gene ID" (P594)
@@ -240,7 +227,8 @@ class Protein:
                                                  fast_run_base_filter={PROPS['Entrez Gene ID']: '',
                                                                        PROPS['found in taxon']: self.organism_info[
                                                                            'wdid']},
-                                                 global_ref_mode="CUSTOM", ref_handler=update_retrieved_if_new)
+                                                 global_ref_mode="CUSTOM", ref_handler=update_retrieved_if_new,
+                                                 core_props=core_props)
             wdi_helpers.try_write(wd_item_gene, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
                                   write=write)
         except Exception as e:
@@ -266,7 +254,8 @@ class Protein:
                                                                           PROPS['found in taxon']: self.organism_info[
                                                                               'wdid']},
                                                     fast_run_use_refs=True, ref_handler=update_retrieved_if_new,
-                                                    global_ref_mode="CUSTOM")
+                                                    global_ref_mode="CUSTOM",
+                                                    core_props=core_props)
             wd_item_protein.set_label(self.label)
             wd_item_protein.set_description(self.description, lang='en')
 
@@ -305,7 +294,8 @@ class Protein:
                                                                           PROPS['found in taxon']: self.organism_info[
                                                                               'wdid']},
                                                     fast_run_use_refs=True, ref_handler=update_retrieved_if_new,
-                                                    global_ref_mode="CUSTOM")
+                                                    global_ref_mode="CUSTOM",
+                                                    core_props=core_props)
             wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
                                   write=write)
             self.protein_wdid = wd_item_protein.wd_item_id

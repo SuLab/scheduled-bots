@@ -22,25 +22,28 @@ sparql query for listing current subclasses: http://tinyurl.com/y8ecgka7
 # TODO: Gene on two chromosomes
 # https://www.wikidata.org/wiki/Q20787772
 
+import argparse
+import json
 import os
 import sys
-import json
 import time
-import argparse
 import traceback
-
-from tqdm import tqdm
-from itertools import chain
 from datetime import datetime
 from functools import partial
+from itertools import chain
 
+from tqdm import tqdm
+
+from scheduled_bots import get_default_core_props, PROPS
 from scheduled_bots.geneprotein.Downloader import MyGeneDownloader
-from wikidataintegrator import wdi_login, wdi_core, wdi_helpers, wdi_property_store
-from wikidataintegrator.wdi_fastrun import FastRunContainer
+from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
+from wikidataintegrator.wdi_fastrun import FastRunContainer
 
-# wdi_property_store.wd_properties['P704']['core_id'] = False
-# wdi_property_store.wd_properties['P639']['core_id'] = False
+core_props = get_default_core_props()
+
+# core_props.discard("P704")
+# core_props.discard("P639")
 
 DAYS = 120
 update_retrieved_if_new = partial(update_retrieved_if_new, days=DAYS)
@@ -59,38 +62,10 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-PROPS = {
-    'found in taxon': 'P703',
-    'instance of': 'P31',
-    'strand orientation': 'P2548',
-    'Entrez Gene ID': 'P351',
-    'NCBI Locus tag': 'P2393',
-    'Ensembl Gene ID': 'P594',
-    'Ensembl Transcript ID': 'P704',
-    'genomic assembly': 'P659',
-    'genomic start': 'P644',
-    'genomic end': 'P645',
-    'chromosome': 'P1057',
-    'HGNC ID': 'P354',
-    'HGNC Gene Symbol': 'P353',
-    'RefSeq RNA ID': 'P639',
-    'HomoloGene ID': 'P593',
-    'Saccharomyces Genome Database ID': 'P3406',
-    'Mouse Genome Informatics ID': 'P671',
-    'MGI Gene Symbol': 'P2394',
-    'Wormbase Gene ID': 'P3860',
-    'FlyBase Gene ID': 'P3852',
-    'ZFIN Gene ID': 'P3870',
-    'Rat Genome Database ID': 'P3853',
-    'encodes': 'P688',
-    'cytogenetic location': 'P4196',
-}
-
 __metadata__ = {
     'name': 'GeneBot',
     'maintainer': 'GSS',
     'tags': ['gene'],
-    'properties': list(PROPS.values())
 }
 
 # If the source is "entrez", the reference identifier to be used is "Ensembl Gene ID" (P594)
@@ -323,7 +298,8 @@ class Gene:
                                                   append_value=[PROPS['instance of']],
                                                   fast_run=fast_run, fast_run_base_filter=self.fast_run_base_filter,
                                                   fast_run_use_refs=True, ref_handler=update_retrieved_if_new,
-                                                  global_ref_mode="CUSTOM")
+                                                  global_ref_mode="CUSTOM",
+                                                  core_props=core_props)
 
         self.wd_item_gene = self.set_label_desc_aliases(self.wd_item_gene)
         self.status = wdi_helpers.try_write(self.wd_item_gene, self.external_ids['Entrez Gene ID'],

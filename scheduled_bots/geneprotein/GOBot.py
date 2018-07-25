@@ -17,11 +17,15 @@ from functools import partial
 from typing import Dict, Set
 
 import pandas as pd
+from tqdm import tqdm
+
+from scheduled_bots import get_default_core_props
 from scheduled_bots.geneprotein import go_props, go_evidence_codes, curators_wdids, curator_ref, PROPS
 from scheduled_bots.utils import get_values
-from tqdm import tqdm
 from wikidataintegrator import ref_handlers
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
+
+core_props = get_default_core_props()
 
 DAYS = 6 * 30
 update_retrieved_if_new = partial(ref_handlers.update_retrieved_if_new_multiple_refs, days=DAYS)
@@ -83,7 +87,8 @@ def make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, retri
     return reference
 
 
-def make_go_statements(uniprot_id: str, this_go: pd.DataFrame, go_map: dict, pmid_map: dict, external_id: dict, retrieved):
+def make_go_statements(uniprot_id: str, this_go: pd.DataFrame, go_map: dict, pmid_map: dict, external_id: dict,
+                       retrieved):
     """
     add go terms to a protein item.
     Follows the schema described here:
@@ -134,7 +139,8 @@ def make_go_statements(uniprot_id: str, this_go: pd.DataFrame, go_map: dict, pmi
                 pmids = set([x[5:] for x in refs if x.startswith("PMID:")])
                 if pmids:
                     for pmid in pmids:
-                        reference = make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, retrieved, pmid=pmid)
+                        reference = make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, retrieved,
+                                                pmid=pmid)
                         statement.references.append(reference)
                 else:
                     reference = make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, retrieved)
@@ -160,11 +166,12 @@ def create_articles(pmids: Set[str], login: object, write: bool = True) -> Dict[
         p = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid", source="europepmc")
         if write:
             try:
-                pmid_wdid = p.get_or_create(login)
+                pmid_wdid, _, success = p.get_or_create(login)
+                if success:
+                    pmid_map[pmid] = pmid_wdid
             except Exception as e:
                 print("Error creating article pmid: {}, error: {}".format(pmid, e))
                 continue
-            pmid_map[pmid] = pmid_wdid
         else:
             pmid_map[pmid] = 'Q1'
     return pmid_map
@@ -262,7 +269,8 @@ def main(taxon, file, retrieved, log_dir="./logs", fast_run=True, write=True):
                                            fast_run_base_filter={UNIPROT: "", "P703": organism_wdid},
                                            fast_run_use_refs=True,
                                            ref_handler=update_retrieved_if_new,
-                                           append_value=['P680', 'P681', 'P682']
+                                           append_value=['P680', 'P681', 'P682'],
+                                           core_props=core_props
                                            )
             wdi_helpers.try_write(wditem, record_id=uniprot_id, record_prop=UNIPROT, edit_summary="update GO terms",
                                   login=login, write=write)
@@ -293,6 +301,7 @@ def get_all_taxa():
     response = wdi_core.WDItemEngine.execute_sparql_query(query=query)
     taxids = [x['taxid']['value'] for x in response['results']['bindings'] if int(x['count']['value']) >= 10]
     return ",".join(sorted(taxids))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata GO bot')

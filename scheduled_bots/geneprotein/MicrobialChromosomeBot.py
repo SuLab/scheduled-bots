@@ -2,9 +2,13 @@ import subprocess
 from datetime import datetime
 
 import pandas as pd
+
+from scheduled_bots import get_default_core_props
 from scheduled_bots.geneprotein import PROPS
 from wikidataintegrator import wdi_core, wdi_helpers
-from wikidataintegrator.wdi_helpers import id_mapper, prop2qid
+from wikidataintegrator.wdi_helpers import prop2qid
+
+core_props = get_default_core_props()
 
 
 class MicrobialChromosomeBot:
@@ -131,7 +135,8 @@ class MicrobialChromosomeBot:
 
         wd_item = wdi_core.WDItemEngine(item_name=item_name, domain='chromosome', data=statements,
                                         append_value=['P31'], fast_run=True,
-                                        fast_run_base_filter={'P703': organism_qid, 'P2249': ''})
+                                        fast_run_base_filter={'P703': organism_qid, 'P2249': ''},
+                                        core_props=core_props)
         if wd_item.wd_item_id:
             return wd_item.wd_item_id
         if login is None:
