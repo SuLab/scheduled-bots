@@ -426,6 +426,7 @@ class Graph:
         self.nodes = [x for x in self.nodes if not x.deprecated and x.type == "CLASS"]
         self.nodes = [x for x in self.nodes if x.id_uri not in self.EXCLUDE_NODES]
         self.nodes = [x for x in self.nodes if x.id_pid]
+        self.nodes = [x for x in self.nodes if x.label]
 
     def create_nodes_par(self, login, write=True):
         pool = multiprocessing.Pool(processes=4)
