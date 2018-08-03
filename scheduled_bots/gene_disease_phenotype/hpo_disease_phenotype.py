@@ -31,6 +31,9 @@ if WIKIBASE:
 
     mediawiki_api_url = "http://localhost:7171/w/api.php"
     sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
+    mediawiki_api_url = "http://185.54.114.71:8181/w/api.php"
+    sparql_endpoint_url = "http://185.54.114.71:8282/proxy/wdqs/bigdata/namespace/wdq/sparql"
+
     username = "testbot"
     password = "password"
     maker = EntityMaker(mediawiki_api_url, sparql_endpoint_url, username, password)
@@ -94,13 +97,8 @@ all_pmids = set(x[5:] for x in all_refs if x.startswith("PMID:"))
 # if wikibase, create these pmid items
 if WIKIBASE:
     all_pmid_wd_qid = wdi_helpers.get_values("P698", all_pmids)
-    # maker.make_entities(sorted(pmid_wd_qid.values()))
-    all_pmid_qid = dict()
-    for pmid, wd_qid in tqdm(all_pmid_wd_qid.items()):
-        qid = wdi_helpers.prop2qid(h.get_pid("P1709"), "http://www.wikidata.org/entity/{}".format(wd_qid),
-                                   endpoint=sparql_endpoint_url, value_type='uri')
-        if qid:
-            all_pmid_qid[pmid] = qid
+    all_pmid_qid = {pmid: h.URI_QID.get("http://www.wikidata.org/entity/" + v) for pmid, v in all_pmid_wd_qid.items()}
+    all_pmid_qid = {k: v for k, v in all_pmid_qid.items() if v}
 else:
     for pmid in all_pmids:
         p = PublicationHelper(pmid, 'pmid', 'europepmc').get_or_create(wd_login)
@@ -114,7 +112,7 @@ for col in {'Qualifier', 'Onset', 'Frequency', 'Sex', 'Modifier', 'Aspect', 'Dat
 # dfdp = dfdp[dfdp.DB_Reference.str.contains("PMID")]
 gb = dfdp.groupby("disease_curie")
 gb = list(gb)
-for disease_curie, thisdf in tqdm(gb[7113:]):
+for disease_curie, thisdf in tqdm(gb[5358+795+425:]):
     disease_qid = retrieve_qid_from_curie(disease_curie)
     if not disease_qid:
         continue

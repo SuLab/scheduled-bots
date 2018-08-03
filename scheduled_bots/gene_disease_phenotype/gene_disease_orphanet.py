@@ -28,6 +28,8 @@ if WIKIBASE:
 
     mediawiki_api_url = "http://localhost:7171/w/api.php"
     sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
+    mediawiki_api_url = "http://185.54.114.71:8181/w/api.php"
+    sparql_endpoint_url = "http://185.54.114.71:8282/proxy/wdqs/bigdata/namespace/wdq/sparql"
     username = "testbot"
     password = "password"
     maker = EntityMaker(mediawiki_api_url, sparql_endpoint_url, username, password)
@@ -101,13 +103,8 @@ all_hgnc = set(df.gene_symbol)
 
 if WIKIBASE:
     all_hgnc_wd_qid = wdi_helpers.get_values("P353", all_hgnc)
-    # maker.make_entities(sorted(all_hgnc_wd_qid.values()))
-    all_hgnc_qid = dict()
-    for hgnc, wd_qid in tqdm(all_hgnc_wd_qid.items()):
-        qid = wdi_helpers.prop2qid(h.get_pid("P1709"), "http://www.wikidata.org/entity/{}".format(wd_qid),
-                                   endpoint=sparql_endpoint_url, value_type='uri')
-        if qid:
-            all_hgnc_qid[hgnc] = qid
+    all_hgnc_qid = {hgnc: h.URI_QID.get("http://www.wikidata.org/entity/" + v) for hgnc, v in all_hgnc_wd_qid.items()}
+    all_hgnc_qid = {k: v for k, v in all_hgnc_qid.items() if v}
 else:
     all_hgnc_qid = wdi_helpers.get_values("P353", all_hgnc)
 
