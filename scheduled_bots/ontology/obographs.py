@@ -167,8 +167,17 @@ class Node:
                 ref_handler=self.ref_handler,
                 mediawiki_api_url=self.mediawiki_api_url,
                 sparql_endpoint_url=self.sparql_endpoint_url,
-                core_props=self.graph.CORE_IDS
+                core_props=self.graph.CORE_IDS,
+                core_prop_match_thresh=.9
             )
+            # assert the retrieved item doesn't already have a primary_ext_id id
+            if self.item.wd_item_id:
+                query = "select ?primary_ext_id where {{ wd:{} wdt:{} ?primary_ext_id }}".format(self.item.wd_item_id, primary_ext_id_pid)
+                results = wdi_core.WDItemEngine.execute_sparql_query(query)['results']['bindings']
+                if results:
+                    existing_primary_ext_id = [x['primary_ext_id']['value'] for x in results]
+                    if self.id_curie not in existing_primary_ext_id:
+                        raise Exception("conflicting primary_ext_id IDs: {} on {}".format(self.id_curie, self.item.wd_item_id))
         except Exception as e:
             traceback.print_exc()
             msg = wdi_helpers.format_msg(primary_ext_id, primary_ext_id_pid, None, str(e), msg_type=type(e))
