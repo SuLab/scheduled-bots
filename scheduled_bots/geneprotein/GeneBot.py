@@ -42,8 +42,11 @@ from wikidataintegrator.wdi_fastrun import FastRunContainer
 
 core_props = get_default_core_props()
 
-# core_props.discard("P704")
-# core_props.discard("P639")
+FASTRUN_PROPS = {'Entrez Gene ID', 'strand orientation', 'Saccharomyces Genome Database ID', 'RefSeq RNA ID',
+                 'ZFIN Gene ID', 'Ensembl Transcript ID', 'HGNC ID', 'encodes', 'genomic assembly', 'found in taxon',
+                 'HomoloGene ID', 'MGI Gene Symbol', 'cytogenetic location', 'Mouse Genome Informatics ID',
+                 'FlyBase Gene ID', 'genomic end', 'NCBI Locus tag', 'Rat Genome Database ID', 'Ensembl Gene ID',
+                 'instance of', 'chromosome', 'HGNC Gene Symbol', 'Wormbase Gene ID', 'genomic start'}
 
 DAYS = 120
 update_retrieved_if_new = partial(update_retrieved_if_new, days=DAYS)
@@ -643,8 +646,9 @@ class GeneBot:
         filter = {PROPS['Entrez Gene ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
         frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter=filter, use_refs=True)
         frc.clear()
+        props = [PROPS[x] for x in FASTRUN_PROPS]
         for qid in tqdm(entrez_qid.values()):
-            remove_deprecated_statements(qid, frc, releases, last_updated, list(PROPS.values()), self.login)
+            remove_deprecated_statements(qid, frc, releases, last_updated, props, self.login)
 
 
 class ChromosomalGeneBot(GeneBot):

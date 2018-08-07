@@ -44,6 +44,11 @@ from wikidataintegrator.wdi_helpers import id_mapper, format_msg
 
 core_props = get_default_core_props()
 
+FASTRUN_PROPS = {'Entrez Gene ID', 'encodes', 'OMIM ID', 'Ensembl Protein ID', 'encoded by', 'instance of',
+                 'found in taxon', 'Mouse Genome Informatics ID', 'Saccharomyces Genome Database ID',
+                 'RefSeq Protein ID', 'UniProt ID'}
+
+
 try:
     from scheduled_bots.local import WDUSER, WDPASS
 except ImportError:
@@ -384,8 +389,9 @@ class ProteinBot:
         filter = {PROPS['UniProt ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
         frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter=filter, use_refs=True)
         frc.clear()
+        props = [PROPS[x] for x in FASTRUN_PROPS]
         for qid in tqdm(uniprot_wdid.values()):
-            remove_deprecated_statements(qid, frc, releases, last_updated, list(PROPS.values()), self.login)
+            remove_deprecated_statements(qid, frc, releases, last_updated, props, self.login)
 
 
 def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, entrez=None):
