@@ -64,7 +64,6 @@ PROPS = {
     'UMLS CUI': 'P2892',
     'UNII': 'P652',
     'Uniprot ID': 'P352',
-    'Word Health Organisation International Nonproprietary Name': 'P1805',
     'anatomical location': 'P927',
     'biological process': 'P682',
     'biological variant of': 'P3433',
