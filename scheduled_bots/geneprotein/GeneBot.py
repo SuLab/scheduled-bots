@@ -332,7 +332,9 @@ class ChromosomalGene(Gene):
 
         # add on gene position statements
         if 'genomic_pos' in self.record:
-            s.extend(self.create_gp_statements_chr())
+            ss = self.create_gp_statements_chr()
+            if ss:
+                s.extend(ss)
 
         return s
 
@@ -355,8 +357,8 @@ class ChromosomalGene(Gene):
             self.ensembl_ref = make_ref_source(self.record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
                                                self.external_ids['Reference Ensembl Gene ID'], login=self.login)
         elif 'Ensembl Gene ID' in self.external_ids:
-            assert len(self.external_ids['Ensembl Gene ID']) == 1
-            self.ensembl_ref = make_ref_source(self.record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
+            if len(self.external_ids['Ensembl Gene ID']) == 1:
+                self.ensembl_ref = make_ref_source(self.record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
                                                list(self.external_ids['Ensembl Gene ID'])[0], login=self.login)
 
     def create_item(self, fast_run=True, write=True):
@@ -380,6 +382,8 @@ class ChromosomalGene(Gene):
             genomic_pos_ref = self.ensembl_ref
         else:
             raise ValueError()
+        if not genomic_pos_ref:
+            return None
         all_chr = set([self.chr_num_wdid[x['chr']] for x in genomic_pos_values])
         all_strand = set(['Q22809680' if x['strand'] == 1 else 'Q22809711' for x in genomic_pos_values])
 
@@ -484,7 +488,9 @@ class HumanGene(ChromosomalGene):
 
         # add on gene position statements
         if 'genomic_pos' in self.record:
-            s.extend(self.do_gp_human())
+            ss = self.do_gp_human()
+            if ss:
+                s.extend(ss)
 
         return s
 
@@ -518,6 +524,8 @@ class HumanGene(ChromosomalGene):
             genomic_pos_ref = self.ensembl_ref
         else:
             raise ValueError()
+        if not genomic_pos_ref:
+            return None
         assembly_hg38 = wdi_core.WDItemID("Q20966585", PROPS['genomic assembly'], is_qualifier=True)
 
         for x in genomic_pos_values:
