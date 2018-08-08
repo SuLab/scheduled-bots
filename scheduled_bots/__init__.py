@@ -153,8 +153,9 @@ DEFAULT_CORE_PROPS = ['NCBI Taxonomy ID', 'National Cancer Thesaurus ID', 'UNII'
                       'InterPro ID', 'InChIKey', 'ChEBI ID', 'mirTarBase ID', 'ChemSpider ID', 'MGI',
                       'miRBase mature miRNA ID', 'OMIM', 'Disease Ontology ID', 'PubChem ID (CID)', 'HGNC symbol',
                       'RTECS Number', 'NDF-RT NUI', 'Gene Ontology ID', 'Drugbank ID', 'miRBase pre-miRNA ID',
-                      'KEGG ID', 'Word Health Organisation International Nonproprietary Name', 'InChI', 'MeSH ID',
-                      'Human Gene symbol', 'ChEMBL ID', 'Orphanet ID', 'CIViC Variant ID']
+                      'KEGG ID', 'InChI', 'MeSH ID', 'Human Gene symbol', 'ChEMBL ID', 'Orphanet ID',
+                      'CIViC Variant ID']
+
 DEFAULT_CORE_PROPS_PIDS = set(PROPS[x] for x in DEFAULT_CORE_PROPS)
 
 
