@@ -52,9 +52,9 @@ class LocalDownloader(Downloader):
         # accepts a function that can be used to filter the gene cursor (returns True or False for each doc)
         data = self.genes
         if filter_f:
-            data = filter(filter_f, data)
+            data = list(filter(filter_f, data))
 
-        return data, data.length
+        return data, len(data)
 
     def get_metadata(self):
         return self.metadata
