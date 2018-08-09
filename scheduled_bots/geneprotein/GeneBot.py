@@ -837,6 +837,12 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
 if __name__ == "__main__":
     """
     Data to be used is retrieved from mygene.info or from a local json file in a similar format
+    For local file:
+        Specify with --filepath './some/path/data.json'
+        JSON list with 3 elements: [docs, metadata, key_source]
+        docs - contains a list of docs in same format as mygene,
+        metadata - contains metadata in same format as mygene endpoint,
+        key_source - contains mapping of keys in a doc to their source
     """
     parser = argparse.ArgumentParser(description='run wikidata gene bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
