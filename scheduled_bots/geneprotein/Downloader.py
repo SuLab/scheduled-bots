@@ -34,7 +34,10 @@ class Downloader:
 class LocalDownloader(Downloader):
 
     def __init__(self, path):
-        self.data = json.load(path)
+        data = json.load(path)
+        self.genes = data[0]
+        self.metadata = data[1]
+        self.sources = data[2]
 
     def get_filter(self):
         return lambda x: ("locus_tag" in x.keys())
@@ -44,61 +47,20 @@ class LocalDownloader(Downloader):
             if 'entrezgene' in gene.keys() and gene['entrezgene'] == entrezgene:
                 return gene, 1
 
-    def get_mg_cursor(self, taxid, filter_f=None):
+    def get_mg_cursor(self, taxid=None, filter_f=None):
         # get a list of all genes in the local file
         # accepts a function that can be used to filter the gene cursor (returns True or False for each doc)
-        data = self.data
+        data = self.genes
         if filter_f:
             data = filter(filter_f, data)
 
-        return data, self.data.length
+        return data, data.length
 
     def get_metadata(self):
-        return {
-            'build_version': datetime.strftime("%Y%m%d"),
-            'src': {
-                'ensembl': {
-                    'version': datetime.strftime("%Y%m%d")
-                },
-                'entrez': {
-                    'version': datetime.strftime("%Y%m%d")
-                },
-                'refseq': {
-                    'version': datetime.strftime("%Y%m%d")
-                },
-                'uniprot': {
-                    'version': datetime.strftime("%Y%m%d")
-                }
-            }
-        }
+        return self.metadata
 
     def get_key_source(self):
-        return {
-            'SGD': 'entrez',
-            'HGNC': 'entrez',
-            'MIM': 'entrez',
-            'FLYBASE': 'entrez',
-            'WormBase': 'entrez',
-            'ZFIN': 'entrez',
-            'RGD': 'entrez',
-            'MGI': 'entrez',
-            'exons': 'ucsc',
-            'ensembl': 'ensembl',
-            'entrezgene': 'entrez',
-            'genomic_pos': 'refseq',
-            'genomic_pos_hg19': None,
-            'locus_tag': 'refseq',
-            'name': 'refseq',
-            'symbol': 'refseq',
-            'taxid': 'refseq',
-            'type_of_gene': 'refseq',
-            'refseq': 'refseq',
-            'uniprot': 'uniprot',
-            'homologene': 'entrez',
-            'other_names': 'entrez',
-            'alias': 'refseq',
-            'map_location': 'entrez',
-        }
+        return self.sources
 
 class MyGeneDownloader(Downloader):
     def __init__(self, url="http://mygene.info/v3/", q=None, fields=None):
