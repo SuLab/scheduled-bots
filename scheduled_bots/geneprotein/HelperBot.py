@@ -165,7 +165,7 @@ def parse_mygene_src_version(d):
     return d2
 
 
-def tag_mygene_docs(docs, metadata):
+def tag_mygene_docs(docs, metadata, key_source):
     """
     The purpose of this to is to tag each field with its source. This is hardcoded/defined here for now.
     Until it comes from mygene.info itself
@@ -174,31 +174,6 @@ def tag_mygene_docs(docs, metadata):
     :return:
     """
     source_dict = parse_mygene_src_version(metadata)
-    key_source = {'SGD': 'entrez',
-                  'HGNC': 'entrez',
-                  'MIM': 'entrez',
-                  'FLYBASE': 'entrez',
-                  'WormBase': 'entrez',
-                  'ZFIN': 'entrez',
-                  'RGD': 'entrez',
-                  'MGI': 'entrez',
-                  'exons': 'ucsc',
-                  'ensembl': 'ensembl',
-                  'entrezgene': 'entrez',
-                  'genomic_pos': None,
-                  'genomic_pos_hg19': None,
-                  'locus_tag': 'entrez',
-                  'name': 'entrez',
-                  'symbol': 'entrez',
-                  'taxid': 'entrez',
-                  'type_of_gene': 'entrez',
-                  'refseq': 'entrez',
-                  'uniprot': 'uniprot',
-                  'homologene': 'entrez',
-                  'other_names': 'entrez',
-                  'alias': 'entrez',
-                  'map_location': 'entrez',
-                  }
     # todo: automate getting this list of ensembl taxids
     # http://uswest.ensembl.org/info/about/species.html
     ensembl_taxids = [4932, 6239, 7227, 7719, 7757, 7897, 7918, 7955, 7994, 8049, 8083, 8090, 8128, 8364, 8479, 8839,

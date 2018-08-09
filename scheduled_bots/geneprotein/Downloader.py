@@ -4,9 +4,103 @@ import os
 from datetime import datetime
 import requests
 from mygene import MyGeneInfo
+import json
 
+class Downloader:
 
-class MyGeneDownloader:
+    def get_metadata(self):
+        raise NotImplementedError("Needs to be implemented")
+
+    def get_timestamp(self):
+        # get the timestamp from mygene's metadata endpoint
+        metadata = self.get_metadata()
+        return datetime.strptime(metadata["build_version"], "%Y%m%d")
+
+    def get_mg_cursor(self, taxid, filter_f=None):
+        raise NotImplementedError("Needs to be implemented")
+
+    def query(self):
+        raise NotImplementedError("Needs to be implemented")
+
+    def get_mg_gene(self, entrezgene):
+        raise NotImplementedError("Needs to be implemented")
+
+    def get_filter(self):
+        raise NotImplementedError("Needs to be implemented")
+
+    def get_key_source(self):
+        raise NotImplementedError("Needs to be implemented")
+
+class LocalDownloader(Downloader):
+
+    def __init__(self, path):
+        self.data = json.load(path)
+
+    def get_filter(self):
+        return lambda x: ("locus_tag" in x.keys())
+
+    def get_mg_gene(self, entrezgene):
+        for gene in self.data:
+            if 'entrezgene' in gene.keys() and gene['entrezgene'] == entrezgene:
+                return gene, 1
+
+    def get_mg_cursor(self, taxid, filter_f=None):
+        # get a list of all genes in the local file
+        # accepts a function that can be used to filter the gene cursor (returns True or False for each doc)
+        data = self.data
+        if filter_f:
+            data = filter(filter_f, data)
+
+        return data, self.data.length
+
+    def get_metadata(self):
+        return {
+            'build_version': datetime.strftime("%Y%m%d"),
+            'src': {
+                'ensembl': {
+                    'version': datetime.strftime("%Y%m%d")
+                },
+                'entrez': {
+                    'version': datetime.strftime("%Y%m%d")
+                },
+                'refseq': {
+                    'version': datetime.strftime("%Y%m%d")
+                },
+                'uniprot': {
+                    'version': datetime.strftime("%Y%m%d")
+                }
+            }
+        }
+
+    def get_key_source(self):
+        return {
+            'SGD': 'entrez',
+            'HGNC': 'entrez',
+            'MIM': 'entrez',
+            'FLYBASE': 'entrez',
+            'WormBase': 'entrez',
+            'ZFIN': 'entrez',
+            'RGD': 'entrez',
+            'MGI': 'entrez',
+            'exons': 'ucsc',
+            'ensembl': 'ensembl',
+            'entrezgene': 'entrez',
+            'genomic_pos': 'refseq',
+            'genomic_pos_hg19': None,
+            'locus_tag': 'refseq',
+            'name': 'refseq',
+            'symbol': 'refseq',
+            'taxid': 'refseq',
+            'type_of_gene': 'refseq',
+            'refseq': 'refseq',
+            'uniprot': 'uniprot',
+            'homologene': 'entrez',
+            'other_names': 'entrez',
+            'alias': 'refseq',
+            'map_location': 'entrez',
+        }
+
+class MyGeneDownloader(Downloader):
     def __init__(self, url="http://mygene.info/v3/", q=None, fields=None):
         self.base_url = url
         self.q = "__all__" if not q else q
@@ -15,6 +109,37 @@ class MyGeneDownloader:
                       "type_of_gene,genomic_pos_hg19,HGNC,homologene,MGI,RGD,SGD,FLYBASE,WormBase,ZFIN,BGD," + \
                       "alias,map_location" if not fields else fields
         # self.fields = ",".join(self.fields) if not isinstance(self.fields, str) else self.fields
+
+    def get_filter(self):
+        return lambda x: (x.get("type_of_gene") != "biological-region") and ("entrezgene" in x)
+
+    def get_key_source(self):
+        return {
+            'SGD': 'entrez',
+            'HGNC': 'entrez',
+            'MIM': 'entrez',
+            'FLYBASE': 'entrez',
+            'WormBase': 'entrez',
+            'ZFIN': 'entrez',
+            'RGD': 'entrez',
+            'MGI': 'entrez',
+            'exons': 'ucsc',
+            'ensembl': 'ensembl',
+            'entrezgene': 'entrez',
+            'genomic_pos': None,
+            'genomic_pos_hg19': None,
+            'locus_tag': 'entrez',
+            'name': 'entrez',
+            'symbol': 'entrez',
+            'taxid': 'entrez',
+            'type_of_gene': 'entrez',
+            'refseq': 'entrez',
+            'uniprot': 'uniprot',
+            'homologene': 'entrez',
+            'other_names': 'entrez',
+            'alias': 'entrez',
+            'map_location': 'entrez',
+        }
 
     def get_metadata(self):
         r = requests.get(os.path.join(self.base_url, 'metadata'))

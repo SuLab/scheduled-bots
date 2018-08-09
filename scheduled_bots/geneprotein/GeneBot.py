@@ -35,7 +35,7 @@ from itertools import chain
 from tqdm import tqdm
 
 from scheduled_bots import get_default_core_props, PROPS
-from scheduled_bots.geneprotein.Downloader import MyGeneDownloader
+from scheduled_bots.geneprotein.Downloader import MyGeneDownloader, LocalDownloader
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
 from wikidataintegrator.wdi_fastrun import FastRunContainer
@@ -732,7 +732,7 @@ def remove_deprecated_statements(qid, frc, releases, last_updated, props, login)
         wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
 
 
-def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, entrez=None):
+def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, entrez=None, filepath=None):
     """
     Main function for creating/updating genes
 
@@ -793,18 +793,21 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         validate_type = "microbial"
 
     # Get handle to mygene records
-    mgd = MyGeneDownloader()
+    if filepath:
+        downloader = LocalDownloader(filepath)
+    else:
+        downloader = MyGeneDownloader()
+
     if entrez:
-        doc, total = mgd.get_mg_gene(entrez)
+        doc, total = downloader.get_mg_gene(entrez)
         docs = iter([doc])
     else:
-        doc_filter = lambda x: (x.get("type_of_gene") != "biological-region") and ("entrezgene" in x)
-        docs, total = mgd.get_mg_cursor(taxid, doc_filter)
+        docs, total = downloader.get_mg_cursor(taxid, downloader.get_filter())
     print("total number of records: {}".format(total))
     # the scroll_id/cursor times out from mygene if we iterate. So.... get the whole thing now
     docs = list(docs)
     docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
-    records = HelperBot.tag_mygene_docs(docs, metadata)
+    records = HelperBot.tag_mygene_docs(docs, metadata, downloader.get_key_source())
 
     bot.run(records, total=total, fast_run=fast_run, write=write)
     for frc in wdi_core.WDItemEngine.fast_run_store:
@@ -814,7 +817,7 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
     releases = dict()
     releases_to_remove = set()
     last_updated = dict()
-    metadata = {k: v for k, v in metadata.items() if k in {'uniprot', 'ensembl', 'entrez'}}
+    metadata = {k: v for k, v in metadata.items() if k in {'uniprot', 'ensembl', 'entrez', 'refseq'}}
     for k, v in parse_mygene_src_version(metadata).items():
         if "release" in v:
             if k not in releases:
@@ -833,7 +836,7 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
 
 if __name__ == "__main__":
     """
-    Data to be used is retrieved from mygene.info
+    Data to be used is retrieved from mygene.info or from a local json file in a similar format
     """
     parser = argparse.ArgumentParser(description='run wikidata gene bot')
     parser.add_argument('--log-dir', help='directory to store logs', type=str)
@@ -844,6 +847,7 @@ if __name__ == "__main__":
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
     parser.add_argument('--entrez', help="Run only this one gene")
+    parser.add_argument('--filepath', help='load gene information from a local file instead of mygene.info', type=str)
     parser.set_defaults(fastrun=True)
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
@@ -854,12 +858,16 @@ if __name__ == "__main__":
     mcb = MicrobialChromosomeBot()
 
     # get metadata about sources
-    mgd = MyGeneDownloader()
-    metadata = mgd.get_metadata()['src_version']
+    if args.filepath:
+        downloader = LocalDownloader(args.filepath)
+    else:
+        downloader = MyGeneDownloader()
+
+    metadata = downloader.get_metadata()['src_version']
 
     if args.entrez:
         main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
-             write=not args.dummy, entrez=args.entrez)
+             write=not args.dummy, entrez=args.entrez, filepath=args.filepath)
         sys.exit(0)
 
     if "microbe" in taxon:
@@ -868,7 +876,8 @@ if __name__ == "__main__":
 
     for taxon1 in taxon.split(","):
         try:
-            main(taxon1, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy)
+            main(taxon1, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy,
+                 filepath=args.filepath)
         except Exception as e:
             # if one taxon fails, still try to run the others
             traceback.print_exc()
