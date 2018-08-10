@@ -31,19 +31,17 @@ class MicrobialChromosomeBot:
         """
 
         # get the assembly accessions of the reference genomes
-        url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt"
-        subprocess.check_output(['wget', '-N', url])
-        assdf = pd.read_csv("assembly_summary.txt", sep="\t", dtype=object, header=0, skiprows=1)
+        assdf = pd.read_csv("https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt", sep="\t", dtype=object, header=0, skiprows=1)
         assdf = assdf.query("refseq_category == 'reference genome'")
         accessions = set(assdf.gbrs_paired_asm)
         # adding Chlamydia muridarum str. Nigg
         accessions.add("GCA_000006685.1")
+        # add myxococcus xanthus dk1622
+        accessions.add("GCA_000012685.1")
 
         # Download prokaryotes genome table
         # but oh wait, it has no ref genome column
-        url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/prokaryotes.txt"
-        subprocess.check_output(['wget', '-N', url])
-        df = pd.read_csv("prokaryotes.txt", sep="\t", dtype=object, header=0)
+        df = pd.read_csv("https://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/prokaryotes.txt", sep="\t", dtype=object, header=0)
         df = df[df['Assembly Accession'].isin(accessions)]
         df = df.rename(columns={df.columns[0]: df.columns[0][1:]})
         # columns = ['Organism/Name', 'TaxID', 'BioProject Accession', 'BioProject ID', 'Group', 'SubGroup', 'Size (Mb)',

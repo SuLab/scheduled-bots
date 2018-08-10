@@ -34,7 +34,8 @@ class Downloader:
 class LocalDownloader(Downloader):
 
     def __init__(self, path):
-        data = json.load(path)
+        with open(path, "r") as file:
+            data = json.load(file)
         self.genes = data[0]
         self.metadata = data[1]
         self.sources = data[2]
@@ -43,7 +44,7 @@ class LocalDownloader(Downloader):
         return lambda x: ("locus_tag" in x.keys())
 
     def get_mg_gene(self, entrezgene):
-        for gene in self.data:
+        for gene in self.genes:
             if 'entrezgene' in gene.keys() and gene['entrezgene'] == entrezgene:
                 return gene, 1
 

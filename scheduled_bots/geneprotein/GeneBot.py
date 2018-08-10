@@ -794,7 +794,7 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
 
     # Get handle to mygene records
     if filepath:
-        downloader = LocalDownloader(filepath)
+        downloader = LocalDownloader(path=filepath)
     else:
         downloader = MyGeneDownloader()
 
@@ -865,7 +865,7 @@ if __name__ == "__main__":
 
     # get metadata about sources
     if args.filepath:
-        downloader = LocalDownloader(args.filepath)
+        downloader = LocalDownloader(path=args.filepath)
     else:
         downloader = MyGeneDownloader()
 
