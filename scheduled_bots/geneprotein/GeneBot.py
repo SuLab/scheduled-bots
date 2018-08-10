@@ -125,7 +125,7 @@ class Gene:
         if self.label is None:
             self.create_label()
         aliases = []
-        if 'symbol' in self.record:
+        if 'symbol' in self.record and self.record['symbol']['@value'] != '':
             aliases.append(self.record['symbol']['@value'])
         if 'name' in self.record:
             aliases.append(self.record['name']['@value'])
@@ -219,7 +219,8 @@ class Gene:
 
     def create_ref_sources(self):
         # create an entrez ref and ensembl ref (optional)
-        self.entrez_ref = make_ref_source(self.record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
+        if self.external_ids['Entrez Gene ID'] != "":
+            self.entrez_ref = make_ref_source(self.record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
                                           self.external_ids['Entrez Gene ID'], login=self.login)
         if 'Ensembl Gene ID' in self.external_ids:
             if len(self.external_ids['Ensembl Gene ID']) != 1:
@@ -233,14 +234,15 @@ class Gene:
         create statements common to all genes
         """
         s = []
-        if not self.entrez_ref:
-            self.create_ref_sources()
 
         ############
         # ID statements (required)
         ############
-        s.append(wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
-                                   references=[self.entrez_ref]))
+        print("ENTREZ ID:" + self.external_ids['Entrez Gene ID'])
+        if self.external_ids['Entrez Gene ID'] != "":
+            print("ERROR!!!@!@!@!@!@!@!!@!")
+            '''s.append(wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'],
+                                   references=[self.entrez_ref]))'''
 
         # optional ID statements
         if self.ensembl_ref:
@@ -260,32 +262,40 @@ class Gene:
                     'MGI Gene Symbol', 'HomoloGene ID', 'Rat Genome Database ID', 'FlyBase Gene ID',
                     'Wormbase Gene ID', 'ZFIN Gene ID', 'cytogenetic location']:
             if key in self.external_ids:
-                s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=[self.entrez_ref]))
+                refs = []
+                if self.entrez_ref is not None:
+                    refs = [self.entrez_ref]
+                s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=refs))
 
         ############
         # Gene statements
         ############
         # if there is an ensembl ID, this comes from ensembl, otherwise, entrez
-        gene_ref = self.ensembl_ref if self.ensembl_ref is not None else self.entrez_ref
+        gene_refs = []
+        if self.ensembl_ref is not None:
+            gene_refs = [self.ensembl_ref]
+        elif self.entrez_ref is not None:
+            gene_refs = [self.entrez_ref]
 
         # instance of gene, ncRNA.. etc
         type_of_gene = self.record['type_of_gene']['@value']
         assert type_of_gene in type_of_gene_map, "unknown type of gene: {}".format(type_of_gene)
         self.type_of_gene = type_of_gene
         # "protein-coding gene" will be instance of "gene"
-        s.append(wdi_core.WDItemID(type_of_gene_map[type_of_gene], PROPS['instance of'], references=[gene_ref]))
+        s.append(wdi_core.WDItemID(type_of_gene_map[type_of_gene], PROPS['instance of'], references=gene_refs))
 
         if type_of_gene not in {'protein-coding', 'pseudo', 'other', 'unknown'}:
             # make sure we add instance of "gene" as well
-            s.append(wdi_core.WDItemID("Q7187", PROPS['instance of'], references=[gene_ref]))
+            s.append(wdi_core.WDItemID("Q7187", PROPS['instance of'], references=gene_refs))
 
         # found in taxon
-        s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=[gene_ref]))
+        s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=gene_refs))
 
         return s
 
     def create_item(self, fast_run=True, write=True):
         self.parse_external_ids()
+        self.create_ref_sources()
         self.statements = self.create_statements()
         # remove subclass of gene statements
         # s = wdi_core.WDItemID("Q7187", "P279")
@@ -305,10 +315,14 @@ class Gene:
                                                   core_props=core_props)
 
         self.wd_item_gene = self.set_label_desc_aliases(self.wd_item_gene)
+        for s in self.wd_item_gene.statements:
+            print("Statement value:" + str(s.get_value()))
+            print("Prop number:" + str(s.get_prop_nr()))
+            for r in s.get_references():
+                print("\tReference: " + str(r))
         self.status = wdi_helpers.try_write(self.wd_item_gene, self.external_ids['Entrez Gene ID'],
                                             PROPS['Entrez Gene ID'],
                                             self.login, write=write)
-
 
 class ChromosomalGene(Gene):
     """
@@ -351,7 +365,8 @@ class ChromosomalGene(Gene):
 
     def create_ref_sources(self):
         # create an entrez ref and ensembl ref (optional)
-        self.entrez_ref = make_ref_source(self.record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
+        if self.external_ids['Entrez Gene ID'] != "":
+            self.entrez_ref = make_ref_source(self.record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
                                           self.external_ids['Entrez Gene ID'], login=self.login)
         if 'Reference Ensembl Gene ID' in self.external_ids:
             self.ensembl_ref = make_ref_source(self.record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
@@ -371,19 +386,16 @@ class ChromosomalGene(Gene):
         Create genomic_pos start stop orientation on a chromosome
         :return:
         """
-        if not self.entrez_ref:
-            self.create_ref_sources()
 
         genomic_pos_values = self.record['genomic_pos']['@value']
         genomic_pos_source = self.record['genomic_pos']['@source']
         if genomic_pos_source['id'] == "entrez":
-            genomic_pos_ref = self.entrez_ref
+            genomic_pos_refs = [self.entrez_ref]
         elif genomic_pos_source['id'] == "ensembl":
-            genomic_pos_ref = self.ensembl_ref
+            genomic_pos_refs = [self.ensembl_ref]
         else:
-            raise ValueError()
-        if not genomic_pos_ref:
-            return None
+            print("No genomic position ref")
+            genomic_pos_refs = []
         all_chr = set([self.chr_num_wdid[x['chr']] for x in genomic_pos_values])
         all_strand = set(['Q22809680' if x['strand'] == 1 else 'Q22809711' for x in genomic_pos_values])
 
@@ -395,17 +407,17 @@ class ChromosomalGene(Gene):
 
             # genomic start and end
             s.append(wdi_core.WDString(str(int(genomic_pos_value['start'])), PROPS['genomic start'],
-                                       references=[genomic_pos_ref], qualifiers=qualifiers))
+                                       references=genomic_pos_refs, qualifiers=qualifiers))
             s.append(wdi_core.WDString(str(int(genomic_pos_value['end'])), PROPS['genomic end'],
-                                       references=[genomic_pos_ref], qualifiers=qualifiers))
+                                       references=genomic_pos_refs, qualifiers=qualifiers))
 
         for chr in all_chr:
-            s.append(wdi_core.WDItemID(chr, PROPS['chromosome'], references=[genomic_pos_ref]))
+            s.append(wdi_core.WDItemID(chr, PROPS['chromosome'], references=genomic_pos_refs))
 
         if len(all_strand) == 1:
             # todo: not sure what to do if you have both orientations on the same chr
             strand_orientation = list(all_strand)[0]
-            s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'], references=[genomic_pos_ref]))
+            s.append(wdi_core.WDItemID(strand_orientation, PROPS['strand orientation'], references=genomic_pos_refs))
 
         return s
 
@@ -732,7 +744,7 @@ def remove_deprecated_statements(qid, frc, releases, last_updated, props, login)
         wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
 
 
-def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, entrez=None, filepath=None):
+def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, entrez=None, filepath=None, locus_tag=None):
     """
     Main function for creating/updating genes
 
@@ -748,6 +760,8 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
     :type write: bool
     :param entrez: Only run this one gene
     :type entrez: int
+    :param locus_tag: Only run this one gene
+    :type locus_tag: str
     :return: None
     """
 
@@ -801,6 +815,9 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
     if entrez:
         doc, total = downloader.get_mg_gene(entrez)
         docs = iter([doc])
+    elif locus_tag:
+        doc, total = downloader.get_mg_gene(locustag=locus_tag)
+        docs = iter([doc])
     else:
         docs, total = downloader.get_mg_cursor(taxid, downloader.get_filter())
     print("total number of records: {}".format(total))
@@ -852,7 +869,8 @@ if __name__ == "__main__":
                         type=str, required=True)
     parser.add_argument('--fastrun', dest='fastrun', action='store_true')
     parser.add_argument('--no-fastrun', dest='fastrun', action='store_false')
-    parser.add_argument('--entrez', help="Run only this one gene")
+    parser.add_argument('--entrez', help="Run only this one gene with specified entrez")
+    parser.add_argument('--locus_tag', help="Run only this one gene with specified locus_tag")
     parser.add_argument('--filepath', help='load gene information from a local file instead of mygene.info', type=str)
     parser.set_defaults(fastrun=True)
     args = parser.parse_args()
@@ -874,6 +892,11 @@ if __name__ == "__main__":
     if args.entrez:
         main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
              write=not args.dummy, entrez=args.entrez, filepath=args.filepath)
+        sys.exit(0)
+
+    if args.locus_tag:
+        main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
+             write=not args.dummy, locus_tag=args.locus_tag, filepath=args.filepath)
         sys.exit(0)
 
     if "microbe" in taxon:

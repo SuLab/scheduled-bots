@@ -28,7 +28,7 @@ source_items = {'uniprot': 'Q905695',
                 'refseq': 'Q7307074'}
 
 mygene_schema = {
-    'entrezgene': {'type': 'integer', 'coerce': int, 'required': True},
+    'entrezgene': {'type': 'string', 'required': True},
     'type_of_gene': {'type': 'string', 'required': True},
     'name': {'type': 'string', 'required': True},
     'symbol': {'type': 'string', 'required': True},

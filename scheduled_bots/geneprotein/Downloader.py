@@ -22,7 +22,7 @@ class Downloader:
     def query(self):
         raise NotImplementedError("Needs to be implemented")
 
-    def get_mg_gene(self, entrezgene):
+    def get_mg_gene(self, entrezgene=None, locustag=None):
         raise NotImplementedError("Needs to be implemented")
 
     def get_filter(self):
@@ -43,10 +43,14 @@ class LocalDownloader(Downloader):
     def get_filter(self):
         return lambda x: ("locus_tag" in x.keys())
 
-    def get_mg_gene(self, entrezgene):
+    def get_mg_gene(self, entrezgene=None, locustag=None):
         for gene in self.genes:
-            if 'entrezgene' in gene.keys() and gene['entrezgene'] == entrezgene:
-                return gene, 1
+            if entrezgene:
+                if 'entrezgene' in gene.keys() and gene['entrezgene'] == entrezgene:
+                    return gene, 1
+            elif locustag:
+                if 'locus_tag' in gene.keys() and gene['locus_tag'] == locustag:
+                    return gene, 1
 
     def get_mg_cursor(self, taxid=None, filter_f=None):
         # get a list of all genes in the local file
@@ -140,7 +144,7 @@ class MyGeneDownloader(Downloader):
         return q, total
 
 
-    def get_mg_gene(self, entrezgene):
+    def get_mg_gene(self, entrezgene, locustag=None):
         mg = MyGeneInfo(url=self.base_url)
         q = mg.getgene(entrezgene, fields=self.fields)
         return q, 1
