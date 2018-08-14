@@ -1,12 +1,12 @@
 """
 This actually does a write in Wikidata
 """
-from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
+from wikidataintegrator import wdi_core
 
 from scheduled_bots.geneprotein import HelperBot
-from scheduled_bots.geneprotein.ProteinBot import main, Protein, PROPS
+from geneprotein.deprecated.ProteinBot import main
 from pymongo import MongoClient
-from scheduled_bots.local import WDUSER, WDPASS
+
 
 def _test_write_one_protein(qid, entrezgene, taxid):
     coll = MongoClient().wikidata_src.mygene

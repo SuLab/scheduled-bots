@@ -6,10 +6,12 @@ and changes the label
 In the future, zebrafish genes without a ZFIN ID will be skipped
 """
 
-from scheduled_bots.geneprotein import GeneBot, ProteinBot, HelperBot
-from scheduled_bots.geneprotein.GeneBot import WDPASS, WDUSER, organisms_info, PROPS
+from scheduled_bots.geneprotein import HelperBot
+from scheduled_bots.geneprotein.bots.GeneBot import GeneBot
+from geneprotein.deprecated import ProteinBot
+from scheduled_bots.geneprotein.GeneProteinRunner import WDPASS, WDUSER, organisms_info, PROPS
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
-from wikidataintegrator import wdi_helpers, wdi_login
+from wikidataintegrator import wdi_login
 from pymongo import MongoClient
 
 from collections import Counter

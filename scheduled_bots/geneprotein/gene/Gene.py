@@ -1,14 +1,11 @@
-from scheduled_bots.geneprotein import HelperBot, organisms_info, type_of_gene_map, descriptions_by_type
+from scheduled_bots.geneprotein import type_of_gene_map, descriptions_by_type
 from itertools import chain
-from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
-from scheduled_bots.geneprotein.MicrobialChromosomeBot import MicrobialChromosomeBot
-from scheduled_bots.geneprotein.HelperBot import make_ref_source, parse_mygene_src_version, source_items
-from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
+from wikidataintegrator import wdi_core
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
-from wikidataintegrator.wdi_fastrun import FastRunContainer
 from scheduled_bots import get_default_core_props, PROPS
 
 core_props = get_default_core_props()
+
 
 class Gene:
     """
@@ -155,18 +152,21 @@ class Gene:
     def create_ref_sources(self):
         # create an entrez ref and ensembl ref (optional)
         if 'Entrez Gene ID' in self.external_ids and self.external_ids['Entrez Gene ID']:
-            self.entrez_ref = self.ref_factory.get_reference(self.record['entrezgene']['@source'], PROPS['Entrez Gene ID'],
-                                          self.external_ids['Entrez Gene ID'])
+            self.entrez_ref = self.ref_factory.get_reference(self.record['entrezgene']['@source'],
+                                                             PROPS['Entrez Gene ID'],
+                                                             self.external_ids['Entrez Gene ID'])
         if 'Ensembl Gene ID' in self.external_ids and self.external_ids['Ensembl Gene ID']:
             if len(self.external_ids['Ensembl Gene ID']) != 1:
                 raise ValueError("more than one ensembl gene ID: {}".format(self.record['entrezgene']))
             ensembl_gene_id = list(self.external_ids['Ensembl Gene ID'])[0]
-            self.ensembl_ref = self.ref_factory.get_reference(self.record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
-                                               ensembl_gene_id)
+            self.ensembl_ref = self.ref_factory.get_reference(self.record['ensembl']['@source'],
+                                                              PROPS['Ensembl Gene ID'],
+                                                              ensembl_gene_id)
 
         if 'RefSeq Genome ID' in self.external_ids and self.external_ids['RefSeq Genome ID']:
-            self.refseq_ref = self.ref_factory.get_reference(self.record['refseq']['@source'], PROPS['Refseq Genome ID'],
-                                          self.external_ids['RefSeq Genome ID'])
+            self.refseq_ref = self.ref_factory.get_reference(self.record['refseq']['@source'],
+                                                             PROPS['Refseq Genome ID'],
+                                                             self.external_ids['RefSeq Genome ID'])
 
     def create_statements(self, refseq=False, deprecated_entrez=False):
         """
@@ -182,7 +182,7 @@ class Gene:
             if deprecated_entrez:
                 rank = 'deprecated'
             s.append(wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], rank=rank,
-                                   references=[self.entrez_ref]))
+                                       references=[self.entrez_ref]))
 
         # optional ID statements
         if self.ensembl_ref:
@@ -219,7 +219,8 @@ class Gene:
         if 'Refseq Genome ID' in self.external_ids:
             if self.refseq_ref:
                 ref = self.refseq_ref
-            s.append(wdi_core.WDString(self.external_ids['Refseq Genome ID'], PROPS['Refseq Genome ID'], references=[ref]))
+            s.append(
+                wdi_core.WDString(self.external_ids['Refseq Genome ID'], PROPS['Refseq Genome ID'], references=[ref]))
 
         ############
         # Gene statements

@@ -29,34 +29,19 @@ import sys
 import time
 import traceback
 from datetime import datetime
-from functools import partial
 
-from tqdm import tqdm
-from gene.ReferenceFactory import ReferenceFactory
-
-from scheduled_bots import get_default_core_props, PROPS
+from scheduled_bots import PROPS
 from scheduled_bots.geneprotein.Downloader import MyGeneDownloader, LocalDownloader
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
-from wikidataintegrator.ref_handlers import update_retrieved_if_new
-from wikidataintegrator.wdi_fastrun import FastRunContainer
+from wikidataintegrator.wdi_helpers import id_mapper
 
-from gene.HumanGene import HumanGene
-from gene.MicrobeGene import MicrobeGene
-from gene.ChromosomalGene import ChromosomalGene
-
-core_props = get_default_core_props()
-
-FASTRUN_PROPS = {'Entrez Gene ID', 'strand orientation', 'Saccharomyces Genome Database ID', 'RefSeq RNA ID',
-                 'ZFIN Gene ID', 'Ensembl Transcript ID', 'HGNC ID', 'encodes', 'genomic assembly', 'found in taxon',
-                 'HomoloGene ID', 'MGI Gene Symbol', 'cytogenetic location', 'Mouse Genome Informatics ID',
-                 'FlyBase Gene ID', 'genomic end', 'NCBI Locus tag', 'Rat Genome Database ID', 'Ensembl Gene ID',
-                 'instance of', 'chromosome', 'HGNC Gene Symbol', 'Wormbase Gene ID', 'genomic start'}
+from scheduled_bots.geneprotein.bots.GeneBot import ChromosomalGeneBot, MicrobeGeneBot, HumanGeneBot
+from scheduled_bots.geneprotein.bots.ProteinBot import ProteinBot
 
 from scheduled_bots.geneprotein import HelperBot, organisms_info, type_of_gene_map, descriptions_by_type
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
 from scheduled_bots.geneprotein.MicrobialChromosomeBot import MicrobialChromosomeBot
 from scheduled_bots.geneprotein.HelperBot import make_ref_source, parse_mygene_src_version, source_items
-from gene.DeprecatedStatements import remove_deprecated_statements
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -73,102 +58,8 @@ __metadata__ = {
     'tags': ['gene'],
 }
 
-class GeneBot:
-    """
-    Generic genebot class
-    """
-    item = None
-    failed = []  # list of entrez ids for those that failed
-
-    def __init__(self, organism_info, login):
-        self.login = login
-        self.organism_info = organism_info
-
-    def run(self, records, total=None, fast_run=True, write=True):
-        # this shouldn't ever actually get used now
-        raise NotImplementedError("The gene bot has not implemented a run method!")
-        '''records = self.filter(records)
-        for record in tqdm(records, mininterval=2, total=total):
-            gene = self.GENE_CLASS(type, record, self.organism_info, self.login)
-            try:
-                gene.create_item(fast_run=fast_run, write=write)
-            except Exception as e:
-                exc_info = sys.exc_info()
-                traceback.print_exception(*exc_info)
-                msg = wdi_helpers.format_msg(gene.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], None,
-                                             str(e), msg_type=type(e))
-                wdi_core.WDItemEngine.log("ERROR", msg)
-                gene.status = msg
-
-            if gene.status is not True:
-                self.failed.append(gene.entrez)'''
-
-    def filter(self, records):
-        """
-        This is used to selectively skip certain records based on conditions within the record or to specifically
-        alter certain fields before sending to the Bot
-        """
-        # If we are processing zebrafish records, skip the record if it doesn't have a zfin ID
-        for record in records:
-            if record['taxid']['@value'] == 7955 and 'ZFIN' not in record:
-                continue
-            else:
-                yield record
-
-    def cleanup(self, releases, last_updated):
-        """
-
-        :param releases:
-        :param last_updated:
-        :param failed: list of entrez ids to skip
-        :return:
-        """
-        print(self.failed)
-        entrez_qid = wdi_helpers.id_mapper('P351', ((PROPS['found in taxon'], self.organism_info['wdid']),))
-        print(len(entrez_qid))
-        entrez_qid = {entrez: qid for entrez, qid in entrez_qid.items() if entrez not in self.failed}
-        print(len(entrez_qid))
-        filter = {PROPS['Entrez Gene ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
-        frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter=filter, use_refs=True)
-        frc.clear()
-        props = [PROPS[x] for x in FASTRUN_PROPS]
-        for qid in tqdm(entrez_qid.values()):
-            remove_deprecated_statements(qid, frc, releases, last_updated, props, self.login)
-
-
-class ChromosomalGeneBot(GeneBot):
-    GENE_CLASS = ChromosomalGene
-
-    def __init__(self, organism_info, chr_num_wdid, login):
-        super().__init__(organism_info, login)
-        self.chr_num_wdid = chr_num_wdid
-
-    def run(self, records, total=None, fast_run=True, write=True, refseq=False, deprecated_entrez=False):
-        records = self.filter(records)
-        for record in tqdm(records, mininterval=2, total=total):
-            gene = self.GENE_CLASS(record, self.organism_info, self.chr_num_wdid, ReferenceFactory(self.login))
-            try:
-                item = gene.create_item(fast_run=fast_run, refseq=refseq, deprecated_entrez=deprecated_entrez)
-                id, prop = gene.get_id_and_prop()
-                status = wdi_helpers.try_write(item, id, prop, self.login, write=write)
-            except Exception as e:
-                exc_info = sys.exc_info()
-                traceback.print_exception(*exc_info)
-                id, prop = gene.get_id_and_prop()
-                msg = wdi_helpers.format_msg(id, prop, None, str(e), msg_type=type(e))
-                wdi_core.WDItemEngine.log("ERROR", msg)
-                status = msg
-            if status is not True:
-                self.failed.append(gene.entrez)
-
-class HumanGeneBot(ChromosomalGeneBot):
-    GENE_CLASS = HumanGene
-
-class MicrobeGeneBot(ChromosomalGeneBot):
-    GENE_CLASS = MicrobeGene
-
 def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, entrez=None, filepath=None,
-         locus_tag=None, refseq=False, deprecated_entrez=False, chromosome=None):
+         locus_tag=None, refseq=False, deprecated_entrez=False, chromosome=None, gene=False, protein=False):
     """
     Main function for creating/updating genes
 
@@ -218,9 +109,9 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         chr_num_wdid = cb.get_or_create(organism_info, login=login)
         chr_num_wdid = {k.upper(): v for k, v in chr_num_wdid.items()}
         if int(organism_info['taxid']) == 9606:
-            bot = HumanGeneBot(organism_info, chr_num_wdid, login)
+            gene_bot = HumanGeneBot(organism_info, chr_num_wdid, login)
         else:
-            bot = ChromosomalGeneBot(organism_info, chr_num_wdid, login)
+            gene_bot = ChromosomalGeneBot(organism_info, chr_num_wdid, login)
     else:
         # check if its one of the reference microbial genomes
         # raises valueerror if not...
@@ -231,7 +122,7 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         else:
             refseq_qid_chrom = mcb.get_or_create_chromosomes(taxid, login)
         print(organism_info)
-        bot = MicrobeGeneBot(organism_info, refseq_qid_chrom, login)
+        gene_bot = MicrobeGeneBot(organism_info, refseq_qid_chrom, login)
         validate_type = "microbial"
 
     # Get handle to mygene records
@@ -240,22 +131,41 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
     else:
         downloader = MyGeneDownloader()
 
-    if entrez:
-        doc, total = downloader.get_mg_gene(entrez)
-        docs = iter([doc])
-    elif locus_tag:
-        doc, total = downloader.get_mg_gene(locustag=locus_tag)
-        docs = iter([doc])
-    else:
-        docs, total = downloader.get_mg_cursor(taxid, downloader.get_filter())
+    if (gene):
+        if entrez:
+            doc, total = downloader.get_mg_gene(entrez)
+            docs = iter([doc])
+        elif locus_tag:
+            doc, total = downloader.get_mg_gene(locustag=locus_tag)
+            docs = iter([doc])
+        else:
+            docs, total = downloader.get_mg_cursor(taxid, downloader.get_filter())
 
-    print("total number of records: {}".format(total))
-    # the scroll_id/cursor times out from mygene if we iterate. So.... get the whole thing now
-    docs = list(docs)
-    docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
-    records = HelperBot.tag_mygene_docs(docs, metadata, downloader.get_key_source())
+        print("total number of gene records: {}".format(total))
+        # the scroll_id/cursor times out from mygene if we iterate. So.... get the whole thing now
+        docs = list(docs)
+        docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
+        records = HelperBot.tag_mygene_docs(docs, metadata, downloader.get_key_source())
+        gene_bot.run(records, total=total, fast_run=fast_run, write=write, refseq=refseq, deprecated_entrez=deprecated_entrez)
 
-    bot.run(records, total=total, fast_run=fast_run, write=write, refseq=refseq, deprecated_entrez=deprecated_entrez)
+    if (protein):
+        protein_bot = ProteinBot(organism_info, login)
+        if entrez:
+            doc, total = downloader.get_mg_gene(entrez)
+            docs = iter([doc])
+        elif locus_tag:
+            doc, total = downloader.get_mg_gene(locustag=locus_tag)
+            docs = iter([doc])
+        else:
+            docs, total = downloader.get_mg_cursor(taxid, downloader.get_filter(protein=True))
+        print("total number of protein-coding gene records: {}".format(total))
+        # the scroll_id/cursor times out from mygene if we iterate. So.... get the whole thing now
+        docs = list(docs)
+        docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
+        records = HelperBot.tag_mygene_docs(docs, metadata, downloader.get_key_source())
+
+        protein_bot.run(records, total=total, write=write, refseq=refseq)
+
     for frc in wdi_core.WDItemEngine.fast_run_store:
         frc.clear()
 
@@ -280,7 +190,11 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         else:
             last_updated[source_items[k]] = datetime.strptime(v["timestamp"], "%Y%m%d")
     print(last_updated)
-    bot.cleanup(releases_to_remove, last_updated)
+
+    if gene:
+        gene_bot.cleanup(releases_to_remove, last_updated)
+    if protein:
+        protein_bot.cleanup(releases_to_remove, last_updated)
 
 if __name__ == "__main__":
     """
@@ -308,6 +222,8 @@ if __name__ == "__main__":
     parser.add_argument('--deprecated_entrez', dest='deprecated_entrez', help='whether or not the entrez id, if present, is deprecated', action='store_true')
     parser.add_argument('--chromosome', help="use specific chromosome in form 'refseq:qid' ex. 'NZ_AOBT01000001.1:Q56085906'", type=str)
     parser.set_defaults(fastrun=True)
+    parser.add_argument('--gene', help='whether or not to run the gene bot', action='store_true')
+    parser.add_argument('--protein', help='whether or not to run the protein bot', action='store_true')
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
@@ -326,13 +242,13 @@ if __name__ == "__main__":
     if args.entrez:
         main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
              write=not args.dummy, entrez=args.entrez, filepath=args.filepath, refseq=args.refseq,
-             deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome)
+             deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome, gene=args.gene, protein=args.protein)
         sys.exit(0)
 
     if args.locus_tag:
         main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
              write=not args.dummy, locus_tag=args.locus_tag, filepath=args.filepath, refseq=args.refseq,
-             deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome)
+             deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome, gene=args.gene, protein=args.protein)
         sys.exit(0)
 
     if args.microbes:
@@ -343,7 +259,8 @@ if __name__ == "__main__":
     for taxon1 in taxon.split(","):
         try:
             main(taxon1, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy,
-                 filepath=args.filepath, refseq=args.refseq, deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome)
+                 filepath=args.filepath, refseq=args.refseq, deprecated_entrez=args.deprecated_entrez,
+                 chromosome=args.chromosome, gene=args.gene, protein=args.protein)
         except Exception as e:
             # if one taxon fails, still try to run the others
             traceback.print_exc()

@@ -40,8 +40,11 @@ class LocalDownloader(Downloader):
         self.metadata = data[1]
         self.sources = data[2]
 
-    def get_filter(self):
-        return lambda x: ("locus_tag" in x.keys())
+    def get_filter(self, protein=False):
+        if not protein:
+            return lambda x: ("locus_tag" in x.keys())
+        else:
+            return lambda x: (x.get("type_of_gene") == "protein-coding" and "locus_tag" in x.keys())
 
     def get_mg_gene(self, entrezgene=None, locustag=None):
         for gene in self.genes:
