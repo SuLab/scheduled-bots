@@ -38,6 +38,9 @@ class MicrobialChromosomeBot:
         accessions.add("GCA_000006685.1")
         # add myxococcus xanthus dk1622
         accessions.add("GCA_000012685.1")
+        #add other mxyo strain accessions
+        accessions.add("GCA_000340515.1")
+        accessions.add("GCA_000278585.2")
 
         # Download prokaryotes genome table
         # but oh wait, it has no ref genome column
