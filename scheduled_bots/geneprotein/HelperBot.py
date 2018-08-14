@@ -158,9 +158,9 @@ def parse_mygene_src_version(d):
     """
     d2 = {}
     for source, version in d.items():
-        if source in {'ensembl', 'refseq'}:
+        if source in {'ensembl'}:
             d2[source] = {'id': source, 'release': str(version)}
-        elif source in {'uniprot', 'entrez', 'ucsc'}:
+        elif source in {'uniprot', 'entrez', 'ucsc', 'refseq'}:
             d2[source] = {'id': source, 'timestamp': str(version)}
     return d2
 
