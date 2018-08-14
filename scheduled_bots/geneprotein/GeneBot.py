@@ -168,7 +168,7 @@ class MicrobeGeneBot(ChromosomalGeneBot):
     GENE_CLASS = MicrobeGene
 
 def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, entrez=None, filepath=None,
-         locus_tag=None, refseq=False, deprecated_entrez=False):
+         locus_tag=None, refseq=False, deprecated_entrez=False, chromosome=None):
     """
     Main function for creating/updating genes
 
@@ -226,7 +226,10 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         # raises valueerror if not...
         mcb = MicrobialChromosomeBot()
         organism_info = mcb.get_organism_info(taxid)
-        refseq_qid_chrom = mcb.get_or_create_chromosomes(taxid, login)
+        if chromosome:
+            refseq_qid_chrom = {chromosome.split(":")[0]: chromosome.split(":")[1]}
+        else:
+            refseq_qid_chrom = mcb.get_or_create_chromosomes(taxid, login)
         print(organism_info)
         bot = MicrobeGeneBot(organism_info, refseq_qid_chrom, login)
         validate_type = "microbial"
@@ -303,6 +306,7 @@ if __name__ == "__main__":
     parser.add_argument('--filepath', help='load gene information from a local file instead of mygene.info', type=str)
     parser.add_argument('--refseq', dest='refseq', help='use refseq references over entrez', action='store_true')
     parser.add_argument('--deprecated_entrez', dest='deprecated_entrez', help='whether or not the entrez id, if present, is deprecated', action='store_true')
+    parser.add_argument('--chromosome', help="use specific chromosome in form 'refseq:qid' ex. 'NZ_AOBT01000001.1:Q56085906'", type=str)
     parser.set_defaults(fastrun=True)
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
@@ -321,12 +325,14 @@ if __name__ == "__main__":
 
     if args.entrez:
         main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
-             write=not args.dummy, entrez=args.entrez, filepath=args.filepath, refseq=args.refseq, deprecated_entrez=args.deprecated_entrez)
+             write=not args.dummy, entrez=args.entrez, filepath=args.filepath, refseq=args.refseq,
+             deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome)
         sys.exit(0)
 
     if args.locus_tag:
         main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
-             write=not args.dummy, locus_tag=args.locus_tag, filepath=args.filepath, refseq=args.refseq, deprecated_entrez=args.deprecated_entrez)
+             write=not args.dummy, locus_tag=args.locus_tag, filepath=args.filepath, refseq=args.refseq,
+             deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome)
         sys.exit(0)
 
     if args.microbes:
@@ -337,7 +343,7 @@ if __name__ == "__main__":
     for taxon1 in taxon.split(","):
         try:
             main(taxon1, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy,
-                 filepath=args.filepath, refseq=args.refseq, deprecated_entrez=args.deprecated_entrez)
+                 filepath=args.filepath, refseq=args.refseq, deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome)
         except Exception as e:
             # if one taxon fails, still try to run the others
             traceback.print_exc()
