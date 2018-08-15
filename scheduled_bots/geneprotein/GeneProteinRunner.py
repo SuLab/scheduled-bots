@@ -146,8 +146,9 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         docs = list(docs)
         docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
         records = HelperBot.tag_mygene_docs(docs, metadata, downloader.get_key_source())
-        wait_for_last_modified(datetime.now())
         gene_bot.run(records, total=total, fast_run=fast_run, write=write, refseq=refseq, deprecated_entrez=deprecated_entrez)
+        if protein:
+            wait_for_last_modified(datetime.now())
 
     if (protein):
         protein_bot = ProteinBot(organism_info, login)
@@ -164,7 +165,6 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         docs = list(docs)
         docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
         records = HelperBot.tag_mygene_docs(docs, metadata, downloader.get_key_source())
-        wait_for_last_modified(datetime.now())
         protein_bot.run(records, total=total, write=write, refseq=refseq, fast_run=fast_run)
 
     for frc in wdi_core.WDItemEngine.fast_run_store:

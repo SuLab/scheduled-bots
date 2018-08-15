@@ -80,7 +80,6 @@ class ProteinBot(Bot):
         # some proteins are encoded by multiple genes. don't try to create it again
         if uniprot and uniprot in self.uniprot_qid:
             qid = self.uniprot_qid[uniprot]
-            wait_for_last_modified(datetime.datetime.now())
             wditem = protein.update_item(qid, fast_run=fast_run, write=write, refseq=refseq)
         else:
 
@@ -88,7 +87,6 @@ class ProteinBot(Bot):
             if not uniprot:
                 qid = get_qid_from_refseq(refseq_id[0], record['taxid']['@value'])
                 if qid:
-                    wait_for_last_modified(datetime.datetime.now())
                     wditem = protein.update_item(qid, fast_run=fast_run, write=write, refseq=refseq)
                 else:
                     wditem = protein.create_item(fast_run=fast_run, write=write, refseq=refseq)
