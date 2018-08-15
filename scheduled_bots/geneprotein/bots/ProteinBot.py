@@ -1,10 +1,11 @@
 from tqdm import tqdm
+import datetime
 
 from scheduled_bots import PROPS
 from scheduled_bots.geneprotein.helpers.DeprecatedStatements import remove_deprecated_statements
 from wikidataintegrator import wdi_core, wdi_helpers
 from wikidataintegrator.wdi_fastrun import FastRunContainer
-from wikidataintegrator.wdi_helpers import format_msg
+from wikidataintegrator.wdi_helpers import format_msg, wait_for_last_modified
 
 from scheduled_bots.geneprotein.bots.Bot import Bot
 from scheduled_bots.geneprotein.protein.Protein import Protein
@@ -20,16 +21,18 @@ class ProteinBot(Bot):
     Generic proteinbot class
     """
     failed = []  # list of uniprot ids for those that failed
+    to_encode = []
 
     def __init__(self, organism_info, login):
         super().__init__(login)
         self.organism_info = organism_info
         self.uniprot_qid = dict()
 
-    def run(self, records, total=None, write=True, refseq=False):
+    def run(self, records, total=None, write=True, refseq=False, fast_run=True):
         records = self.filter(records)
         entrez_mapping = id_mapper("P351", (("P703", self.organism_info['wdid']),))
         locus_mapping = id_mapper("P2393", (("P703", self.organism_info['wdid']),))
+        print("Creating Protein Item(s)")
         for record in tqdm(records, mininterval=2, total=total):
 
             entrez = str(record['entrezgene']['@value'])
@@ -51,9 +54,16 @@ class ProteinBot(Bot):
                 uniprots = record['uniprot']['@value']['Swiss-Prot']
                 for uniprot in uniprots:
                     record['uniprot']['@value']['Swiss-Prot'] = uniprot
-                    self.run_one(record, gene_wdid, write, refseq=refseq)
+                    self.run_one(record, gene_wdid, write, refseq=refseq, fast_run=fast_run)
             else:
-                self.run_one(record, gene_wdid, write, refseq=refseq)
+                self.run_one(record, gene_wdid, write, refseq=refseq, fast_run=fast_run)
+
+        wait_for_last_modified(datetime.datetime.now())
+        print("Updating gene encodes statements")
+        for protein in tqdm(self.to_encode, mininterval=2, total=total):
+            protein.make_gene_encodes(fast_run=fast_run, write=write)
+            if protein.status is not True:
+                self.failed.append(protein.uniprot)
 
     def run_one(self, record, gene_wdid, write, fast_run=True, refseq=False):
         protein = Protein(record, self.organism_info, gene_wdid, self.login)
@@ -73,9 +83,7 @@ class ProteinBot(Bot):
             wditem = protein.create_item(fast_run=fast_run, write=write, refseq=refseq)
         if wditem is not None:
             self.uniprot_qid[uniprot] = wditem.wd_item_id
-            protein.make_gene_encodes(fast_run=fast_run, write=write)
-        if protein.status is not True:
-            self.failed.append(protein.uniprot)
+            self.to_encode.append(protein)
 
     def filter(self, records):
         """
