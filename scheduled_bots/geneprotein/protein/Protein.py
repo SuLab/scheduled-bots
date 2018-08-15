@@ -122,7 +122,9 @@ class Protein:
         # Required: uniprot (1)
         # Optional: OMIM (1?), Ensembl protein (0 or more), refseq protein (0 or more)
         ############
-        uniprot_ref = make_ref_source(self.record['uniprot']['@source'], PROPS['UniProt ID'],
+        uniprot_ref = None
+        if self.external_ids['UniProt ID']:
+            uniprot_ref = make_ref_source(self.record['uniprot']['@source'], PROPS['UniProt ID'],
                                       self.external_ids['UniProt ID'],
                                       login=self.login)
 
@@ -136,7 +138,8 @@ class Protein:
             refseq_ref = make_ref_source(self.record['refseq']['@source'], PROPS['Refseq Genome ID'],
                                                              self.external_ids['RefSeq Genome ID'], login=self.login)
 
-        s.append(wdi_core.WDString(self.external_ids['UniProt ID'], PROPS['UniProt ID'], references=[uniprot_ref]))
+        if uniprot_ref:
+            s.append(wdi_core.WDString(self.external_ids['UniProt ID'], PROPS['UniProt ID'], references=[uniprot_ref]))
 
         if entrez_ref:
             for key in ['Saccharomyces Genome Database ID']:
@@ -166,27 +169,43 @@ class Protein:
         # Protein statements
         ############
         # instance of protein
-        s.append(wdi_core.WDItemID("Q8054", PROPS['instance of'], references=[uniprot_ref]))
+        ref = None
+        if refseq and refseq_ref:
+            ref = refseq_ref
+        elif uniprot_ref:
+            ref = uniprot_ref
+        s.append(wdi_core.WDItemID("Q8054", PROPS['instance of'], references=[ref]))
 
         # found in taxon
-        s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=[uniprot_ref]))
+        s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=[ref]))
 
         # encoded by
-        s.append(wdi_core.WDItemID(self.gene_wdid, PROPS['encoded by'], references=[uniprot_ref]))
+        s.append(wdi_core.WDItemID(self.gene_wdid, PROPS['encoded by'], references=[ref]))
 
         return s
 
-    def make_gene_encodes(self, fast_run=True, write=True):
+    def make_gene_encodes(self, fast_run=True, write=True, refseq=False):
         """
         Add an "encodes" statement to the gene item
         :return:
         """
-        uniprot_ref = make_ref_source(self.record['uniprot']['@source'], PROPS['UniProt ID'],
+        if 'RefSeq Genome ID' in self.external_ids and self.external_ids['RefSeq Genome ID']:
+            refseq_ref = make_ref_source(self.record['refseq']['@source'], PROPS['Refseq Genome ID'],
+                                                             self.external_ids['RefSeq Genome ID'], login=self.login)
+
+        if self.external_ids['UniProt ID']:
+            uniprot_ref = make_ref_source(self.record['uniprot']['@source'], PROPS['UniProt ID'],
                                       self.external_ids['UniProt ID'],
                                       login=self.login)
 
+        ref = None
+        if refseq and refseq_ref:
+            ref = refseq_ref
+        elif uniprot_ref:
+            ref = uniprot_ref
+
         try:
-            statements = [wdi_core.WDItemID(self.protein_wdid, PROPS['encodes'], references=[uniprot_ref])]
+            statements = [wdi_core.WDItemID(self.protein_wdid, PROPS['encodes'], references=[ref])]
             wd_item_gene = wdi_core.WDItemEngine(wd_item_id=self.gene_wdid, domain='genes', data=statements,
                                                  append_value=[PROPS['encodes']], fast_run=fast_run,
                                                  fast_run_base_filter={PROPS['found in taxon']: self.organism_info['wdid']},
@@ -249,15 +268,12 @@ class Protein:
         try:
             self.parse_external_ids()
             self.statements = self.create_statements(refseq=refseq)
-
             wd_item_protein = wdi_core.WDItemEngine(wd_item_id=qid, data=self.statements,
                                                     append_value=[PROPS['instance of'], PROPS['encoded by'],
                                                                   PROPS['Ensembl Protein ID'],
                                                                   PROPS['RefSeq Protein ID']],
                                                     fast_run=fast_run,
-                                                    fast_run_base_filter={PROPS['UniProt ID']: '',
-                                                                          PROPS['found in taxon']: self.organism_info[
-                                                                              'wdid']},
+                                                    fast_run_base_filter={PROPS['found in taxon']: self.organism_info['wdid']},
                                                     fast_run_use_refs=True, ref_handler=update_retrieved_if_new,
                                                     global_ref_mode="CUSTOM",
                                                     core_props=core_props)

@@ -6,6 +6,7 @@ from scheduled_bots.geneprotein.helpers.DeprecatedStatements import remove_depre
 from wikidataintegrator import wdi_core, wdi_helpers
 from wikidataintegrator.wdi_fastrun import FastRunContainer
 from wikidataintegrator.wdi_helpers import format_msg, wait_for_last_modified
+from scheduled_bots.geneprotein.helpers.qid_helper import get_qid_from_refseq
 
 from scheduled_bots.geneprotein.bots.Bot import Bot
 from scheduled_bots.geneprotein.protein.Protein import Protein
@@ -61,7 +62,7 @@ class ProteinBot(Bot):
         wait_for_last_modified(datetime.datetime.now())
         print("Updating gene encodes statements")
         for protein in tqdm(self.to_encode, mininterval=2, total=total):
-            protein.make_gene_encodes(fast_run=fast_run, write=write)
+            protein.make_gene_encodes(fast_run=fast_run, write=write, refseq=refseq)
             if protein.status is not True:
                 self.failed.append(protein.uniprot)
 
@@ -70,19 +71,32 @@ class ProteinBot(Bot):
         try:
             protein.parse_external_ids()
             uniprot = protein.external_ids['UniProt ID']
+            refseq_id = protein.external_ids['RefSeq Protein ID']
         except Exception as e:
             msg = wdi_helpers.format_msg(gene_wdid, None, None, str(e), msg_type=type(e))
             wdi_core.WDItemEngine.log("ERROR", msg)
             return
 
         # some proteins are encoded by multiple genes. don't try to create it again
-        if uniprot in self.uniprot_qid:
+        if uniprot and uniprot in self.uniprot_qid:
             qid = self.uniprot_qid[uniprot]
+            wait_for_last_modified(datetime.datetime.now())
             wditem = protein.update_item(qid, fast_run=fast_run, write=write, refseq=refseq)
         else:
-            wditem = protein.create_item(fast_run=fast_run, write=write, refseq=refseq)
+
+            # check if it can be found with refseq
+            if not uniprot:
+                qid = get_qid_from_refseq(refseq_id[0], record['taxid']['@value'])
+                if qid:
+                    wait_for_last_modified(datetime.datetime.now())
+                    wditem = protein.update_item(qid, fast_run=fast_run, write=write, refseq=refseq)
+                else:
+                    wditem = protein.create_item(fast_run=fast_run, write=write, refseq=refseq)
+            else:
+                wditem = protein.create_item(fast_run=fast_run, write=write, refseq=refseq)
         if wditem is not None:
-            self.uniprot_qid[uniprot] = wditem.wd_item_id
+            if uniprot:
+                self.uniprot_qid[uniprot] = wditem.wd_item_id
             self.to_encode.append(protein)
 
     def filter(self, records):

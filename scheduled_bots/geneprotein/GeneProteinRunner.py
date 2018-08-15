@@ -33,15 +33,15 @@ from datetime import datetime
 from scheduled_bots import PROPS
 from scheduled_bots.geneprotein.Downloader import MyGeneDownloader, LocalDownloader
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
-from wikidataintegrator.wdi_helpers import id_mapper
+from wikidataintegrator.wdi_helpers import wait_for_last_modified
 
 from scheduled_bots.geneprotein.bots.GeneBot import ChromosomalGeneBot, MicrobeGeneBot, HumanGeneBot
 from scheduled_bots.geneprotein.bots.ProteinBot import ProteinBot
 
-from scheduled_bots.geneprotein import HelperBot, organisms_info, type_of_gene_map, descriptions_by_type
+from scheduled_bots.geneprotein import HelperBot, organisms_info
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
 from scheduled_bots.geneprotein.MicrobialChromosomeBot import MicrobialChromosomeBot
-from scheduled_bots.geneprotein.HelperBot import make_ref_source, parse_mygene_src_version, source_items
+from scheduled_bots.geneprotein.HelperBot import parse_mygene_src_version, source_items
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -146,6 +146,7 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         docs = list(docs)
         docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
         records = HelperBot.tag_mygene_docs(docs, metadata, downloader.get_key_source())
+        wait_for_last_modified(datetime.now())
         gene_bot.run(records, total=total, fast_run=fast_run, write=write, refseq=refseq, deprecated_entrez=deprecated_entrez)
 
     if (protein):
@@ -163,7 +164,7 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         docs = list(docs)
         docs = HelperBot.validate_docs(docs, validate_type, PROPS['Entrez Gene ID'])
         records = HelperBot.tag_mygene_docs(docs, metadata, downloader.get_key_source())
-
+        wait_for_last_modified(datetime.now())
         protein_bot.run(records, total=total, write=write, refseq=refseq, fast_run=fast_run)
 
     for frc in wdi_core.WDItemEngine.fast_run_store:
