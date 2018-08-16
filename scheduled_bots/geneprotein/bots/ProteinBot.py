@@ -24,10 +24,11 @@ class ProteinBot(Bot):
     failed = []  # list of uniprot ids for those that failed
     to_encode = []
 
-    def __init__(self, organism_info, login):
+    def __init__(self, organism_info, login, no_chromosome=False):
         super().__init__(login)
         self.organism_info = organism_info
         self.uniprot_qid = dict()
+        self.no_chromosome = no_chromosome
 
     def run(self, records, total=None, write=True, refseq=False, fast_run=True):
         records = self.filter(records)
@@ -67,7 +68,7 @@ class ProteinBot(Bot):
                 self.failed.append(protein.uniprot)
 
     def run_one(self, record, gene_wdid, write, fast_run=True, refseq=False):
-        protein = Protein(record, self.organism_info, gene_wdid, self.login)
+        protein = Protein(record, self.organism_info, gene_wdid, self.login, self.no_chromosome)
         try:
             protein.parse_external_ids()
             uniprot = protein.external_ids['UniProt ID']

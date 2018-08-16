@@ -9,6 +9,8 @@ source_ref_id = {
 }
 
 class HumanGene(ChromosomalGene):
+
+    '''
     def create_statements(self):
         # create gene statements
         #s = Gene.create_statements(self)
@@ -22,12 +24,13 @@ class HumanGene(ChromosomalGene):
                 s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=[self.entrez_ref]))
 
         # add on gene position statements
-        '''if 'genomic_pos' in self.record:
+        if 'genomic_pos' in self.record:
             ss = self.do_gp_human()
             if ss:
                 s.extend(ss)
-        '''
+
         return s
+        '''
 
     def validate_record(self):
         assert 'locus_tag' in self.record
@@ -37,6 +40,7 @@ class HumanGene(ChromosomalGene):
         assert 'refseq' in self.record and 'rna' in self.record['ensembl']
         assert 'alias' in self.record
 
+    '''
     def create_gp_statements_chr(self):
         """
         create genomic pos, chr, strand statements for human
@@ -128,3 +132,4 @@ class HumanGene(ChromosomalGene):
 
         # print(s)
         return s
+    '''

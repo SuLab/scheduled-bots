@@ -22,7 +22,7 @@ class Protein:
     external_ids = None
     status = None
 
-    def __init__(self, record, organism_info, gene_wdid, login):
+    def __init__(self, record, organism_info, gene_wdid, login, no_chromosome=False):
         """
         generate pbb_core item object
 
@@ -45,6 +45,7 @@ class Protein:
         self.statements = None
         self.protein_wdid = None
         self.uniprot = None
+        self.no_chromosome = no_chromosome
 
     def create_description(self):
         if self.organism_info['type']:
@@ -134,7 +135,7 @@ class Protein:
                 self.external_ids['Entrez Gene ID'], login=self.login)
 
         refseq_ref = None
-        if 'RefSeq Genome ID' in self.external_ids and self.external_ids['RefSeq Genome ID']:
+        if 'RefSeq Genome ID' in self.external_ids and self.external_ids['RefSeq Genome ID'] and not self.no_chromosome:
             refseq_ref = make_ref_source(self.record['refseq']['@source'], PROPS['Refseq Genome ID'],
                                                              self.external_ids['RefSeq Genome ID'], login=self.login)
 
@@ -169,7 +170,7 @@ class Protein:
         # Protein statements
         ############
         # instance of protein
-        ref = None
+        ref = []
         if refseq and refseq_ref:
             ref = refseq_ref
         elif uniprot_ref:
@@ -189,16 +190,18 @@ class Protein:
         Add an "encodes" statement to the gene item
         :return:
         """
+        refseq_ref = None
         if 'RefSeq Genome ID' in self.external_ids and self.external_ids['RefSeq Genome ID']:
             refseq_ref = make_ref_source(self.record['refseq']['@source'], PROPS['Refseq Genome ID'],
                                                              self.external_ids['RefSeq Genome ID'], login=self.login)
 
+        uniprot_ref = None
         if self.external_ids['UniProt ID']:
             uniprot_ref = make_ref_source(self.record['uniprot']['@source'], PROPS['UniProt ID'],
                                       self.external_ids['UniProt ID'],
                                       login=self.login)
 
-        ref = None
+        ref = []
         if refseq and refseq_ref:
             ref = refseq_ref
         elif uniprot_ref:
@@ -247,6 +250,13 @@ class Protein:
                 aliases.remove("protein")
 
             wd_item_protein.set_aliases(aliases, append=False)
+
+            print(self.label)
+            print(self.description)
+            print(aliases)
+            for s in self.statements:
+                print(s.get_prop_nr())
+                print(s.get_value())
 
             self.status = wdi_helpers.try_write(wd_item_protein, self.external_ids['UniProt ID'], PROPS['UniProt ID'],
                                                 self.login,

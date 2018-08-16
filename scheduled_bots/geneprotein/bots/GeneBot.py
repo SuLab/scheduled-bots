@@ -28,9 +28,10 @@ class GeneBot(Bot):
     item = None
     failed = []  # list of entrez ids for those that failed
 
-    def __init__(self, organism_info, login):
+    def __init__(self, organism_info, login, stat_factory):
         super().__init__(login)
         self.organism_info = organism_info
+        self.stat_factory = stat_factory
 
     def filter(self, records):
         """
@@ -68,14 +69,13 @@ class GeneBot(Bot):
 class ChromosomalGeneBot(GeneBot):
     GENE_CLASS = ChromosomalGene
 
-    def __init__(self, organism_info, chr_num_wdid, login):
-        super().__init__(organism_info, login)
-        self.chr_num_wdid = chr_num_wdid
+    def __init__(self, organism_info, login, stat_factory):
+        super().__init__(organism_info, login, stat_factory)
 
     def run(self, records, total=None, fast_run=True, write=True, refseq=False, deprecated_entrez=False):
         records = self.filter(records)
         for record in tqdm(records, mininterval=2, total=total):
-            gene = self.GENE_CLASS(record, self.organism_info, self.chr_num_wdid, ReferenceFactory(self.login))
+            gene = self.GENE_CLASS(record, self.organism_info, ReferenceFactory(self.login), self.stat_factory)
             try:
                 item = gene.create_item(fast_run=fast_run, refseq=refseq, deprecated_entrez=deprecated_entrez)
                 id, prop = gene.get_id_and_prop()

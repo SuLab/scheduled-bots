@@ -6,10 +6,6 @@ class MicrobeGene(ChromosomalGene):
 
     """
 
-    def __init__(self, record, organism_info, refseq_qid_chrom, ref_factory):
-        super().__init__(record, organism_info, refseq_qid_chrom, ref_factory)
-        #self.refseq_qid_chrom = refseq_qid_chrom
-
     def create_label(self):
         name = self.record['name']['@value']
         if self.record['locus_tag']['@value'] not in name:

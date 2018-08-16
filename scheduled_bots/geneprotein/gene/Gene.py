@@ -12,7 +12,7 @@ class Gene:
     Generic gene class. Subclasses: Human, Mammal, Microbe
     """
 
-    def __init__(self, record, organism_info, ref_factory):
+    def __init__(self, record, organism_info, ref_factory, stat_factory):
         """
         generate pbb_core item object
 
@@ -30,6 +30,7 @@ class Gene:
         self.record = record
         self.organism_info = organism_info
         self.ref_factory = ref_factory
+        self.stat_factory = stat_factory
 
         self.wd_item_gene = None
         self.label = None
@@ -169,89 +170,9 @@ class Gene:
                                                              self.external_ids['RefSeq Genome ID'])
 
     def create_statements(self, refseq=False, deprecated_entrez=False):
-        """
-        create statements common to all genes
-        """
-        s = []
-
-        ############
-        # ID statements (required)
-        ############
-        if self.entrez_ref:
-            rank = 'normal'
-            if deprecated_entrez:
-                rank = 'deprecated'
-            s.append(wdi_core.WDString(self.external_ids['Entrez Gene ID'], PROPS['Entrez Gene ID'], rank=rank,
-                                       references=[self.entrez_ref]))
-
-        # optional ID statements
-        if self.ensembl_ref:
-            for ensembl_gene_id in self.external_ids['Ensembl Gene ID']:
-                s.append(wdi_core.WDString(ensembl_gene_id, PROPS['Ensembl Gene ID'], references=[self.ensembl_ref]))
-
-            if 'Ensembl Transcript ID' in self.external_ids:
-                for id in self.external_ids['Ensembl Transcript ID']:
-                    s.append(wdi_core.WDString(id, PROPS['Ensembl Transcript ID'], references=[self.ensembl_ref]))
-
-        key = 'RefSeq RNA ID'
-        if key in self.external_ids and self.entrez_ref:
-            for id in self.external_ids[key]:
-                s.append(wdi_core.WDString(id, PROPS[key], references=[self.entrez_ref]))
-
-        for key in ['Saccharomyces Genome Database ID', 'Mouse Genome Informatics ID',
-                    'MGI Gene Symbol', 'HomoloGene ID', 'Rat Genome Database ID', 'FlyBase Gene ID',
-                    'Wormbase Gene ID', 'ZFIN Gene ID', 'cytogenetic location']:
-            if key in self.external_ids:
-                refs = []
-                if self.entrez_ref is not None:
-                    refs = [self.entrez_ref]
-                s.append(wdi_core.WDString(self.external_ids[key], PROPS[key], references=refs))
-
-        if 'NCBI Locus tag' in self.external_ids:
-            if self.entrez_ref:
-                ref = self.entrez_ref
-                if refseq and self.refseq_ref:
-                    ref = self.refseq_ref
-            elif self.refseq_ref:
-                ref = self.refseq_ref
-            s.append(wdi_core.WDString(self.external_ids['NCBI Locus tag'], PROPS['NCBI Locus tag'], references=[ref]))
-
-        if 'Refseq Genome ID' in self.external_ids:
-            if self.refseq_ref:
-                ref = self.refseq_ref
-            s.append(
-                wdi_core.WDString(self.external_ids['Refseq Genome ID'], PROPS['Refseq Genome ID'], references=[ref]))
-
-        ############
-        # Gene statements
-        ############
-        # if there is an ensembl ID, this comes from ensembl, otherwise, entrez
-        gene_refs = []
-        if self.ensembl_ref:
-            gene_refs = [self.ensembl_ref]
-        elif self.entrez_ref:
-            gene_refs = [self.entrez_ref]
-        elif self.refseq_ref:
-            gene_refs = [self.refseq_ref]
-
-        if refseq and self.refseq_ref:
-            gene_refs = [self.refseq_ref]
-
-        # instance of gene, ncRNA.. etc
-        type_of_gene = self.record['type_of_gene']['@value']
-        assert type_of_gene in type_of_gene_map, "unknown type of gene: {}".format(type_of_gene)
-        self.type_of_gene = type_of_gene
-        # "protein-coding gene" will be instance of "gene"
-        s.append(wdi_core.WDItemID(type_of_gene_map[type_of_gene], PROPS['instance of'], references=gene_refs))
-
-        if type_of_gene not in {'protein-coding', 'pseudo', 'other', 'unknown'}:
-            # make sure we add instance of "gene" as well
-            s.append(wdi_core.WDItemID("Q7187", PROPS['instance of'], references=gene_refs))
-
-        # found in taxon
-        s.append(wdi_core.WDItemID(self.organism_info['wdid'], PROPS['found in taxon'], references=gene_refs))
-
-        return s
+        return self.stat_factory.create_statements(self.record, self.organism_info, self.external_ids, self.entrez_ref,
+                                                   self.ensembl_ref, self.refseq_ref, refseq=refseq,
+                                                   deprecated_entrez=deprecated_entrez)
 
     def create_item(self, fast_run=True, refseq=False, deprecated_entrez=False):
         '''

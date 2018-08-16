@@ -42,6 +42,7 @@ from scheduled_bots.geneprotein import HelperBot, organisms_info
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
 from scheduled_bots.geneprotein.MicrobialChromosomeBot import MicrobialChromosomeBot
 from scheduled_bots.geneprotein.HelperBot import parse_mygene_src_version, source_items
+from scheduled_bots.geneprotein.helpers.StatementFactory import StatementFactory, ChromosomalStatementFactory, HumanStatementFactory
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -59,7 +60,7 @@ __metadata__ = {
 }
 
 def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=True, entrez=None, filepath=None,
-         locus_tag=None, refseq=False, deprecated_entrez=False, chromosome=None, gene=False, protein=False):
+         locus_tag=None, refseq=False, deprecated_entrez=False, chromosome=None, gene=False, protein=False, no_chromosome=False):
     """
     Main function for creating/updating genes
 
@@ -109,20 +110,24 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
         chr_num_wdid = cb.get_or_create(organism_info, login=login)
         chr_num_wdid = {k.upper(): v for k, v in chr_num_wdid.items()}
         if int(organism_info['taxid']) == 9606:
-            gene_bot = HumanGeneBot(organism_info, chr_num_wdid, login)
+            gene_bot = HumanGeneBot(organism_info, login, HumanStatementFactory(chr_num_wdid))
         else:
-            gene_bot = ChromosomalGeneBot(organism_info, chr_num_wdid, login)
+            gene_bot = ChromosomalGeneBot(organism_info, chr_num_wdid, login, ChromosomalStatementFactory(chr_num_wdid))
     else:
         # check if its one of the reference microbial genomes
         # raises valueerror if not...
         mcb = MicrobialChromosomeBot()
         organism_info = mcb.get_organism_info(taxid)
-        if chromosome:
-            refseq_qid_chrom = {chromosome.split(":")[0]: chromosome.split(":")[1]}
+        if not no_chromosome:
+            if chromosome:
+                refseq_qid_chrom = {chromosome.split(":")[0]: chromosome.split(":")[1]}
+            else:
+                refseq_qid_chrom = mcb.get_or_create_chromosomes(taxid, login)
+            factory = ChromosomalStatementFactory(refseq_qid_chrom)
         else:
-            refseq_qid_chrom = mcb.get_or_create_chromosomes(taxid, login)
+            factory = StatementFactory()
         print(organism_info)
-        gene_bot = MicrobeGeneBot(organism_info, refseq_qid_chrom, login)
+        gene_bot = MicrobeGeneBot(organism_info, login, factory)
         validate_type = "microbial"
 
     # Get handle to mygene records
@@ -151,7 +156,7 @@ def main(taxid, metadata, log_dir="./logs", run_id=None, fast_run=True, write=Tr
             wait_for_last_modified(datetime.now())
 
     if (protein):
-        protein_bot = ProteinBot(organism_info, login)
+        protein_bot = ProteinBot(organism_info, login, no_chromosome=no_chromosome)
         if entrez:
             doc, total = downloader.get_mg_gene(entrez)
             docs = iter([doc])
@@ -225,6 +230,7 @@ if __name__ == "__main__":
     parser.set_defaults(fastrun=True)
     parser.add_argument('--gene', help='whether or not to run the gene bot', action='store_true')
     parser.add_argument('--protein', help='whether or not to run the protein bot', action='store_true')
+    parser.add_argument('--no-chromosome', dest='no_chromosome', help='whether or not to run the chromosome bot', action='store_true')
     args = parser.parse_args()
     log_dir = args.log_dir if args.log_dir else "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
@@ -243,13 +249,13 @@ if __name__ == "__main__":
     if args.entrez:
         main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
              write=not args.dummy, entrez=args.entrez, filepath=args.filepath, refseq=args.refseq,
-             deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome, gene=args.gene, protein=args.protein)
+             deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome, gene=args.gene, protein=args.protein, no_chromosome=args.no_chromosome)
         sys.exit(0)
 
     if args.locus_tag:
         main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
              write=not args.dummy, locus_tag=args.locus_tag, filepath=args.filepath, refseq=args.refseq,
-             deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome, gene=args.gene, protein=args.protein)
+             deprecated_entrez=args.deprecated_entrez, chromosome=args.chromosome, gene=args.gene, protein=args.protein, no_chromosome=args.no_chromosome)
         sys.exit(0)
 
     if args.microbes:
@@ -261,7 +267,7 @@ if __name__ == "__main__":
         try:
             main(taxon1, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run, write=not args.dummy,
                  filepath=args.filepath, refseq=args.refseq, deprecated_entrez=args.deprecated_entrez,
-                 chromosome=args.chromosome, gene=args.gene, protein=args.protein)
+                 chromosome=args.chromosome, gene=args.gene, protein=args.protein, no_chromosome=args.no_chromosome)
         except Exception as e:
             # if one taxon fails, still try to run the others
             traceback.print_exc()
