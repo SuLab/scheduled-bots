@@ -28,7 +28,7 @@ except ImportError:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
 core_props = get_default_core_props()
-core_props.update({'P3329'})
+core_props.update({PROPS['CIViC Variant ID']})
 
 __metadata__ = {
     'name': 'ProteinBoxBot',
@@ -36,8 +36,8 @@ __metadata__ = {
     'tags': ['variant'],
 }
 
-fast_run_base_filter = {'P3329': ''}
-GENOME_BUILD_QUALIFIER = wdi_core.WDItemID(value="Q21067546", prop_nr='P659', is_qualifier=True)
+fast_run_base_filter = {PROPS['CIViC Variant ID']: ''}
+GENOME_BUILD_QUAL = wdi_core.WDItemID(ITEMS['Genome assembly GRCh37'], PROPS['genomic assembly'], is_qualifier=True)
 ENTREZ_QID_MAP = wdi_helpers.id_mapper(PROPS['Entrez Gene ID '], ((PROPS['found in taxon'], ITEMS['Homo sapiens']),))
 SO_QID_MAP = wdi_helpers.id_mapper(PROPS['Sequence Ontology ID'])
 DO_QID_MAP = wdi_helpers.id_mapper(PROPS['Disease Ontology ID'])
@@ -106,38 +106,38 @@ def run_one(variant_id, retrieved, fast_run, write, login):
         prep['P1057'] = [wdi_core.WDItemID(value=CHROMOSOME[coordinates["chromosome"]],
                                            prop_nr=PROPS['chromosome'],
                                            references=[variant_reference],
-                                           qualifiers=[GENOME_BUILD_QUALIFIER])]
+                                           qualifiers=[GENOME_BUILD_QUAL])]
         if coordinates["chromosome2"]:
             prep['P1057'].append(wdi_core.WDItemID(value=CHROMOSOME[coordinates["chromosome2"]],
                                                    prop_nr=PROPS['chromosome'],
                                                    references=[variant_reference],
-                                                   qualifiers=[GENOME_BUILD_QUALIFIER]))
+                                                   qualifiers=[GENOME_BUILD_QUAL]))
 
         # genomic start
         prep['P644'] = [wdi_core.WDString(value=str(coordinates["start"]),
                                           prop_nr=PROPS['genomic start'],
                                           references=[variant_reference],
-                                          qualifiers=[GENOME_BUILD_QUALIFIER])]
+                                          qualifiers=[GENOME_BUILD_QUAL])]
         prep['P645'] = [wdi_core.WDString(value=str(coordinates["stop"]),
                                           prop_nr=PROPS['genomic end'],
                                           references=[variant_reference],
-                                          qualifiers=[GENOME_BUILD_QUALIFIER])]
+                                          qualifiers=[GENOME_BUILD_QUAL])]
 
         if coordinates["start2"]:
             prep['P644'].append(wdi_core.WDString(value=str(coordinates["start2"]),
                                                   prop_nr=PROPS['genomic start'],
                                                   references=[variant_reference],
-                                                  qualifiers=[GENOME_BUILD_QUALIFIER]))
+                                                  qualifiers=[GENOME_BUILD_QUAL]))
             prep['P645'].append(wdi_core.WDString(value=str(coordinates["stop2"]),
                                                   prop_nr=PROPS['genomic end'],
                                                   references=[variant_reference],
-                                                  qualifiers=[GENOME_BUILD_QUALIFIER]))
+                                                  qualifiers=[GENOME_BUILD_QUAL]))
 
     # Sequence ontology variant_type = instance of
     prep["P31"] = []
     for variant_type in variant_data["variant_types"]:
         if variant_type["name"] == "N/A":
-            prep['P31'].append(wdi_core.WDItemID(value="Q15304597", prop_nr='P31',
+            prep['P31'].append(wdi_core.WDItemID(value=ITEMS['sequence variant'], prop_nr='P31',
                                                  references=[variant_reference]))
         else:
             prep['P31'].append(wdi_core.WDItemID(value=SO_QID_MAP[variant_type["so_id"]], prop_nr='P31',
@@ -146,6 +146,7 @@ def run_one(variant_id, retrieved, fast_run, write, login):
     # only use evidence items that are accepted and have a rating
     evidence_items = [x for x in variant_data['evidence_items'] if
                       x["status"] == "accepted" and x["rating"] is not None]
+    evidence_items = sorted(evidence_items, key=lambda x: x['id'])
 
     if not evidence_items:
         return
@@ -271,7 +272,7 @@ def make_statements_from_evidence(variant_id, evidence_item, login, write):
     pmid = evidence_item["source"]["pubmed_id"]
     pmid_qid, _, _ = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
                                                    source="europepmc").get_or_create(login if write else None)
-    if pmid_qid is None:
+    if not pmid_qid:
         panic(variant_id, "not found: {}".format(pmid), "pmid")
         return []
     refStatedIn = wdi_core.WDItemID(value=pmid_qid, prop_nr=PROPS['stated in'], is_reference=True)
