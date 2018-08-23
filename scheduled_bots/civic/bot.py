@@ -151,7 +151,6 @@ def run_one(variant_id, retrieved, fast_run, write, login):
         return
 
     evidence_statements = make_statements_from_evidences(variant_id, evidence_items, login, write)
-    print(evidence_statements)
 
     data2add = []
     for key in prep.keys():
@@ -256,8 +255,15 @@ def make_statements_from_evidence(variant_id, evidence_item, login, write):
     if dit == "Combination":
         # make this a drug therapy combination item instead!!
         drug_qids = [DrugCombo(drug_qids).get_or_create(login if write else None)]
-    elif dit and dit not in {"Combination"}:
-        # todo: Sequential, Substitutes
+    elif dit == "Substitutes":
+        # see "Drug Interaction Type" in https://civicdb.org/help/evidence/overview
+        # we're going to add a statement for each drug
+        pass
+    elif dit == "Sequential":
+        # we have no wikidata way of specying this for now
+        panic(variant_id, "drug_interaction_type: {}".format(dit), "drug")
+        return []
+    elif dit:
         panic(variant_id, "drug_interaction_type: {}".format(dit), "drug")
         return []
 
