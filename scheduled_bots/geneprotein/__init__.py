@@ -228,4 +228,10 @@ organisms_info = {
         "wdid": "Q169444",
         'taxid': 7955
     },
+    105023: {
+        "name": "Nothobranchius furzeri",  # zebrafish
+        "type": None,
+        "wdid": "Q149300",
+        'taxid': 105023
+    }
 }
