@@ -55,7 +55,7 @@ def create_redirect(from_id, to_id, login):
 
 
 login = wdi_login.WDLogin(GREGUSER, GREGPASS)
-log = open("log.txt", "w")
+log = open("log.txt", "a")
 disease_qids = wdi_helpers.id_mapper("P699")
 
 for disease_qid in tqdm(sorted(list(disease_qids.values()))):
@@ -66,15 +66,18 @@ for disease_qid in tqdm(sorted(list(disease_qids.values()))):
     label = item.get_label()
 
     search_results = search(label)
-    search_results = [x for x in search_results if x['description'] != "scientific article"]
+    search_results = [x for x in search_results if x.get('description') != "scientific article"]
     search_results = [x for x in search_results if x['id'] != disease_qid]
     search_results = [x for x in search_results if x['label'].lower() == label.lower()]
 
     if len(search_results) != 1:
         continue
     to_merge_qid = search_results[0]['id']
-    wdi_core.WDItemEngine.merge_items(disease_qid, to_merge_qid, login_obj=login, ignore_conflicts='description')
-    create_redirect(disease_qid, to_merge_qid, login)
+    try:
+        wdi_core.WDItemEngine.merge_items(disease_qid, to_merge_qid, login_obj=login, ignore_conflicts='description')
+        create_redirect(disease_qid, to_merge_qid, login)
+    except Exception as e:
+        continue
     s = [disease_qid, to_merge_qid, label, search_results[0]['label'],
          "http://www.wikidata.org/entity/" + disease_qid, "http://www.wikidata.org/entity/" + to_merge_qid]
     print("|".join(s), file=log)
