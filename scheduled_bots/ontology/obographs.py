@@ -114,6 +114,8 @@ class Node:
         self.graph.CORE_IDS.update({self.id_pid})
         # this node's primary id
         s = [wdi_core.WDExternalID(self.id_value, self.id_pid, references=[ref])]
+        # add the exact match statements
+        s.append(wdi_core.WDUrl(self.id_uri, self.helper.get_pid('P2888'), references=[ref]))
 
         s.extend(self.create_xref_statements())
 
@@ -172,12 +174,14 @@ class Node:
             )
             # assert the retrieved item doesn't already have a primary_ext_id id
             if self.item.wd_item_id:
-                query = "select ?primary_ext_id where {{ wd:{} wdt:{} ?primary_ext_id }}".format(self.item.wd_item_id, primary_ext_id_pid)
+                query = "select ?primary_ext_id where {{ wd:{} wdt:{} ?primary_ext_id }}".format(self.item.wd_item_id,
+                                                                                                 primary_ext_id_pid)
                 results = wdi_core.WDItemEngine.execute_sparql_query(query)['results']['bindings']
                 if results:
                     existing_primary_ext_id = [x['primary_ext_id']['value'] for x in results]
                     if self.id_curie not in existing_primary_ext_id:
-                        raise Exception("conflicting primary_ext_id IDs: {} on {}".format(self.id_curie, self.item.wd_item_id))
+                        raise Exception(
+                            "conflicting primary_ext_id IDs: {} on {}".format(self.id_curie, self.item.wd_item_id))
         except Exception as e:
             traceback.print_exc()
             msg = wdi_helpers.format_msg(primary_ext_id, primary_ext_id_pid, None, str(e), msg_type=type(e))
@@ -309,7 +313,8 @@ class Graph:
         # get the localized version of these pids and qids
         self.QID = self.helper.get_qid(self.QID)
         self.PRED_PID_MAP = {k: self.helper.get_pid(v) if v else None for k, v in self.PRED_PID_MAP.items()}
-        self.APPEND_PROPS = {self.helper.get_pid(v) for v in self.APPEND_PROPS}
+        self.APPEND_PROPS = list({self.helper.get_pid(v) for v in self.APPEND_PROPS})
+        self.APPEND_PROPS.append(self.helper.get_pid('P2888'))  # exact match
 
         self.load_graph()
         self.parse_graph()
