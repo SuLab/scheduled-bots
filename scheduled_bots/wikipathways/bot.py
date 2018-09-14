@@ -213,7 +213,6 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
 
         try_write(wdPage, record_id=pathway_id, record_prop=PROPS['Wikipathways ID'],
                 edit_summary="Updated a Wikipathways pathway", login=login, write=write)
-        sys.exit
 
 def get_PathwayElements(pathway, datatype, temp, prep):
     wikidata_sparql = SPARQLWrapper("https://query.wikidata.org/sparql")
