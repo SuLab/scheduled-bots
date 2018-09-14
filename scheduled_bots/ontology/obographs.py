@@ -3,36 +3,28 @@ This is a generic OWL -> Wikidata importer
 Requires a obographs JSON file made from an owl file
 
 """
+import json
+import multiprocessing
 import os
 import subprocess
 import traceback
 from collections import defaultdict
+from datetime import datetime
 from functools import partial
 from itertools import chain
 from time import strftime, gmtime
 
-import multiprocessing
-
-import itertools
+import networkx as nx
 import requests
 from tqdm import tqdm
-from wikicurie.wikicurie import CurieUtil, default_curie_map
-import json
-from datetime import datetime
-import networkx as nx
+from wikicurie.wikicurie import CurieUtil
 
 from scheduled_bots import utils
-from wikidataintegrator import wdi_core, wdi_property_store, wdi_helpers, wdi_login
+from wikidataintegrator import wdi_core, wdi_helpers
 from wikidataintegrator.ref_handlers import update_release
 from wikidataintegrator.wdi_helpers import WikibaseHelper
 
 cu = CurieUtil()
-
-# reset core properties
-# core props gets set by the node's primary ID
-# todo: this WILL be an issue if we have two Graphs with different CORE_PROPS loaded.
-# will have to modify WDI to accept the core_props on WDItemEngine instanciation and not set globally like it is now..
-wdi_property_store.wd_properties = dict()
 
 
 class Node:
@@ -97,16 +89,16 @@ class Node:
 
     def set_label(self, wd_item):
         # only setting the label if its currently blank or a new item is being created
-        if wd_item.get_label() == "":
+        if not wd_item.get_label():
             wd_item.set_label(self.label)
 
     def set_descr(self, wd_item):
         # if the current description is blank and the new description
         # is something else (and not over 250 characters), use it
         current_descr = wd_item.get_description()
-        if current_descr.lower() in {""} and self.descr and len(self.descr) < 250:
+        if (not current_descr) and self.descr and len(self.descr) < 250:
             wd_item.set_description(utils.clean_description(self.descr))
-        elif current_descr.lower() == "":
+        elif not current_descr:
             wd_item.set_description(self.graph.DEFAULT_DESCRIPTION)
 
     def set_aliases(self, wd_item):
@@ -119,9 +111,11 @@ class Node:
         self.pids.add(self.id_pid)
 
         # make sure this ID is unique in wikidata
-        wdi_property_store.wd_properties[self.id_pid] = {'core_id': True}
+        self.graph.CORE_IDS.update({self.id_pid})
         # this node's primary id
         s = [wdi_core.WDExternalID(self.id_value, self.id_pid, references=[ref])]
+        # add the exact match statements
+        s.append(wdi_core.WDUrl(self.id_uri, self.helper.get_pid('P2888'), references=[ref]))
 
         s.extend(self.create_xref_statements())
 
@@ -174,8 +168,20 @@ class Node:
                 global_ref_mode='CUSTOM',
                 ref_handler=self.ref_handler,
                 mediawiki_api_url=self.mediawiki_api_url,
-                sparql_endpoint_url=self.sparql_endpoint_url
+                sparql_endpoint_url=self.sparql_endpoint_url,
+                core_props=self.graph.CORE_IDS,
+                core_prop_match_thresh=.9
             )
+            # assert the retrieved item doesn't already have a primary_ext_id id
+            if self.item.wd_item_id:
+                query = "select ?primary_ext_id where {{ wd:{} wdt:{} ?primary_ext_id }}".format(self.item.wd_item_id,
+                                                                                                 primary_ext_id_pid)
+                results = wdi_core.WDItemEngine.execute_sparql_query(query)['results']['bindings']
+                if results:
+                    existing_primary_ext_id = [x['primary_ext_id']['value'] for x in results]
+                    if self.id_curie not in existing_primary_ext_id:
+                        raise Exception(
+                            "conflicting primary_ext_id IDs: {} on {}".format(self.id_curie, self.item.wd_item_id))
         except Exception as e:
             traceback.print_exc()
             msg = wdi_helpers.format_msg(primary_ext_id, primary_ext_id_pid, None, str(e), msg_type=type(e))
@@ -303,13 +309,12 @@ class Graph:
 
         self.ref_handler = None
         self.helper = WikibaseHelper(sparql_endpoint_url)
-        for core_id in self.CORE_IDS:
-            wdi_property_store.wd_properties[self.helper.get_pid(core_id)] = {'core_id': True}
 
         # get the localized version of these pids and qids
         self.QID = self.helper.get_qid(self.QID)
         self.PRED_PID_MAP = {k: self.helper.get_pid(v) if v else None for k, v in self.PRED_PID_MAP.items()}
-        self.APPEND_PROPS = {self.helper.get_pid(v) for v in self.APPEND_PROPS}
+        self.APPEND_PROPS = list({self.helper.get_pid(v) for v in self.APPEND_PROPS})
+        self.APPEND_PROPS.append(self.helper.get_pid('P2888'))  # exact match
 
         self.load_graph()
         self.parse_graph()
@@ -435,6 +440,7 @@ class Graph:
         self.nodes = [x for x in self.nodes if not x.deprecated and x.type == "CLASS"]
         self.nodes = [x for x in self.nodes if x.id_uri not in self.EXCLUDE_NODES]
         self.nodes = [x for x in self.nodes if x.id_pid]
+        self.nodes = [x for x in self.nodes if x.label]
 
     def create_nodes_par(self, login, write=True):
         pool = multiprocessing.Pool(processes=4)
@@ -507,7 +513,8 @@ class Graph:
                 global_ref_mode='CUSTOM',
                 ref_handler=self.ref_handler,
                 sparql_endpoint_url=self.sparql_endpoint_url,
-                mediawiki_api_url=self.mediawiki_api_url
+                mediawiki_api_url=self.mediawiki_api_url,
+                core_props=self.CORE_IDS
             )
             this_pid, this_value = cu.parse_curie(cu.uri_to_curie(this_uri))
             this_pid = self.helper.get_pid(this_pid)

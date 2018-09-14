@@ -16,14 +16,14 @@ import os
 from collections import defaultdict
 from datetime import datetime
 
-import pymongo
-from pymongo import MongoClient
 from tqdm import tqdm
 
+from scheduled_bots import get_default_core_props, PROPS
+from scheduled_bots.geneprotein import HelperBot
 from scheduled_bots.geneprotein.Downloader import MyGeneDownloader
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 
-from scheduled_bots.geneprotein import HelperBot
+core_props = get_default_core_props()
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -34,18 +34,9 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-PROPS = {'ortholog': 'P684',
-         'Entrez Gene ID': 'P351',
-         'stated in': 'P248',
-         'HomoloGene ID': 'P593',
-         'found in taxon': 'P703',
-         'NCBI Taxonomy ID': 'P685'
-         }
-
 __metadata__ = {'name': 'OrthologBot',
                 'maintainer': 'GSS',
                 'tags': ['gene', 'ortholog'],
-                'properties': list(PROPS.values())
                 }
 
 
@@ -147,7 +138,8 @@ def do_item(entrezgene, orthologs, reference, entrez_homo, entrez_taxon, taxon_w
                                    references=[this_ref], qualifiers=[qualifier]))
     item = wdi_core.WDItemEngine(wd_item_id=entrez_wdid[entrezgene], data=s, fast_run=fast_run,
                                  fast_run_base_filter={PROPS['Entrez Gene ID']: '',
-                                                       PROPS['found in taxon']: taxon_wdid[entrez_taxon[entrezgene]]})
+                                                       PROPS['found in taxon']: taxon_wdid[entrez_taxon[entrezgene]]},
+                                 core_props=core_props)
     wdi_helpers.try_write(item, entrezgene, PROPS['Entrez Gene ID'], edit_summary="edit orthologs", login=login,
                           write=write)
     # print(item.wd_item_id)

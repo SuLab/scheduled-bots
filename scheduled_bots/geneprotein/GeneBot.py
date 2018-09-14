@@ -22,25 +22,31 @@ sparql query for listing current subclasses: http://tinyurl.com/y8ecgka7
 # TODO: Gene on two chromosomes
 # https://www.wikidata.org/wiki/Q20787772
 
+import argparse
+import json
 import os
 import sys
-import json
 import time
-import argparse
 import traceback
-
-from tqdm import tqdm
-from itertools import chain
 from datetime import datetime
 from functools import partial
+from itertools import chain
 
+from tqdm import tqdm
+
+from scheduled_bots import get_default_core_props, PROPS
 from scheduled_bots.geneprotein.Downloader import MyGeneDownloader
-from wikidataintegrator import wdi_login, wdi_core, wdi_helpers, wdi_property_store
-from wikidataintegrator.wdi_fastrun import FastRunContainer
+from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
+from wikidataintegrator.wdi_fastrun import FastRunContainer
 
-# wdi_property_store.wd_properties['P704']['core_id'] = False
-# wdi_property_store.wd_properties['P639']['core_id'] = False
+core_props = get_default_core_props()
+
+FASTRUN_PROPS = {'Entrez Gene ID', 'strand orientation', 'Saccharomyces Genome Database ID', 'RefSeq RNA ID',
+                 'ZFIN Gene ID', 'Ensembl Transcript ID', 'HGNC ID', 'encodes', 'genomic assembly', 'found in taxon',
+                 'HomoloGene ID', 'MGI Gene Symbol', 'cytogenetic location', 'Mouse Genome Informatics ID',
+                 'FlyBase Gene ID', 'genomic end', 'NCBI Locus tag', 'Rat Genome Database ID', 'Ensembl Gene ID',
+                 'instance of', 'chromosome', 'HGNC Gene Symbol', 'Wormbase Gene ID', 'genomic start'}
 
 DAYS = 120
 update_retrieved_if_new = partial(update_retrieved_if_new, days=DAYS)
@@ -59,38 +65,10 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-PROPS = {
-    'found in taxon': 'P703',
-    'instance of': 'P31',
-    'strand orientation': 'P2548',
-    'Entrez Gene ID': 'P351',
-    'NCBI Locus tag': 'P2393',
-    'Ensembl Gene ID': 'P594',
-    'Ensembl Transcript ID': 'P704',
-    'genomic assembly': 'P659',
-    'genomic start': 'P644',
-    'genomic end': 'P645',
-    'chromosome': 'P1057',
-    'HGNC ID': 'P354',
-    'HGNC Gene Symbol': 'P353',
-    'RefSeq RNA ID': 'P639',
-    'HomoloGene ID': 'P593',
-    'Saccharomyces Genome Database ID': 'P3406',
-    'Mouse Genome Informatics ID': 'P671',
-    'MGI Gene Symbol': 'P2394',
-    'Wormbase Gene ID': 'P3860',
-    'FlyBase Gene ID': 'P3852',
-    'ZFIN Gene ID': 'P3870',
-    'Rat Genome Database ID': 'P3853',
-    'encodes': 'P688',
-    'cytogenetic location': 'P4196',
-}
-
 __metadata__ = {
     'name': 'GeneBot',
     'maintainer': 'GSS',
     'tags': ['gene'],
-    'properties': list(PROPS.values())
 }
 
 # If the source is "entrez", the reference identifier to be used is "Ensembl Gene ID" (P594)
@@ -323,7 +301,8 @@ class Gene:
                                                   append_value=[PROPS['instance of']],
                                                   fast_run=fast_run, fast_run_base_filter=self.fast_run_base_filter,
                                                   fast_run_use_refs=True, ref_handler=update_retrieved_if_new,
-                                                  global_ref_mode="CUSTOM")
+                                                  global_ref_mode="CUSTOM",
+                                                  core_props=core_props)
 
         self.wd_item_gene = self.set_label_desc_aliases(self.wd_item_gene)
         self.status = wdi_helpers.try_write(self.wd_item_gene, self.external_ids['Entrez Gene ID'],
@@ -353,7 +332,9 @@ class ChromosomalGene(Gene):
 
         # add on gene position statements
         if 'genomic_pos' in self.record:
-            s.extend(self.create_gp_statements_chr())
+            ss = self.create_gp_statements_chr()
+            if ss:
+                s.extend(ss)
 
         return s
 
@@ -376,8 +357,8 @@ class ChromosomalGene(Gene):
             self.ensembl_ref = make_ref_source(self.record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
                                                self.external_ids['Reference Ensembl Gene ID'], login=self.login)
         elif 'Ensembl Gene ID' in self.external_ids:
-            assert len(self.external_ids['Ensembl Gene ID']) == 1
-            self.ensembl_ref = make_ref_source(self.record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
+            if len(self.external_ids['Ensembl Gene ID']) == 1:
+                self.ensembl_ref = make_ref_source(self.record['ensembl']['@source'], PROPS['Ensembl Gene ID'],
                                                list(self.external_ids['Ensembl Gene ID'])[0], login=self.login)
 
     def create_item(self, fast_run=True, write=True):
@@ -401,6 +382,8 @@ class ChromosomalGene(Gene):
             genomic_pos_ref = self.ensembl_ref
         else:
             raise ValueError()
+        if not genomic_pos_ref:
+            return None
         all_chr = set([self.chr_num_wdid[x['chr']] for x in genomic_pos_values])
         all_strand = set(['Q22809680' if x['strand'] == 1 else 'Q22809711' for x in genomic_pos_values])
 
@@ -505,7 +488,9 @@ class HumanGene(ChromosomalGene):
 
         # add on gene position statements
         if 'genomic_pos' in self.record:
-            s.extend(self.do_gp_human())
+            ss = self.do_gp_human()
+            if ss:
+                s.extend(ss)
 
         return s
 
@@ -539,6 +524,8 @@ class HumanGene(ChromosomalGene):
             genomic_pos_ref = self.ensembl_ref
         else:
             raise ValueError()
+        if not genomic_pos_ref:
+            return None
         assembly_hg38 = wdi_core.WDItemID("Q20966585", PROPS['genomic assembly'], is_qualifier=True)
 
         for x in genomic_pos_values:
@@ -667,8 +654,9 @@ class GeneBot:
         filter = {PROPS['Entrez Gene ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
         frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter=filter, use_refs=True)
         frc.clear()
+        props = [PROPS[x] for x in FASTRUN_PROPS]
         for qid in tqdm(entrez_qid.values()):
-            remove_deprecated_statements(qid, frc, releases, last_updated, list(PROPS.values()), self.login)
+            remove_deprecated_statements(qid, frc, releases, last_updated, props, self.login)
 
 
 class ChromosomalGeneBot(GeneBot):

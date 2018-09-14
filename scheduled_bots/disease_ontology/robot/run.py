@@ -13,8 +13,8 @@ import pandas as pd
 from rdflib import Graph
 from rdflib import URIRef, Literal
 from tqdm import tqdm
-from functools import lru_cache
 
+from scheduled_bots.disease_ontology.robot.utils import get_mesh_info, get_gard_info
 from wikidataintegrator.wdi_core import WDItemEngine
 from wikicurie import wikicurie
 
@@ -151,9 +151,6 @@ def compare(wd, do):
         # get rid of the OMIM PS ids
         wd[k]['xref'] = {x for x in wd[k]['xref'] if not x.startswith("OMIM:PS")}
         do[k]['xref'] = {x for x in do[k]['xref'] if not x.startswith("OMIM:PS")}
-        # get rid of GARD because we didn't add those
-        wd[k]['xref'] = {x for x in wd[k]['xref'] if not x.startswith("GARD")}
-        do[k]['xref'] = {x for x in do[k]['xref'] if not x.startswith("GARD")}
         # remove icd9 and 10 for now
         wd[k]['xref'] = {x for x in wd[k]['xref'] if not x.startswith("ICD")}
         do[k]['xref'] = {x for x in do[k]['xref'] if not x.startswith("ICD")}
@@ -210,46 +207,6 @@ def get_latest_owl():
     os.system("wget -N {}".format(URL))
 
 
-@lru_cache(maxsize=99999)
-def get_mesh_info(mesh_id):
-    url = "http://data.bioontology.org/ontologies/MESH/classes/http%3A%2F%2Fpurl.bioontology.org%2Fontology%2FMESH%2F{}"
-    d = requests.get(url.format(mesh_id), params={'apikey': BIOPORTAL_KEY}).json()
-    if "errors" in d:
-        return {'mesh_label': '', 'mesh_descr': '', 'mesh_synonyms': ''}
-    d = {'mesh_label': d['prefLabel'], 'mesh_descr': d['definition'], 'mesh_synonyms': ";".join(d['synonym'])}
-    d['mesh_descr'] = d['mesh_descr'][0] if d['mesh_descr'] else ''
-    return d
-
-
-@lru_cache(maxsize=99999)
-def get_ordo_info(mesh_id):
-    url = "https://www.ebi.ac.uk/ols/api/ontologies/ordo/terms?iri=http://www.orpha.net/ORDO/Orphanet_{}"
-    d = requests.get(url.format(mesh_id)).json()
-    try:
-        d = d['_embedded']['terms'][0]
-        d = {'ordo_label': d['label'], 'ordo_descr': d['description'], 'ordo_synonyms': ";".join(d['synonyms'])}
-        d['ordo_descr'] = d['ordo_descr'][0] if d['ordo_descr'] else ''
-    except Exception:
-        return {'ordo_label': '', 'ordo_descr': '', 'ordo_synonyms': ''}
-    return d
-
-
-@lru_cache(maxsize=99999)
-def get_omim_info(omim_id):
-    url = "https://api.omim.org/api/entry?mimNumber={}".format(omim_id)
-    params = {'apiKey': 'YusepqJtQDuqSPctv6tmVQ', 'format': 'json'}
-    try:
-        d = requests.get(url, params=params).json()['omim']['entryList'][0]['entry']
-    except Exception:
-        return {'omim_label': '', 'omim_descr': '', 'omim_synonyms': '', 'omim_prefix': ''}
-    print(d)
-    d = {'omim_label': d['titles']['preferredTitle'], 'omim_descr': '',
-         'omim_synonyms': d['titles']['alternativeTitles'].replace("\n", "") if 'alternativeTitles' in d[
-             'titles'] else '',
-         'omim_prefix': d.get('prefix', '')}
-    return d
-
-
 def run_mesh(wd, do, leftover_in_wd):
     ## get only the mesh changes
     records = []
@@ -278,6 +235,32 @@ def run_mesh(wd, do, leftover_in_wd):
                                       "mesh xref additions notexact.csv")
 
 
+def run_gard(wd, do, leftover_in_wd):
+    records = []
+    url = "https://rarediseases.info.nih.gov/diseases/{}/index"
+    for k, v in leftover_in_wd.items():
+        records.extend([{'doid': k, 'doid_label': do[k]['label'],
+                         'gard_id': x, 'gard_url': url.format(x)} for x in v if x.startswith("GARD:")])
+    for record in tqdm(records):
+        record.update(get_gard_info(record['gard_id'].split(":")[1]))
+    # classify match by exact sring match on title or one of the aliases
+    for record in tqdm(records):
+        if record['doid_label'].lower() == record['gard_label'].lower():
+            record['match_type'] = 'exact'
+        elif record['doid_label'].lower() in map(str.lower, record['gard_synonyms'].split(";")):
+            record['match_type'] = 'exact_syn'
+        else:
+            record['match_type'] = 'not'
+    # rename keys
+    records = [{k.replace("gard", "ext"): v for k, v in record.items()} for record in records]
+    records = sorted(records, key=lambda x: x['doid'])
+
+    make_robot_xref_additions_records(wd, do, [x for x in records if x['match_type'] in {'exact', 'exact_syn'}],
+                                      "gard xref additions exact.csv")
+    make_robot_xref_additions_records(wd, do, [x for x in records if x['match_type'] == 'not'],
+                                      "gard xref additions notexact.csv")
+
+
 def run():
     wd = get_wikidata_do_xrefs()
     do = parse_do_owl()
@@ -286,6 +269,7 @@ def run():
     # print(leftover_in_do)
 
     run_mesh(wd, do, leftover_in_wd)
+    run_gard(wd, do, leftover_in_wd)
 
     if False:
         ## get only the OMIM changes

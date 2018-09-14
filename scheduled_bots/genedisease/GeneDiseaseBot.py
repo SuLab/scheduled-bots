@@ -1,15 +1,16 @@
 import argparse
 import json
 import os
-
 from collections import defaultdict
 from datetime import datetime
 from functools import partial
 from time import gmtime, strftime
 
 import pytz
-from scheduled_bots.utils import get_values
 from tqdm import tqdm
+
+from scheduled_bots import PROPS, get_default_core_props
+from scheduled_bots.utils import get_values
 from wikidataintegrator import ref_handlers
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
 from wikidataintegrator.wdi_helpers import id_mapper
@@ -17,6 +18,7 @@ from wikidataintegrator.wdi_helpers import id_mapper
 DAYS = 6 * 30
 update_retrieved_if_new = partial(ref_handlers.update_retrieved_if_new, days=DAYS)
 GWAS_PATH = "GWAS_Catalog.tsv"
+core_props = get_default_core_props()
 
 try:
     from scheduled_bots.local import WDUSER, WDPASS
@@ -27,21 +29,10 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-PROPS = {'Entrez Gene ID': 'P351',
-         'Disease Ontology ID': 'P699',
-         'genetic association': 'P2293',
-         'reference URL': 'P854',
-         'stated in': 'P248',
-         'retrieved': 'P813',
-         'determination method': 'P459',
-         'found in taxon': 'P703',
-         'PubMed ID': 'P698',
-         }
-
-__metadata__ = {'name': 'GeneDiseaseBot',
-                'tags': ['gene', 'disease'],
-                'properties': list(PROPS.values())
-                }
+__metadata__ = {
+    'name': 'GeneDiseaseBot',
+    'tags': ['gene', 'disease'],
+}
 
 
 class GWASCatalog(object):
@@ -144,8 +135,10 @@ class GeneDiseaseBot(object):
         self.pmid_qid_map = get_values("P698", pmids)
         print("Found {} pmids".format(len(self.pmid_qid_map)))
         for pmid in pmids - set(self.pmid_qid_map.keys()):
-            self.pmid_qid_map[pmid] = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
-                                                                    source="europepmc").get_or_create(self.login)
+            qid, _, success = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
+                                                            source="europepmc").get_or_create(self.login)
+            if success:
+                self.pmid_qid_map[pmid] = qid
 
         print("Building relationships & references")
         for gdr in tqdm(gdrs):
@@ -200,7 +193,8 @@ class GeneDiseaseBot(object):
                                                      fast_run_base_filter=self.fast_run_base_gene_filter,
                                                      fast_run_use_refs=True,
                                                      ref_handler=update_retrieved_if_new,
-                                                     global_ref_mode="CUSTOM")
+                                                     global_ref_mode="CUSTOM",
+                                                     core_props=core_props)
                 wd_item = {'item': gene_wd_item, 'record_id': gdrs[0].ncbi, 'record_prop': PROPS['Entrez Gene ID']}
                 self.write_item(wd_item)
             except Exception as e:
@@ -220,7 +214,8 @@ class GeneDiseaseBot(object):
                                                         fast_run_base_filter=self.fast_run_base_disease_filter,
                                                         fast_run_use_refs=True,
                                                         ref_handler=update_retrieved_if_new,
-                                                        global_ref_mode="CUSTOM")
+                                                        global_ref_mode="CUSTOM",
+                                                        core_props=core_props)
                 wd_item = {'item': disease_wd_item, 'record_id': "DOID:{}".format(gdrs[0].doid),
                            'record_prop': PROPS['Disease Ontology ID']}
                 self.write_item(wd_item)

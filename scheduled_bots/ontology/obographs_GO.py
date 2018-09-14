@@ -2,7 +2,7 @@ import argparse
 import os
 
 from scheduled_bots.ontology.obographs import Graph, Node
-from wikidataintegrator import wdi_login, wdi_core
+from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 from scheduled_bots import PROPS
 
 
@@ -61,12 +61,17 @@ class GOGraph(Graph):
             obj_qid = self.get_object_qid(edge['obj'])
             # print(obj_qid, edge['pred'])
             qual_qid = self.uri_node_map[self.regulates[edge['pred']]].qid
-            qualifier = wdi_core.WDItemID(qual_qid, h.get_pid(PROPS['subject has role']),
-                                          is_qualifier=True)
             pred_pid = self.PRED_PID_MAP['http://purl.obolibrary.org/obo/RO_0002211']
-            return wdi_core.WDItemID(obj_qid, pred_pid,
-                                     references=[subj_node.create_ref_statement()],
-                                     qualifiers=[qualifier])
+
+            if not (obj_qid and qual_qid and pred_pid):
+                m = wdi_helpers.format_msg(edge['sub'], None, None, "failed on edge: {}".format(edge))
+                print(m)
+                wdi_core.WDItemEngine.log("WARNING", m)
+                return None
+
+            qualifier = wdi_core.WDItemID(qual_qid, h.get_pid(PROPS['subject has role']), is_qualifier=True)
+            return wdi_core.WDItemID(obj_qid, pred_pid, qualifiers=[qualifier],
+                                     references=[subj_node.create_ref_statement()])
         else:
             return super(GOGraph, self).make_statement_from_edge(edge)
 

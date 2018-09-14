@@ -10,12 +10,15 @@ https://www.wikidata.org/wiki/Q27525657
 """
 import os
 from datetime import datetime
-
-import pandas as pd
 from io import StringIO
-from wikidataintegrator import wdi_core, wdi_helpers
 from urllib import request
 
+import pandas as pd
+
+from scheduled_bots import get_default_core_props
+from wikidataintegrator import wdi_core, wdi_helpers
+
+core_props = get_default_core_props()
 
 
 class ChromosomeBot:
@@ -165,7 +168,8 @@ class ChromosomeBot:
 
         wd_item = wdi_core.WDItemEngine(item_name=item_name, domain='chromosome', data=statements,
                                         append_value=['P31'], fast_run=True,
-                                        fast_run_base_filter={'P703': organism_info['wdid'], 'P2249': ''})
+                                        fast_run_base_filter={'P703': organism_info['wdid'], 'P2249': ''},
+                                        core_props=core_props)
         if wd_item.wd_item_id:
             return wd_item.wd_item_id
 

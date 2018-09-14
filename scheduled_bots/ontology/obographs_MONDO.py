@@ -24,9 +24,9 @@ class MondoNode(Node):
             wd_item.set_aliases(aliases=aliases, append=True)
 
     def _pre_create(self):
-        # remove SNOMEDCT_US_2016_03_01 xrefs
-        prefixes = {'SNOMED', 'EFO:', 'KEGG:', 'MEDDRA:', 'CSP:'}
-        self.xrefs = set(x for x in self.xrefs if all(not x.lower().startswith(prefix.lower()) for prefix in prefixes))
+        # remove leading zeros from GARD
+        self.xrefs = set("GARD:" + str(int(xref.replace("GARD:", ""))) if xref.startswith("GARD:") else xref for xref in self.xrefs)
+
         # change ICD10 to ICD10CM
         self.xrefs = set([x.replace("ICD10:", "ICD10CM:").replace("ICD9:", "ICD9CM:") for x in self.xrefs])
 
@@ -90,6 +90,10 @@ class MondoNode(Node):
             elif len(self.descr) < 250:
                 wd_item.set_description(utils.clean_description(self.descr))
 
+    def set_label(self, wd_item):
+        self.label = self.label.replace("(disease)", "").strip()
+        super(MondoNode, self).set_label(wd_item)
+
 
 class MondoGraph(Graph):
     NAME = "Monarch Disease Ontology"
@@ -105,7 +109,16 @@ class MondoGraph(Graph):
                     PROPS['ICD-9'], PROPS['NCI Thesaurus ID'],
                     PROPS['UMLS CUI'], PROPS['Mondo ID'],
                     PROPS['GARD rare disease ID'], PROPS['Disease Ontology ID']}
-    CORE_IDS = {PROPS['Disease Ontology ID'], PROPS['Mondo ID'], PROPS['MeSH ID']}
+    CORE_IDS = {
+        PROPS['Disease Ontology ID'],
+        PROPS['Mondo ID'],
+        PROPS['MeSH ID'],
+        PROPS['UMLS CUI'],
+        PROPS['Orphanet ID'],
+        PROPS['OMIM ID'],
+        PROPS['GARD rare disease ID']
+    }
+
     FAST_RUN = True
 
     PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': PROPS['location'],
@@ -121,7 +134,16 @@ class MondoGraph(Graph):
     def filter_nodes(self):
         super(MondoGraph, self).filter_nodes()
         # self.nodes = self.nodes[:20]
-        # self.nodes = [x for x in self.nodes if x.id_curie == "MONDO:0010278"]
+        # self.nodes = [x for x in self.nodes if x.id_curie == "MONDO:0005393"]
+        print("starting with {} nodes".format(len(self.nodes)))
+        for node in self.nodes:
+            # only take these xrefs
+            prefixes = {'UMLS', 'Orphanet:', 'DOID:', 'OMIM:', 'MESH:', 'NCIT:', 'ICD10', 'ICD9', 'GARD:', 'HP:'}
+            node.xrefs = set(x for x in node.xrefs if any(x.lower().startswith(prefix.lower()) for prefix in prefixes))
+            if len(node.xrefs) == 0:
+                node.id_uri = None
+        self.nodes = [x for x in self.nodes if x.id_uri]
+        print("after filtering branch {} nodes".format(len(self.nodes)))
 
 
 if __name__ == "__main__":
@@ -150,3 +172,19 @@ if __name__ == "__main__":
 
     g = MondoGraph(args.json_path, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
     g.run(login)
+
+
+"""
+from obographs_MONDO import *
+mediawiki_api_url = 'https://www.wikidata.org/w/api.php'
+sparql_endpoint_url = 'https://query.wikidata.org/sparql'
+g = MondoGraph("mondo.json", mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
+g.FAST_RUN=False
+g.nodes = g.nodes[1000:]
+from scheduled_bots.local import WDUSER, WDPASS
+login = wdi_login.WDLogin(WDUSER, WDPASS)
+g.run(login)
+
+"""
+# next thing to do, get only nodes that have a DOID, then run them with CORE_ID being only DO
+# example item that should get added: https://www.wikidata.org/wiki/Q5090449
