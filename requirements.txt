@@ -43,4 +43,4 @@ SPARQLWrapper
 rdflib
 datetime
 bs4
-zipfile
+zlib
