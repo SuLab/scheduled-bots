@@ -14,7 +14,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 
 import requests
 # from scheduled_bots.wikipathways import CHROMOSOME, IGNORE_SYNONYMS, DrugCombo, EVIDENCE_LEVEL, TRUST_RATING
-from wikidataintegrator import wdi_core, wdi_login, wdi_property_store, wdi_helpers
+from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers import try_write
 
@@ -45,13 +45,6 @@ PROPS = {
 ITEMS = {
     'Wikipathways': 'Q7999828',
     'Homo sapiens': 'Q15978631'
-}
-
-wdi_property_store.wd_properties['P2410'] = {
-    'datatype': 'string',
-    'name': 'Wikipathways ID',
-    'domain': ['pathways'],
-    'core_id': True
 }
 
 __metadata__ = {
