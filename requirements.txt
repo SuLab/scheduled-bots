@@ -42,3 +42,5 @@ python-jenkins>=0.4.16
 SPARQLWrapper
 rdflib
 datetime
+bs4
+zipfile

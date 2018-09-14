@@ -10,8 +10,7 @@ import io
 from contextlib import closing
 from bs4 import BeautifulSoup, SoupStrainer
 from SPARQLWrapper import SPARQLWrapper, JSON
-import pprint
-import sys
+
 
 import requests
 # from scheduled_bots.wikipathways import CHROMOSOME, IGNORE_SYNONYMS, DrugCombo, EVIDENCE_LEVEL, TRUST_RATING
@@ -204,8 +203,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             for statement in prep[key]:
                 data2add.append(statement)
                 print(statement.prop_nr, statement.value)
-        pprint.pprint(data2add)
-        print(row[2])
+
         wdPage = wdi_core.WDItemEngine(data=data2add, domain="pathways", item_name=row[2])
 
         wdPage.set_label(str(row[2]), lang="en")
@@ -241,7 +239,6 @@ def get_PathwayElements(pathway, datatype, temp, prep):
     for row in qres2:
         ids.append("\"" + str(row[2]).replace("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID", "").replace(
             "http://identifiers.org/ncbigene/", "") + "\"")
-    # pprint.pprint(ids)
 
 
     # Check for existence of the ids in wikidata
