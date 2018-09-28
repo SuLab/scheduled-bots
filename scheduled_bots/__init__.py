@@ -64,6 +64,7 @@ PROPS = {
     'UMLS CUI': 'P2892',
     'UNII': 'P652',
     'Uniprot ID': 'P352',
+    'WikiPathways ID': 'P2410',
     'anatomical location': 'P927',
     'biological process': 'P682',
     'biological variant of': 'P3433',
@@ -144,7 +145,8 @@ ITEMS = {
     'CGI Evidence Pre-Clinical Data': 'Q38145925',
     'combination therapy': 'Q1304270',
     'CIViC database': 'Q27612411',
-    'Homo sapiens': 'Q15978631'
+    'Homo sapiens': 'Q15978631',
+    'Wikipathways': 'Q7999828'
 }
 
 DEFAULT_CORE_PROPS = ['NCBI Taxonomy ID', 'National Cancer Thesaurus ID', 'UNII', 'MeSH Code', 'IUPHAR ID',
@@ -154,7 +156,7 @@ DEFAULT_CORE_PROPS = ['NCBI Taxonomy ID', 'National Cancer Thesaurus ID', 'UNII'
                       'miRBase mature miRNA ID', 'OMIM', 'Disease Ontology ID', 'PubChem ID (CID)', 'HGNC symbol',
                       'RTECS Number', 'NDF-RT NUI', 'Gene Ontology ID', 'Drugbank ID', 'miRBase pre-miRNA ID',
                       'KEGG ID', 'InChI', 'MeSH ID', 'Human Gene symbol', 'ChEMBL ID', 'Orphanet ID',
-                      'CIViC Variant ID']
+                      'CIViC Variant ID', 'WikiPathways ID']
 
 DEFAULT_CORE_PROPS_PIDS = set(PROPS[x] for x in DEFAULT_CORE_PROPS)
 

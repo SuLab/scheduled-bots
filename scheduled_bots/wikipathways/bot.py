@@ -10,6 +10,7 @@ import io
 from contextlib import closing
 from bs4 import BeautifulSoup, SoupStrainer
 from SPARQLWrapper import SPARQLWrapper, JSON
+import pprint
 
 
 import requests
@@ -17,6 +18,8 @@ import requests
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers import try_write
+
+from scheduled_bots import PROPS, ITEMS, get_default_core_props
 
 CACHE_SIZE = 10000
 CACHE_TIMEOUT_SEC = 300  # 5 min
@@ -46,6 +49,9 @@ ITEMS = {
     'Wikipathways': 'Q7999828',
     'Homo sapiens': 'Q15978631'
 }
+
+core_props = get_default_core_props()
+#core_props.update({PROPS['WikiPathways ID']})
 
 __metadata__ = {
     'name': 'PathwayBot',
@@ -97,19 +103,19 @@ def main(retrieved, fast_run, write):
                     temp.parse(data=nt_content.decode(), format="turtle")
             print("size: "+str(len(temp)))
 
-        wp_query = """prefix dcterm: <http://purl.org/dc/terms/>
-                prefix wp: <http://vocabularies.wikipathways.org/wp#>
-                SELECT DISTINCT ?wpid WHERE {
-                  ?s rdf:type <http://vocabularies.wikipathways.org/wp#Pathway> ;
-                     dcterm:identifier ?wpid ;
-                     ?p <http://vocabularies.wikipathways.org/wp#Curation:AnalysisCollection> ;
-                     wp:organism <http://purl.obolibrary.org/obo/NCBITaxon_9606> .
-                  }"""
+    wp_query = """prefix dcterm: <http://purl.org/dc/terms/>
+            prefix wp: <http://vocabularies.wikipathways.org/wp#>
+            SELECT DISTINCT ?wpid WHERE {
+              ?s rdf:type <http://vocabularies.wikipathways.org/wp#Pathway> ;
+                 dcterm:identifier ?wpid ;
+                 ?p <http://vocabularies.wikipathways.org/wp#Curation:AnalysisCollection> ;
+                 wp:organism <http://purl.obolibrary.org/obo/NCBITaxon_9606> .
+              }"""
 
-        qres = temp.query(wp_query)
-        for row in qres:
-            print("%s" % row)
-            wpids.append(str(row[0]))
+    qres = temp.query(wp_query)
+    for row in qres:
+        print("%s" % row)
+        wpids.append(str(row[0]))
 
     for pathway_id in wpids:
         try:
@@ -176,28 +182,37 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
 
                 """
         qres4 = temp.query(query)
-
+        print(query)
 
         for pubmed_result in qres4:
-            if 'P2860' not in prep.keys():
-                prep["P2860"] = []
+            pprint.pprint(pubmed_result)
+
             pmid = str(pubmed_result[0]).replace("http://identifiers.org/pubmed/", "")
             print(pmid)
-            pmid_qid = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
+            pmid_qid, _, _ = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
                                                      source="europepmc").get_or_create(login if write else None)
-            if pmid_qid[0]  is None:
+            if pmid_qid  is None:
                 return panic(pathway_id, "not found: {}".format(pmid), "pmid")
             else:
-                print(pmid_qid[0])
-                prep['P2860'].append(wdi_core.WDItemID(value=pmid_qid[0], prop_nr='P2860', references=[copy.deepcopy(pathway_reference)]))
+                print(pmid_qid)
+                if 'P2860' not in prep.keys():
+                    prep["P2860"] = []
+                prep['P2860'].append(wdi_core.WDItemID(value=str(pmid_qid), prop_nr='P2860', references=[copy.deepcopy(pathway_reference)]))
 
         data2add = []
         for key in prep.keys():
             for statement in prep[key]:
                 data2add.append(statement)
                 print(statement.prop_nr, statement.value)
-
-        wdPage = wdi_core.WDItemEngine(data=data2add, domain="pathways", item_name=row[2])
+        pprint.pprint(data2add)
+        wdPage = wdi_core.WDItemEngine(data=data2add,
+                                     domain="pathways",
+                                     fast_run=fast_run,
+                                     item_name=row.pwLabel,
+                                     fast_run_base_filter=fast_run_base_filter,
+                                     fast_run_use_refs=True,
+                                     ref_handler=update_retrieved_if_new_multiple_refs,
+                                     core_props=core_props)
 
         wdPage.set_label(str(row[2]), lang="en")
         wdPage.set_description("biological pathway in human", lang="en")
@@ -264,7 +279,7 @@ if __name__ == "__main__":
     log_dir = "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     __metadata__['run_id'] = run_id
-    fast_run = False if args.no_fastrun else True
+    fast_run = False if args.no_fastrun else False
     retrieved = datetime.now()
 
     log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
