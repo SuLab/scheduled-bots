@@ -122,9 +122,9 @@ class FAERSBot:
                 raise ValueError("{} not found".format(self.run_one))
             return None
 
-        for drug_qid, indications_qid in self.drug_indications.items():
+        for drug_qid, indications_qid in tqdm(self.drug_indications.items()):
             self.run_one_drug(drug_qid, indications_qid)
-        for indication_qid, drugs_qid in self.indication_drugs.items():
+        for indication_qid, drugs_qid in tqdm(self.indication_drugs.items()):
             self.run_one_indication(indication_qid, drugs_qid)
 
 
