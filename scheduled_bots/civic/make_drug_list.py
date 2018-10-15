@@ -60,5 +60,6 @@ qid_chebi = {v:k for k,v in chebi_qid.items()}
 
 df['inchikey'] = df.qid.map(qid_inchi.get)
 df['chebi'] = df.qid.map(qid_chebi.get)
+df['drugname'] = df.index
 
 df.to_csv("drugname_pmid_oct_2018.csv", index=False)
