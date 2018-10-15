@@ -27,7 +27,7 @@ def alwayslist(value):
     else:
         return [value]
 
-records = defaultdict(set)
+records = defaultdict(lambda: defaultdict(set))
 for variant_data in all_data.values():
 #variant_data = all_data[0]
     evidence_items = [x for x in variant_data['evidence_items']]
@@ -35,12 +35,30 @@ for variant_data in all_data.values():
     for evidence_item in evidence_items:
         for drug in evidence_item["drugs"]:
             drug_label = drug['name'].lower()
-            record = {'drug_label': drug_label, 'pmid': evidence_item['source']['pubmed_id']}
-            records[drug_label].add(evidence_item['source']['pubmed_id'])
+            records[drug_label]['pmids'].add(evidence_item['source']['pubmed_id'])
+            records[drug_label]['variant_id'].add(str(variant_data['id']))
 
-records = {k: "|".join(v) for k,v in records.items()}
-records = [{"drugname": k, "pmids": v} for k,v in records.items()]
+for k,v in records.items():
+    v['pmids'] = "|".join(v['pmids'])
+    v['variant_id'] = "|".join(v['variant_id'])
 
 import pandas as pd
-df = pd.DataFrame(records)
-df.to_csv("drugname_pmid_oct_2018.csv")
+df = pd.DataFrame(records).T
+
+old_df = pd.read_csv("drugs.tsv", sep="\t")
+old_df = old_df.set_index("name")
+
+df = df.join(old_df)
+
+from wikidataintegrator import wdi_helpers
+inchi_qid = wdi_helpers.id_mapper("P235")
+qid_inchi = {v:k for k,v in inchi_qid.items()}
+
+chebi_qid = wdi_helpers.id_mapper("P683")
+qid_chebi = {v:k for k,v in chebi_qid.items()}
+
+
+df['inchikey'] = df.qid.map(qid_inchi.get)
+df['chebi'] = df.qid.map(qid_chebi.get)
+
+df.to_csv("drugname_pmid_oct_2018.csv", index=False)
