@@ -79,7 +79,7 @@ class InxightBot:
         t = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
         ref.append(wdi_core.WDTime(t, prop_nr=PROPS['retrieved'], is_reference=True))
         if url:
-            ref.append(wdi_core.WDUrl(url, PROPS['reference URL'], is_reference=True))
+            ref.extend([wdi_core.WDUrl(u, PROPS['reference URL'], is_reference=True) for u in url])
         return ref
 
     @staticmethod
@@ -123,16 +123,18 @@ class InxightBot:
     def run(self):
         if self.run_one:
             if self.run_one in self.drug_indications:
+                print(self.drug_indications[self.run_one])
                 self.run_one_drug(self.run_one, self.drug_indications[self.run_one])
             elif self.run_one in self.indication_drugs:
                 self.run_one_indication(self.run_one, self.indication_drugs[self.run_one])
             else:
                 raise ValueError("{} not found".format(self.run_one))
             return None
-
-        for drug_qid, indications_qid in tqdm(self.drug_indications.items()):
+        d = sorted(self.drug_indications.items(), key=lambda x: x[0])
+        for drug_qid, indications_qid in tqdm(d):
             self.run_one_drug(drug_qid, indications_qid)
-        for indication_qid, drugs_qid in tqdm(self.indication_drugs.items()):
+        d = sorted(self.indication_drugs.items(), key=lambda x: x[0])
+        for indication_qid, drugs_qid in tqdm(d):
             self.run_one_indication(indication_qid, drugs_qid)
 
 
@@ -148,7 +150,7 @@ def normalize_to_qids(d: dict):
         d[key] = [x for x in d[key] if x['indication_qid']]
         for x in d[key]:
             x['drug_qid'] = key
-    d = {k: v for k, v in d.items() if v}
+    d = {k: v for k, v in d.items() if k and v}
     return d
 
 

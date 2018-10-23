@@ -84,7 +84,7 @@ def organize_one_record(d):
     records = []
     for k, v in conditions.items():
         if k not in node_xref:
-            print("fuck")
+            pass
         else:
             records.append({'xrefs': node_xref[k], 'conditions': v})
 
@@ -104,6 +104,7 @@ def organize_data(contents):
         d[key] = [x for x in d[key] if x.get('TreatmentModality') == "Primary"]
         d[key] = [x for x in d[key] if x.get('isConditionDoImprecise') is False]
         d[key] = [x for x in d[key] if x.get('ConditionDoId') != "Unknown"]
+        d[key] = [x for x in d[key] if x.get('ConditionProductDate') != "Unknown"]
     d = {k: v for k, v in d.items() if v}
 
     """
@@ -127,6 +128,7 @@ def organize_data(contents):
         x['ConditionProductDate'] = datetime.datetime.strptime(x['ConditionProductDate'], '%Y-%m-%d') if \
             x['ConditionProductDate'] else None
         x['ConditionDoId'] = "DOID:" + str(x['ConditionDoId']) if x['ConditionDoId'] else None
+        x['FdaUseURI'] = alwayslist(x['FdaUseURI']) if x['FdaUseURI'] else []
 
     return d
 
@@ -141,3 +143,6 @@ def main():
     d = organize_data(contents)
     with open("stitcher_parsed_{}.pkl".format(datetime.datetime.now().strftime("%Y-%m-%d")), "wb") as f:
         pickle.dump(d, f)
+
+if __name__ == '__main__':
+    main()
