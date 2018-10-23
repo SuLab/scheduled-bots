@@ -104,7 +104,7 @@ def organize_data(contents):
         d[key] = [x for x in d[key] if x.get('TreatmentModality') == "Primary"]
         d[key] = [x for x in d[key] if x.get('isConditionDoImprecise') is False]
         d[key] = [x for x in d[key] if x.get('ConditionDoId') != "Unknown"]
-        d[key] = [x for x in d[key] if x.get('ConditionProductDate') != "Unknown"]
+        d[key] = [x for x in d[key] if x.get('ConditionFdaUse') != "Unknown"]
     d = {k: v for k, v in d.items() if v}
 
     """
