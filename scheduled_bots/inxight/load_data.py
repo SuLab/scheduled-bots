@@ -3,7 +3,7 @@ import datetime
 import json
 import pickle
 import time
-from collections import defaultdict
+from collections import defaultdict, Counter
 from itertools import chain
 
 import requests
@@ -103,9 +103,11 @@ def organize_data(contents):
         d[key] = [x for x in d[key] if x.get('HighestPhase') == "Approved"]
         d[key] = [x for x in d[key] if x.get('TreatmentModality') == "Primary"]
         d[key] = [x for x in d[key] if x.get('isConditionDoImprecise') is False]
-        d[key] = [x for x in d[key] if x.get('ConditionDoId') != "Unknown"]
-        d[key] = [x for x in d[key] if x.get('ConditionFdaUse') != "Unknown"]
-        d[key] = [x for x in d[key] if x.get('HighestPhaseComment') not in {'Veterinary use', 'Veterinary use only'}]
+        d[key] = [x for x in d[key] if x.get('ConditionDoId') not in {None, "Unknown"}]
+        d[key] = [x for x in d[key] if x.get('ConditionFdaUse') not in {None, "Unknown"}]
+        d[key] = [x for x in d[key] if 'HighestPhaseComment' not in x]
+
+    # print(Counter([x.get('HighestPhaseComment') for x in chain(*d.values())]).most_common(20))
     d = {k: v for k, v in d.items() if v}
 
     """
