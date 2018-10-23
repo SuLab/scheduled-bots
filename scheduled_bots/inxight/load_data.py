@@ -132,6 +132,7 @@ def organize_data(contents):
             x['ConditionProductDate'] else None
         x['ConditionDoId'] = "DOID:" + str(x['ConditionDoId']) if x['ConditionDoId'] else None
         x['FdaUseURI'] = alwayslist(x['FdaUseURI']) if x['FdaUseURI'] else []
+        x['FdaUseURI'] = ["http://" + url if url.startswith("www.") else url for url in x['FdaUseURI']]
 
     return d
 

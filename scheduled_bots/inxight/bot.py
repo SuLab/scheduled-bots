@@ -79,7 +79,12 @@ class InxightBot:
         t = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
         ref.append(wdi_core.WDTime(t, prop_nr=PROPS['retrieved'], is_reference=True))
         if url:
-            ref.extend([wdi_core.WDUrl(u, PROPS['reference URL'], is_reference=True) for u in url])
+            for u in url:
+                try:
+                    ref.append(wdi_core.WDUrl(u, PROPS['reference URL'], is_reference=True))
+                except Exception as e:
+                    print(e)
+                    print(u)
         return ref
 
     @staticmethod
