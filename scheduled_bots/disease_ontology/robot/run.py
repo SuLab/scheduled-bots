@@ -6,6 +6,8 @@ Generate a ROBOT file to implement all changes
 """
 import os
 from collections import defaultdict, Counter
+from functools import reduce
+
 import requests
 from itertools import chain
 import csv
@@ -14,7 +16,7 @@ from rdflib import Graph
 from rdflib import URIRef, Literal
 from tqdm import tqdm
 
-from scheduled_bots.disease_ontology.robot.utils import get_mesh_info, get_gard_info
+from scheduled_bots.disease_ontology.robot.utils import get_mesh_info, get_gard_info, get_ordo_info
 from wikidataintegrator.wdi_core import WDItemEngine
 from wikicurie import wikicurie
 
@@ -33,6 +35,29 @@ PREFIX_TO_CURIE = {
 PREFIXES = {'UMLS_CUI', 'ORDO', 'OMIM', 'NCI', 'MESH', 'ICD9CM', 'ICD10CM', 'GARD'}
 
 
+def get_doid_qid_map():
+    # get a good QID to DOID map, using exact match only
+    query = """
+    SELECT distinct ?disease ?doid ?mrt WHERE {
+      ?disease p:P699 ?s_doid .
+      ?s_doid ps:P699 ?doid .
+      OPTIONAL {?s_doid pq:P4390 ?mrt} .
+    }
+    """
+    df = WDItemEngine.execute_sparql_query(query, as_dataframe=True)
+    df.disease = df.disease.str.replace("http://www.wikidata.org/entity/", "")
+    df = df[df.mrt.isnull() | (df.mrt == "http://www.wikidata.org/entity/Q39893449")]
+    # make sure one doid goes with one qid
+    bad1 = df[df.duplicated("disease", keep=False)]
+    bad2 = df[df.duplicated("doid", keep=False)]
+    # get rid of these baddies
+    df = df[~df.index.isin(bad1.index)]
+    df = df[~df.index.isin(bad2.index)]
+    doid_qid = dict(zip(df.doid, df.disease))
+
+    return doid_qid
+
+
 def get_wikidata_do_xrefs():
     """
     From wikidata, get all items with a DOID on them. Get all of the following external-ids (defined in PREFIXES)
@@ -45,48 +70,57 @@ def get_wikidata_do_xrefs():
       'disease': 'Q7758678',
       'doid': 'DOID:8499'}
     """
-    query = """
-    SELECT ?disease ?doid ?GARDG ?OMIMG ?ICD9CMG ?ICD10CMG ?MESHG ?ORDOG ?UMLS_CUIG ?NCIG WHERE {
-      {
-        SELECT ?disease ?doid
-          (group_concat(distinct ?gard; separator=",") as ?GARDG)
-          (group_concat(distinct ?omim; separator=",") as ?OMIMG)
-          (group_concat(distinct ?icd9cm; separator=",") as ?ICD9CMG)
-          (group_concat(distinct ?icd10cm; separator=",") as ?ICD10CMG)
-          (group_concat(distinct ?mesh; separator=",") as ?MESHG)
-          (group_concat(distinct ?orphanet; separator=",") as ?ORDOG)
-          (group_concat(distinct ?umls; separator=",") as ?UMLS_CUIG)
-          (group_concat(distinct ?nci; separator=",") as ?NCIG)  WHERE {
-            ?disease wdt:P699 ?doid .
-            OPTIONAL {?disease wdt:P492 ?omim}
-            OPTIONAL {?disease wdt:P1692 ?icd9cm}
-            OPTIONAL {?disease wdt:P4229 ?icd10cm}
-            OPTIONAL {?disease wdt:P1550 ?orphanet}
-            OPTIONAL {?disease wdt:P4317 ?gard}
-            OPTIONAL {?disease wdt:P486 ?mesh}
-            OPTIONAL {?disease wdt:P2892 ?umls}
-            OPTIONAL {?disease wdt:P1748 ?nci}
-         } GROUP BY ?disease ?doid
-      }
-    } """
-    df = WDItemEngine.execute_sparql_query(query, as_dataframe=True)
-    df.disease = df.disease.str.replace("http://www.wikidata.org/entity/", "")
-    assert len(df.doid) == len(set(df.doid)), "{}".format(df[df.doid.duplicated(keep=False)])
 
-    rs = df.to_dict("records")
-    newrs = []
-    for r in rs:
+    # get xrefs on items where DO is an exact match, and the statement doesn't have a MONDO reference
+    # getting ones in which it has no reference, or it has a reference which is not from mondo
+    # is too complicated, so get the ref info and we'll filter out the mondo ones afterwards
+    query_template = """
+    SELECT ?disease ?doid ?xref ?match ?mondo WHERE {{
+      ?disease p:P699 ?s_doid .
+      ?s_doid ps:P699 ?doid .
+      OPTIONAL {{ ?s_doid pq:P4390 ?match}}
+      ?disease p:{xref_pid} ?s_xref .
+      ?s_xref ps:{xref_pid} ?xref .
+      OPTIONAL {{?s_xref prov:wasDerivedFrom ?ref .
+                       ?ref pr:P5270 ?mondo }}
+    }}
+    """
+
+    # these match the prefixes in DO (but uppercase)
+    xref_pid = {
+        'omim': 'P492',
+        'icd9cm': 'P1692',
+        'icd10cm': 'P4229',
+        'ordo': 'P1550',
+        'gard': 'P4317',
+        'mesh': 'P486',
+        'UMLS_CUI': 'P2892',
+        'nci': 'P1748',
+    }
+
+    dfs = []
+    for xref, pid in xref_pid.items():
+        query = query_template.format(xref_pid=pid)
+        df = WDItemEngine.execute_sparql_query(query, as_dataframe=True)
+        # has no reference but if it does, is not a mondo reference
+        df = df[df.mondo.isnull()]
+        # has no qualifier or is an exact match
+        df = df[df.match.isnull() | (df.match == "http://www.wikidata.org/entity/Q39893449")]
+        df = df.groupby('doid').xref.apply(lambda x: ",".join(x)).reset_index().set_index("doid")
+        df.rename(columns={'xref': xref.upper()}, inplace=True)
+        dfs.append(df)
+
+    # join all of these dfs together
+    dfj = reduce(lambda x, y: x.join(y), dfs)
+
+    d = dict()
+    for doid, row in dfj.iterrows():
         s = set()
-        newr = dict()
-        for k, v in r.items():
-            if k.endswith("G") and v:
-                s.update(k[:-1] + ":" + vv for vv in v.split(","))
-            elif not k.endswith("G"):
-                newr[k] = v
-        newr['xref'] = s
-        newrs.append(newr)
+        for k, v in row.to_dict().items():
+            if not pd.isnull(v):
+                s.update(k + ":" + vv for vv in v.split(","))
+        d[doid] = {'xref': s}
 
-    d = {x['doid']: x for x in newrs}
     return d
 
 
@@ -145,8 +179,8 @@ def compare(wd, do):
     doids = set(wd.keys()) & set(do.keys())
     missing_in_do = set(wd.keys()) - set(do.keys())
     missing_in_wd = set(do.keys()) - set(wd.keys())
-    print("Items missing in wikidata: {}".format(missing_in_wd))
-    print("Items missing in DO: {}".format(missing_in_do))
+    # print("Items missing in wikidata: {}".format(missing_in_wd))
+    # print("Items missing in DO: {}".format(missing_in_do))
     for k in doids:
         # get rid of the OMIM PS ids
         wd[k]['xref'] = {x for x in wd[k]['xref'] if not x.startswith("OMIM:PS")}
@@ -261,81 +295,62 @@ def run_gard(wd, do, leftover_in_wd):
                                       "gard xref additions notexact.csv")
 
 
+def run_ordo(wd, do, leftover_in_wd):
+    records = []
+    url = "http://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=EN&Expert={}"
+    for k, v in leftover_in_wd.items():
+        records.extend([{'doid': k, 'doid_label': do[k]['label'], 'ordo_id': x,
+                         'ordo_url': url.format(x.replace("ORDO:", ""))} for x in v if x.startswith("ORDO:")])
+    # get ordo labels
+    for record in tqdm(records):
+        record.update(get_ordo_info(record['ordo_id'].replace("ORDO:", "")))
+    # classify match by exact sring match on title or one of the aliases
+    for record in tqdm(records):
+        if record['doid_label'].lower() == record['ordo_label'].lower():
+            record['match_type'] = 'exact'
+        elif record['doid_label'].lower() in map(str.lower, record['ordo_synonyms'].split(";")):
+            record['match_type'] = 'exact_syn'
+        else:
+            record['match_type'] = 'not'
+    # rename keys
+    records = [{k.replace("ordo", "ext"): v for k, v in record.items()} for record in records]
+    records = sorted(records, key=lambda x: x['doid'])
+
+    make_robot_xref_additions_records(wd, do, [x for x in records if x['match_type'] == 'exact'],
+                                      "ordo xref additions exact.csv")
+    make_robot_xref_additions_records(wd, do, [x for x in records if x['match_type'] == 'exact_syn'],
+                                      "ordo xref additions exact_syn.csv")
+    make_robot_xref_additions_records(wd, do, [x for x in records if x['match_type'] == 'not'],
+                                      "ordo xref additions notexact.csv")
+
+
 def run():
+    doid_qid = get_doid_qid_map()
     wd = get_wikidata_do_xrefs()
+    for k, v in wd.items():
+        v['disease'] = doid_qid.get(k)
+
+    wd = {k: v for k, v in wd.items() if v['disease']}
     do = parse_do_owl()
 
     leftover_in_wd, leftover_in_do = compare(wd, do)
     # print(leftover_in_do)
 
+    # counts of what we have
+    Counter([x.split(":")[0] for x in chain(*leftover_in_wd.values())])
+    """
+    Counter({'GARD': 218,
+         'MESH': 1008,
+         'NCI': 518,
+         'OMIM': 474,
+         'ORDO': 1946,
+         'UMLS_CUI': 2953})
+    """
+
     run_mesh(wd, do, leftover_in_wd)
     run_gard(wd, do, leftover_in_wd)
+    run_ordo(wd, do, leftover_in_wd)
 
-    if False:
-        ## get only the OMIM changes
-        records = []
-        url = "https://omim.org/entry/{}"
-        for k, v in leftover_in_wd.items():
-            if 'OMIM' in v:
-                records.extend([{'doid': k, 'doid_label': do[k]['label'],
-                                 'omim_id': x, 'omim_url': url.format(x)} for x in v['OMIM']])
-        # get omim labels
-        for record in tqdm(records):
-            record.update(get_omim_info(record['omim_id']))
-        # classify match by exact sring match on title or one of the aliases
-        for record in tqdm(records):
-            if record['doid_label'].lower() == record['omim_label'].lower():
-                record['match_type'] = 'exact'
-            elif record['doid_label'].lower() in map(str.lower, record['omim_synonyms'].split(";")):
-                record['match_type'] = 'exact_syn'
-            else:
-                record['match_type'] = 'not'
-        # rename keys
-        records = [{k.replace("omim", "ext"): v for k, v in record.items()} for record in records]
-        # curie-ize ext id
-        for record in records:
-            record['ext_id'] = "OMIM:" + record['ext_id']
-            record['ext_descr'] = record['ext_prefix']
-        records = sorted(records, key=lambda x: x['doid'])
-
-        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact'],
-                                          "omim xref additions exact.csv")
-        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact_syn'],
-                                          "omim xref additions exact_syn.csv")
-        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'not'],
-                                          "omim xref additions notexact.csv")
-
-        ## get only the ORDO changes
-        records = []
-        url = "http://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=EN&Expert={}"
-        for k, v in leftover_in_wd.items():
-            if 'ORDO' in v:
-                records.extend([{'doid': k, 'doid_label': do[k]['label'],
-                                 'ordo_id': x, 'ordo_url': url.format(x)} for x in v['ORDO']])
-        # get ordo labels
-        for record in tqdm(records):
-            record.update(get_ordo_info(record['ordo_id']))
-        # classify match by exact sring match on title or one of the aliases
-        for record in tqdm(records):
-            if record['doid_label'].lower() == record['ordo_label'].lower():
-                record['match_type'] = 'exact'
-            elif record['doid_label'].lower() in map(str.lower, record['ordo_synonyms'].split(";")):
-                record['match_type'] = 'exact_syn'
-            else:
-                record['match_type'] = 'not'
-        # rename keys
-        records = [{k.replace("ordo", "ext"): v for k, v in record.items()} for record in records]
-        # curie-ize ext id
-        for record in records:
-            record['ext_id'] = "ORDO:" + record['ext_id']
-        records = sorted(records, key=lambda x: x['doid'])
-
-        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact'],
-                                          "ordo xref additions exact.csv")
-        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'exact_syn'],
-                                          "ordo xref additions exact_syn.csv")
-        make_robot_xref_additions_records(wd, [x for x in records if x['match_type'] == 'not'],
-                                          "ordo xref additions notexact.csv")
 
 
 if __name__ == "__main__":
