@@ -16,7 +16,7 @@ from rdflib import Graph
 from rdflib import URIRef, Literal
 from tqdm import tqdm
 
-from scheduled_bots.disease_ontology.robot.utils import get_mesh_info, get_gard_info, get_ordo_info
+from scheduled_bots.disease_ontology.robot.utils import get_mesh_info, get_gard_info, get_ordo_info, get_omim_info
 from wikidataintegrator.wdi_core import WDItemEngine
 from wikicurie import wikicurie
 
@@ -47,6 +47,7 @@ def get_doid_qid_map():
     df = WDItemEngine.execute_sparql_query(query, as_dataframe=True)
     df.disease = df.disease.str.replace("http://www.wikidata.org/entity/", "")
     df = df[df.mrt.isnull() | (df.mrt == "http://www.wikidata.org/entity/Q39893449")]
+    df.drop_duplicates(subset=['disease', 'doid'], inplace=True)
     # make sure one doid goes with one qid
     bad1 = df[df.duplicated("disease", keep=False)]
     bad2 = df[df.duplicated("doid", keep=False)]
@@ -324,6 +325,35 @@ def run_ordo(wd, do, leftover_in_wd):
                                       "ordo xref additions notexact.csv")
 
 
+def run_omim(wd, do, leftover_in_wd):
+    records = []
+    url = "https://omim.org/entry/{}"
+    for k, v in leftover_in_wd.items():
+        records.extend([{'doid': k, 'doid_label': do[k]['label'], 'omim_id': x,
+                         'omim_url': url.format(x.replace("OMIM:", ""))} for x in v if x.startswith("OMIM:")])
+    # get ordo labels
+    for record in tqdm(records):
+        record.update(get_omim_info(record['omim_id'].replace("OMIM:", "")))
+    # classify match by exact sring match on title or one of the aliases
+    for record in tqdm(records):
+        if record['doid_label'].lower() == record['omim_label'].lower():
+            record['match_type'] = 'exact'
+        elif record['doid_label'].lower() in map(str.lower, record['omim_synonyms'].split(";")):
+            record['match_type'] = 'exact_syn'
+        else:
+            record['match_type'] = 'not'
+    # rename keys
+    records = [{k.replace("omim", "ext"): v for k, v in record.items()} for record in records]
+    records = sorted(records, key=lambda x: x['doid'])
+
+    make_robot_xref_additions_records(wd, do, [x for x in records if x['match_type'] == 'exact'],
+                                      "omim xref additions exact.csv")
+    make_robot_xref_additions_records(wd, do, [x for x in records if x['match_type'] == 'exact_syn'],
+                                      "omim xref additions exact_syn.csv")
+    make_robot_xref_additions_records(wd, do, [x for x in records if x['match_type'] == 'not'],
+                                      "omim xref additions notexact.csv")
+
+
 def run():
     doid_qid = get_doid_qid_map()
     wd = get_wikidata_do_xrefs()
@@ -350,7 +380,7 @@ def run():
     run_mesh(wd, do, leftover_in_wd)
     run_gard(wd, do, leftover_in_wd)
     run_ordo(wd, do, leftover_in_wd)
-
+    run_omim(wd, do, leftover_in_wd)
 
 
 if __name__ == "__main__":
