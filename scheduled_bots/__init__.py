@@ -1,6 +1,8 @@
 PROPS = {
     'ATC code': 'P267',
     'Archive url': 'P1065',
+    'authority': 'P797',
+    'approved by': 'P790',
     'CAS registry number': 'P231',
     'CIViC Variant ID': 'P3329',
     'CIViC variant ID': 'P3329',
@@ -10,6 +12,7 @@ PROPS = {
     'DOI': 'P356',
     'Disease Ontology ID': 'P699',
     'Drugbank ID': 'P715',
+    'drug used for treatment': 'P2176',
     'EC Number': 'P591',
     'Encoded By': 'P702',
     'Ensembl Gene ID': 'P594',
@@ -57,9 +60,11 @@ PROPS = {
     'RefSeq RNA ID': 'P639',
     'Refseq Genome ID': 'P2249',
     'Refseq Protein ID': 'P637',
+    'RxNorm CUI': 'P3345',
     'SMILES': 'P233',
     'Saccharomyces Genome Database ID': 'P3406',
     'Sequence Ontology ID': 'P3986',
+    'start time': 'P580',
     'UBERON ID': 'P1554',
     'UMLS CUI': 'P2892',
     'UNII': 'P652',
@@ -146,7 +151,9 @@ ITEMS = {
     'combination therapy': 'Q1304270',
     'CIViC database': 'Q27612411',
     'Homo sapiens': 'Q15978631',
-    'Wikipathways': 'Q7999828'
+    'Wikipathways': 'Q7999828',
+    'Food and Drug Administration': 'Q204711',
+    'Inxight: Drugs Database': 'Q57664317'
 }
 
 DEFAULT_CORE_PROPS = ['NCBI Taxonomy ID', 'National Cancer Thesaurus ID', 'UNII', 'MeSH Code', 'IUPHAR ID',

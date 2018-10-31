@@ -146,7 +146,7 @@ class Node:
         # override in subclass to do something before the node is created
         pass
 
-    def create(self, login, write=True):
+    def create(self, login, write=True, allow_new=True):
         # create or get qid
         # creates the primary external ID, the xrefs, instance of (if set), checks label, description, and aliases
         # not other properties (i.e. subclass), as these may require items existing that may not exist yet
@@ -182,6 +182,8 @@ class Node:
                     if self.id_curie not in existing_primary_ext_id:
                         raise Exception(
                             "conflicting primary_ext_id IDs: {} on {}".format(self.id_curie, self.item.wd_item_id))
+            if self.item.create_new_item and not allow_new:
+                return None
         except Exception as e:
             traceback.print_exc()
             msg = wdi_helpers.format_msg(primary_ext_id, primary_ext_id_pid, None, str(e), msg_type=type(e))
@@ -258,9 +260,9 @@ class Node:
                 wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
 
 
-def create_node(node, login, write):
+def create_node(node, login, write, create_new):
     # pickleable function that calls create on node
-    node.create(login, write)
+    node.create(login, write, create_new)
 
 
 class Graph:
@@ -449,8 +451,8 @@ class Graph:
                       desc="creating items"):
             pass
 
-    def create_nodes(self, login, write=True):
-        create_node_f = partial(create_node, login=login, write=write)
+    def create_nodes(self, login, write=True, create_new=True):
+        create_node_f = partial(create_node, login=login, write=write, create_new=create_new)
         for _ in tqdm(map(create_node_f, self.nodes), total=len(self.nodes), desc="creating items"):
             pass
 

@@ -92,7 +92,7 @@ class InxightBot:
         q = []
         if start_time:
             q.append(wdi_core.WDTime(start_time.strftime('+%Y-%m-%dT00:00:00Z'), PROPS['start time'], is_qualifier=True))
-        q.append(wdi_core.WDItemID(ITEMS['Food and Drug Administration'], PROPS['authority'], is_qualifier=True))
+        q.append(wdi_core.WDItemID(ITEMS['Food and Drug Administration'], PROPS['approved by'], is_qualifier=True))
         return q
 
     def run_one_drug(self, drug_qid, indications):

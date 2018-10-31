@@ -23,9 +23,6 @@ class HPGraph(Graph):
     FAST_RUN = True
     EXCLUDE_NODES = {'http://purl.obolibrary.org/obo/HP_0000001'}
 
-    # TODO: the instance of statement should be 'Phenotype' (Q104053), which is in UPHENO, not HP
-    # so I'm not sure how to handle this as we don't have that prop in wikidata
-
     PRED_PID_MAP = {
         'is_a': PROPS['subclass of'],
     }
@@ -39,8 +36,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.local:
-        mediawiki_api_url = "http://localhost:7171/w/api.php"
-        sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
+        mediawiki_api_url = "http://185.54.114.71:8181/w/api.php"
+        sparql_endpoint_url = "http://185.54.114.71:8282/proxy/wdqs/bigdata/namespace/wdq/sparql"
         login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
     else:
         try:

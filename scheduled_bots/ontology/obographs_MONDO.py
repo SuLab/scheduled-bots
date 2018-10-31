@@ -118,6 +118,7 @@ class MondoGraph(Graph):
         PROPS['OMIM ID'],
         PROPS['GARD rare disease ID']
     }
+    # CORE_IDS = {PROPS['Mondo ID']}
 
     FAST_RUN = True
 
@@ -153,8 +154,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.local:
-        mediawiki_api_url = "http://localhost:7171/w/api.php"
-        sparql_endpoint_url = "http://localhost:7272/proxy/wdqs/bigdata/namespace/wdq/sparql"
+        mediawiki_api_url = "http://185.54.114.71:8181/w/api.php"
+        sparql_endpoint_url = "http://185.54.114.71:8282/proxy/wdqs/bigdata/namespace/wdq/sparql"
         login = wdi_login.WDLogin("testbot", "password", mediawiki_api_url=mediawiki_api_url)
     else:
         try:
@@ -180,9 +181,20 @@ mediawiki_api_url = 'https://www.wikidata.org/w/api.php'
 sparql_endpoint_url = 'https://query.wikidata.org/sparql'
 g = MondoGraph("mondo.json", mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
 g.FAST_RUN=False
-g.nodes = g.nodes[1000:]
 from scheduled_bots.local import WDUSER, WDPASS
 login = wdi_login.WDLogin(WDUSER, WDPASS)
+g.create_release(login)
+g.set_ref_handler()
+# g.nodes = g.nodes[:200]
+# g.nodes = [x for x in g.nodes if x.id_curie == "MONDO:0001208"]
+
+
+node = [node for node in g.nodes if node.id_curie == "MONDO:0012406"][0]
+
+m = wdi_helpers.id_mapper(PROPS['Mondo ID'])
+g.nodes = [x for x in g.nodes if x.id_curie not in m.keys()]
+
+
 g.run(login)
 
 """

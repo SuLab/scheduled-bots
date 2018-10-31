@@ -1,6 +1,6 @@
 import json
 import os
-import shelve
+import traceback
 from datetime import datetime
 import time
 
@@ -13,11 +13,12 @@ from scheduled_bots.interpro.IPRTerm import IPRTerm
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
 from wikidataintegrator.wdi_fastrun import FastRunContainer
 
-__metadata__ = {'name': 'InterproBot_Proteins',
-                'maintainer': 'GSS',
-                'tags': ['protein', 'interpro'],
-                'properties': ["P279", "P527", "P361"]
-                }
+__metadata__ = {
+    'name': 'InterproBot_Proteins',
+    'maintainer': 'GSS',
+    'tags': ['protein', 'interpro'],
+    'properties': ["P279", "P527", "P361"]
+}
 
 INTERPRO = "P2926"
 UNIPROT = "P352"
@@ -64,8 +65,11 @@ def create_for_one_protein(login, uniprot_id, doc, release_wdid, uniprot2wd, fas
         wdi_core.WDItemEngine.log("ERROR",
                                   wdi_helpers.format_msg(uniprot_id, UNIPROT, uniprot2wd[uniprot_id], str(e),
                                                          msg_type=type(e)))
+        traceback.print_exc()
         return None
 
+    if wd_item.require_write:
+        print(uniprot_id, uniprot2wd[uniprot_id])
     wdi_helpers.try_write(wd_item, uniprot_id, INTERPRO, login, write=write,
                           edit_summary="add/update family and/or domains")
     wd_item.wd_json_representation = dict()
@@ -85,7 +89,7 @@ def create_uniprot_relationships(login, release_wdid, collection, taxon=None, wr
 
     uniprotids = sorted(list(uniprot2wd.keys()))
     qids = []
-    for n, key in tqdm(enumerate(uniprotids), mininterval=10.0, total=len(uniprotids)):
+    for n, key in tqdm(enumerate(uniprotids), total=len(uniprotids)):
         if key not in collection:
             continue
         doc = collection[key]
@@ -117,11 +121,17 @@ def main(login, release_wdid, taxon, log_dir="./logs", run_id=None, run_one=Fals
     uniprot_ids = sorted(list(uniprot2wd.keys()))
 
     print("loading data")
-    df_iter = pd.read_csv("protein2ipr.csv.gz", iterator=True, chunksize=100000, sep=";", names=['part_of', 'has_part'])
-    df = pd.concat([x[x.index.isin(uniprot_ids)] for x in tqdm(df_iter, total=93075570/100000)])
-    df.fillna("", inplace=True)
-    collection = {x[0]: {'_id': x[0], 'part_of': x[1].part_of.split(","), 'has_part': x[1].has_part.split(",")} for x in
-                  df.iterrows()}
+    if os.path.exists(taxon + ".csv"):
+        df = pd.read_csv(taxon + ".csv", index_col=0)
+        print(df.head())
+    else:
+        df_iter = pd.read_csv("protein2ipr.csv.gz", iterator=True, chunksize=100000, sep=";", names=['part_of', 'has_part'])
+        df = pd.concat([x[x.index.isin(uniprot_ids)] for x in tqdm(df_iter, total=93075570 / 100000)])
+        df.to_csv(taxon + ".csv")
+        print(df.head())
+    split_if_str = lambda x: x.split(",") if pd.notnull(x) else list()
+    collection = {x[0]: {'_id': x[0], 'part_of': split_if_str(x[1].part_of), 'has_part': split_if_str(x[1].has_part)}
+                  for x in df.iterrows()}
 
     # """
     create_uniprot_relationships(login, release_wdid, collection, taxon=taxon, write=write, run_one=run_one)
@@ -133,7 +143,7 @@ def main(login, release_wdid, taxon, log_dir="./logs", run_id=None, run_one=Fals
     frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter={UNIPROT: "", "P703": taxon},
                            use_refs=True)
     qids = sorted(list(uniprot2wd.values()))
-    for qid in qids:
+    for qid in tqdm(qids):
         # the old subclass of statements should get removed here (see: https://github.com/SuLab/GeneWikiCentral/issues/68)
         remove_deprecated_statements(qid, frc, release_wdid, [PROPS[x] for x in ['subclass of', 'has part', 'part of']],
                                      login)

@@ -38,6 +38,7 @@ class MicrobialChromosomeBot:
         accessions = set(assdf.gbrs_paired_asm)
         # adding Chlamydia muridarum str. Nigg
         accessions.add("GCA_000006685.1")
+        accessions.add("GCA_000012685.1")
 
         # Download prokaryotes genome table
         # but oh wait, it has no ref genome column
