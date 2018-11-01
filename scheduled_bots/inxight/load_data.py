@@ -1,11 +1,9 @@
 import base64
 import datetime
-import json
 import pickle
 import time
-from collections import defaultdict, Counter
+from collections import defaultdict
 from itertools import chain
-
 import requests
 from tqdm import tqdm
 
@@ -97,6 +95,9 @@ def organize_data(contents):
         records.extend(organize_one_record(d))
 
     records = [x for x in records if len(x['xrefs'].get('CHEMBL.COMPOUND', [])) == 1]
+    for record in records:
+        for condition in record['conditions']:
+            condition['UNII'] = record['xrefs']['UNII']
     d = {list(x['xrefs']['CHEMBL.COMPOUND'])[0]: x['conditions'] for x in records}
 
     for key in d:
@@ -117,7 +118,7 @@ def organize_data(contents):
     isConditionDoImprecise
     Counter({False: 2160, True: 456})
     """
-    keys_to_keep = ['ConditionDoId', 'ConditionProductDate', 'FdaUseURI']
+    keys_to_keep = ['ConditionDoId', 'ConditionProductDate', 'FdaUseURI', 'UNII']
     for key in d:
         d[key] = [{k: v for k, v in x.items() if k in keys_to_keep} for x in d[key]]
 

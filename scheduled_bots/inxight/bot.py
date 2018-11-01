@@ -5,11 +5,8 @@ from collections import defaultdict
 from datetime import datetime
 from itertools import chain
 from time import gmtime, strftime
-
-import pandas as pd
 from tqdm import tqdm
-
-from scheduled_bots import PROPS, ITEMS, get_default_core_props
+from scheduled_bots import PROPS, ITEMS
 from scheduled_bots.inxight.load_data import load_parsed_data
 from wikidataintegrator import wdi_core, wdi_helpers, wdi_login
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
@@ -50,6 +47,9 @@ class InxightBot:
 
         self.item_engine = self.make_item_engine()
 
+        self.unii_qid = wdi_helpers.id_mapper(PROPS['UNII'])
+        self.qid_unii = {v: k for k, v in self.unii_qid.items()}
+
     def make_item_engine(self):
         append_props = self.append_props
         core_props = self.core_props
@@ -67,7 +67,7 @@ class InxightBot:
         return SubCls
 
     @staticmethod
-    def create_reference(url=None):
+    def create_reference(unii: str, url=None):
         """
         Reference is:
         retrieved: date
@@ -78,6 +78,8 @@ class InxightBot:
         ref = [wdi_core.WDItemID(ITEMS['Inxight: Drugs Database'], PROPS['stated in'], is_reference=True)]
         t = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
         ref.append(wdi_core.WDTime(t, prop_nr=PROPS['retrieved'], is_reference=True))
+        ref_url = "https://drugs.ncats.io/drug/{}".format(unii)
+        ref.append(wdi_core.WDUrl(ref_url, PROPS['reference URL'], is_reference=True))
         if url:
             for u in url:
                 try:
@@ -88,17 +90,19 @@ class InxightBot:
         return ref
 
     @staticmethod
-    def create_qualifier(start_time:datetime):
+    def create_qualifier(start_time: datetime):
         q = []
         if start_time:
-            q.append(wdi_core.WDTime(start_time.strftime('+%Y-%m-%dT00:00:00Z'), PROPS['start time'], is_qualifier=True))
+            q.append(
+                wdi_core.WDTime(start_time.strftime('+%Y-%m-%dT00:00:00Z'), PROPS['start time'], is_qualifier=True))
         q.append(wdi_core.WDItemID(ITEMS['Food and Drug Administration'], PROPS['approved by'], is_qualifier=True))
         return q
 
     def run_one_drug(self, drug_qid, indications):
         ss = []
+        unii = self.qid_unii[drug_qid]
         for ind in indications:
-            refs = [self.create_reference(ind['FdaUseURI'])]
+            refs = [self.create_reference(unii, ind['FdaUseURI'])]
             qual = self.create_qualifier(ind['ConditionProductDate'])
             s = wdi_core.WDItemID(ind['indication_qid'], PROPS['medical condition treated'],
                                   references=refs, qualifiers=qual)
@@ -113,7 +117,8 @@ class InxightBot:
     def run_one_indication(self, indication_qid, drugs):
         ss = []
         for drug in drugs:
-            refs = [self.create_reference(drug['FdaUseURI'])]
+            unii = self.qid_unii[drug]
+            refs = [self.create_reference(unii, drug['FdaUseURI'])]
             qual = self.create_qualifier(drug['ConditionProductDate'])
             s = wdi_core.WDItemID(drug['drug_qid'], PROPS['drug used for treatment'],
                                   references=refs, qualifiers=qual)
