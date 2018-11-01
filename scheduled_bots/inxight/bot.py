@@ -99,6 +99,18 @@ class InxightBot:
         return q
 
     def run_one_drug(self, drug_qid, indications):
+
+        # remove old s
+        item = wdi_core.WDItemEngine(wd_item_id=drug_qid, search_only=True)
+        orig_ss = [x for x in item.statements if x.get_prop_nr() == PROPS['medical condition treated']]
+        orig_ss = [x for x in orig_ss if x.get_qualifiers()]
+        orig_ss = [x for x in orig_ss if x.get_qualifiers()[1].get_prop_nr() == PROPS['authority']]
+        orig_ss = [x for x in orig_ss if x.get_qualifiers()[1].get_value() == 204711]
+        for s in orig_ss:
+            setattr(s, "remove", "")
+        item = wdi_core.WDItemEngine(wd_item_id=drug_qid, data=orig_ss)
+        item.write(login=self.login)
+
         ss = []
         unii = self.qid_unii[drug_qid]
         for ind in indications:
