@@ -156,7 +156,8 @@ ITEMS = {
     'Food and Drug Administration': 'Q204711',
     'Inxight: Drugs Database': 'Q57664317',
     'MitoDB': 'Q58019775',
-    'Mitochondrial Disease Database': 'Q58019775'
+    'Mitochondrial Disease Database': 'Q58019775',
+    'percentage': 'Q11229'
 }
 
 DEFAULT_CORE_PROPS = ['NCBI Taxonomy ID', 'National Cancer Thesaurus ID', 'UNII', 'MeSH Code', 'IUPHAR ID',
