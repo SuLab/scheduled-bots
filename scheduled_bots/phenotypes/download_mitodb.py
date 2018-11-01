@@ -90,5 +90,20 @@ def main():
 
     df.to_csv("mitodb.csv", index=False)
 
+    # look at what is missing
+    df2 = df[df.hpo.isnull()]
+    print("{} out of {} unique symptoms missing".format(len(set(df2['Symptom/sign'])), len(set(df['Symptom/sign']))))
+    print("accounting for {} out of {} links".format(len(df2), len(df)))
+    # most used missing
+    from collections import Counter
+    print("most used missing phenotypes")
+    print(Counter(df2['Symptom/sign']).most_common(10))
+
+    print("all missing phenotypes")
+    df3 = df2.groupby("Symptom/sign").agg(
+        {"Pubmed id": lambda x: ";".join(list(x)), "disease": lambda x: ";".join(list(x))})
+    df3.to_csv("mitodb_missing.csv")
+
+
 if __name__ == '__main__':
     main()
