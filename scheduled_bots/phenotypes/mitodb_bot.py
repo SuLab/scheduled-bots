@@ -67,7 +67,7 @@ class MitoBot:
         return SubCls
 
     @staticmethod
-    def create_reference(pmid, login=None):
+    def create_reference(omim, pmid, login=None):
         """
         Reference is:
         retrieved: date
@@ -81,6 +81,8 @@ class MitoBot:
         pmid_qid, _, success = PublicationHelper(ext_id=pmid, id_type='pmid', source="europepmc").get_or_create(login)
         if success:
             ref.append(wdi_core.WDItemID(pmid_qid, PROPS['stated in'], is_reference=True))
+        ref_url = "http://mitodb.com/symptoms.php?oid={}&symptoms=Show"
+        ref.append(wdi_core.WDUrl(ref_url.format(omim), PROPS['reference URL'], is_reference=True))
         return ref
 
     @staticmethod
@@ -98,8 +100,9 @@ class MitoBot:
             incidence = float(record['Percent affected'][:-2])
             pmid = record['Pubmed id']
             phenotype_qid = record['phenotype_qid']
+            omim_id = record['disease']
 
-            refs = [self.create_reference(pmid=pmid, login=self.login)]
+            refs = [self.create_reference(omim_id, pmid=pmid, login=self.login)]
             qual = self.create_qualifier(incidence)
             s = wdi_core.WDItemID(phenotype_qid, PROPS['symptoms'], references=refs, qualifiers=qual)
             ss.append(s)
@@ -126,8 +129,10 @@ class MitoBot:
 
 
 def main(write=True, run_one=None):
-    omim_qid = wdi_helpers.id_mapper(PROPS['OMIM ID'], prefer_exact_match=True)
-    hpo_qid = wdi_helpers.id_mapper(PROPS['Human Phenotype Ontology ID'], prefer_exact_match=True)
+    omim_qid = wdi_helpers.id_mapper(PROPS['OMIM ID'], prefer_exact_match=True, return_as_set=True)
+    omim_qid = {k: list(v)[0] for k, v in omim_qid.items() if len(v) == 1}
+    hpo_qid = wdi_helpers.id_mapper(PROPS['Human Phenotype Ontology ID'], prefer_exact_match=True, return_as_set=True)
+    hpo_qid = {k: list(v)[0] for k, v in hpo_qid.items() if len(v) == 1}
 
     df = pd.read_csv("mitodb.csv", dtype=str)
     df['disease_qid'] = df.disease.map(omim_qid.get)
@@ -136,8 +141,6 @@ def main(write=True, run_one=None):
 
     records = df.to_dict("records")
     login = wdi_login.WDLogin(user=WDUSER, pwd=WDPASS)
-    write = True
-    run_one = "Q55345782"
     bot = MitoBot(records, login, write=write, run_one=run_one)
     bot.run()
 
