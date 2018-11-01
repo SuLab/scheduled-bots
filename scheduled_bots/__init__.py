@@ -36,6 +36,7 @@ PROPS = {
     'IUPHAR ID': 'P595',
     'InChI': 'P234',
     'InChIKey': 'P235',
+    'incidence': 'P2844',
     'InterPro ID': 'P2926',
     'Isomeric SMILES': 'P2017',
     'KEGG ID': 'P665',
@@ -153,7 +154,9 @@ ITEMS = {
     'Homo sapiens': 'Q15978631',
     'Wikipathways': 'Q7999828',
     'Food and Drug Administration': 'Q204711',
-    'Inxight: Drugs Database': 'Q57664317'
+    'Inxight: Drugs Database': 'Q57664317',
+    'MitoDB': 'Q58019775',
+    'Mitochondrial Disease Database': 'Q58019775'
 }
 
 DEFAULT_CORE_PROPS = ['NCBI Taxonomy ID', 'National Cancer Thesaurus ID', 'UNII', 'MeSH Code', 'IUPHAR ID',
