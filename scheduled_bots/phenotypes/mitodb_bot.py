@@ -79,7 +79,7 @@ class MitoBot:
         t = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
         ref.append(wdi_core.WDTime(t, prop_nr=PROPS['retrieved'], is_reference=True))
         pmid_qid, _, success = PublicationHelper(ext_id=pmid, id_type='pmid', source="europepmc").get_or_create(login)
-        if success:
+        if success is True:
             ref.append(wdi_core.WDItemID(pmid_qid, PROPS['stated in'], is_reference=True))
         ref_url = "http://mitodb.com/symptoms.php?oid={}&symptoms=Show"
         ref.append(wdi_core.WDUrl(ref_url.format(omim), PROPS['reference URL'], is_reference=True))
