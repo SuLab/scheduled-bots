@@ -78,8 +78,9 @@ class InxightBot:
         ref = [wdi_core.WDItemID(ITEMS['Inxight: Drugs Database'], PROPS['stated in'], is_reference=True)]
         t = strftime("+%Y-%m-%dT00:00:00Z", gmtime())
         ref.append(wdi_core.WDTime(t, prop_nr=PROPS['retrieved'], is_reference=True))
-        ref_url = "https://drugs.ncats.io/drug/{}".format(unii)
-        ref.append(wdi_core.WDUrl(ref_url, PROPS['reference URL'], is_reference=True))
+        if unii:
+            ref_url = "https://drugs.ncats.io/drug/{}".format(unii)
+            ref.append(wdi_core.WDUrl(ref_url, PROPS['reference URL'], is_reference=True))
         if url:
             for u in url:
                 try:
@@ -99,20 +100,20 @@ class InxightBot:
         return q
 
     def run_one_drug(self, drug_qid, indications):
-
+        print(drug_qid)
         # remove old s
         item = wdi_core.WDItemEngine(wd_item_id=drug_qid, search_only=True)
         orig_ss = [x for x in item.statements if x.get_prop_nr() == PROPS['medical condition treated']]
         orig_ss = [x for x in orig_ss if x.get_qualifiers()]
-        orig_ss = [x for x in orig_ss if x.get_qualifiers()[1].get_prop_nr() == PROPS['authority']]
-        orig_ss = [x for x in orig_ss if x.get_qualifiers()[1].get_value() == 204711]
+        orig_ss = [x for x in orig_ss if any([q.get_prop_nr() == PROPS['authority'] for q in x.get_qualifiers()])]
+        orig_ss = [x for x in orig_ss if any([q.get_value() == 204711 for q in x.get_qualifiers()])]
         for s in orig_ss:
             setattr(s, "remove", "")
         item = wdi_core.WDItemEngine(wd_item_id=drug_qid, data=orig_ss)
         item.write(login=self.login)
 
         ss = []
-        unii = self.qid_unii[drug_qid]
+        unii = self.qid_unii.get(drug_qid)
         for ind in indications:
             refs = [self.create_reference(unii, ind['FdaUseURI'])]
             qual = self.create_qualifier(ind['ConditionProductDate'])
@@ -127,9 +128,21 @@ class InxightBot:
                   edit_summary="Add indication from FDA", login=self.login, write=self.write)
 
     def run_one_indication(self, indication_qid, drugs):
+
+        # remove old s
+        item = wdi_core.WDItemEngine(wd_item_id=indication_qid, search_only=True)
+        orig_ss = [x for x in item.statements if x.get_prop_nr() == PROPS['drug used for treatment']]
+        orig_ss = [x for x in orig_ss if x.get_qualifiers()]
+        orig_ss = [x for x in orig_ss if any([q.get_prop_nr() == PROPS['authority'] for q in x.get_qualifiers()])]
+        orig_ss = [x for x in orig_ss if any([q.get_value() == 204711 for q in x.get_qualifiers()])]
+        for s in orig_ss:
+            setattr(s, "remove", "")
+        item = wdi_core.WDItemEngine(wd_item_id=indication_qid, data=orig_ss)
+        item.write(login=self.login)
+
         ss = []
         for drug in drugs:
-            unii = self.qid_unii[drug]
+            unii = self.qid_unii.get(drug)
             refs = [self.create_reference(unii, drug['FdaUseURI'])]
             qual = self.create_qualifier(drug['ConditionProductDate'])
             s = wdi_core.WDItemID(drug['drug_qid'], PROPS['drug used for treatment'],
