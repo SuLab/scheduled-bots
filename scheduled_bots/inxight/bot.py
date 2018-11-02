@@ -142,7 +142,7 @@ class InxightBot:
 
         ss = []
         for drug in drugs:
-            unii = self.qid_unii.get(drug)
+            unii = self.qid_unii.get(drug['drug_qid'])
             refs = [self.create_reference(unii, drug['FdaUseURI'])]
             qual = self.create_qualifier(drug['ConditionProductDate'])
             s = wdi_core.WDItemID(drug['drug_qid'], PROPS['drug used for treatment'],
