@@ -1,3 +1,4 @@
+import os
 from itertools import chain
 
 import pandas as pd
@@ -7,6 +8,16 @@ from wikidataintegrator import wdi_core
 from wikidataintegrator.wdi_helpers import id_mapper
 from wikidataintegrator.wdi_core import WDItemEngine
 from wikidataintegrator.wdi_login import WDLogin
+
+try:
+    from scheduled_bots.local import WDUSER, WDPASS
+except ImportError:
+    if "WDUSER" in os.environ and "WDPASS" in os.environ:
+        WDUSER = os.environ['WDUSER']
+        WDPASS = os.environ['WDPASS']
+    else:
+        raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
+
 
 PROPS = {
     'instance of': 'P31',
@@ -125,7 +136,7 @@ qid_combo = {v:k for k,v in combo_qid.items()}
 assert len(combo_qid) == len(qid_combo)
 
 # ---------------- Create combination treatment items
-login = WDLogin("Gstupp", "sulab.org")
+login = WDLogin(user=WDUSER, pwd=WDPASS)
 for name_str, items in combo_parts_qid.items():
     if not all(x for x in items):
         continue
