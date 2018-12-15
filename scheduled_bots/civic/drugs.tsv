@@ -165,7 +165,7 @@ fluorouracil, 5-fu, carac, efudex, fluoroplex, adrucil	Q238512
 flutamide	Q418669	
 folfiri regimen		
 folfox4	Q59771126
-folfox protocol
+folfoxprotocol  Q117636
 foretinib	Q5469311	
 fulvestrant	Q5508491	
 g-573	Q27156806	
@@ -294,7 +294,7 @@ pd0325901	Q27088255
 pd0332991	Q15269707	
 pd173074	Q27088276	
 pd184352	Q27076005	
-pegylated ifn-alpha-2a		
+pegylated ifn-alpha-2a	Q420056
 pembrolizumab	Q13896859	
 pembrolizumab, nivolumab, atezolizumab		mixture
 pembrolizumab, nivolumab, ipilimumab		mixture
@@ -391,7 +391,8 @@ verteporfin	Q782318
 vincristine	Q408977	
 vinorelbine	Q420532	
 vismodegib	Q2070286	
-vorinostat (saha)	Q905901	
+vorinostat (saha)	Q905901
+veliparib   Q7919041
 vtx-11e		
 whi-p154		
 wye354		
