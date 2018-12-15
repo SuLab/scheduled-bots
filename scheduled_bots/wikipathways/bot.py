@@ -10,7 +10,7 @@ import io
 from contextlib import closing
 from bs4 import BeautifulSoup, SoupStrainer
 from SPARQLWrapper import SPARQLWrapper, JSON
-import pprint
+import re
 
 
 import requests
@@ -99,7 +99,6 @@ def main(retrieved, fast_run, write):
             with closing(u), zipfile.ZipFile(io.BytesIO(u.content)) as archive:
                 for member in archive.infolist():
                     nt_content = archive.read(member)
-                    # print(nt_content)
                     temp.parse(data=nt_content.decode(), format="turtle")
             print("size: "+str(len(temp)))
 
@@ -114,7 +113,6 @@ def main(retrieved, fast_run, write):
 
     qres = temp.query(wp_query)
     for row in qres:
-        print("%s" % row)
         wpids.append(str(row[0]))
 
     for pathway_id in wpids:
@@ -151,15 +149,14 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
                     <http://vocabularies.wikipathways.org/wp#isAbout> ?details ;
                     wp:organismName "Homo sapiens"^^xsd:string .
         }"""
-    # print(query)
     qres3 = temp.query(query)
 
     for row in qres3:
-        print(row[1])
-        print(str(row[2]))
         # P31 = instance of
         prep["P31"] = [
             wdi_core.WDItemID(value="Q4915012", prop_nr="P31", references=[copy.deepcopy(pathway_reference)])]
+
+        prep["P1476"] = [wdi_core.WDMonolingualText(value=str(row[2]), prop_nr="P1476", references=[copy.deepcopy(pathway_reference)])]
 
         # P2410 = WikiPathways ID
         prep["P2410"] = [wdi_core.WDString(pathway_id, prop_nr='P2410', references=[copy.deepcopy(pathway_reference)])]
@@ -182,19 +179,21 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
 
                 """
         qres4 = temp.query(query)
-        print(query)
-
+        p = re.compile('^[0-9]+$')
         for pubmed_result in qres4:
-            pprint.pprint(pubmed_result)
-
             pmid = str(pubmed_result[0]).replace("http://identifiers.org/pubmed/", "")
             print(pmid)
-            pmid_qid, _, _ = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
+            m = p.match(pmid)
+
+            if not m:
+                pmid_qid, _, _ = wdi_helpers.PublicationHelper(pmid, id_type="doi",
+                                                               source="crossref").get_or_create(login if write else None)
+            else:
+                pmid_qid, _, _ = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
                                                      source="europepmc").get_or_create(login if write else None)
             if pmid_qid  is None:
                 return panic(pathway_id, "not found: {}".format(pmid), "pmid")
             else:
-                print(pmid_qid)
                 if 'P2860' not in prep.keys():
                     prep["P2860"] = []
                 prep['P2860'].append(wdi_core.WDItemID(value=str(pmid_qid), prop_nr='P2860', references=[copy.deepcopy(pathway_reference)]))
@@ -204,7 +203,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             for statement in prep[key]:
                 data2add.append(statement)
                 print(statement.prop_nr, statement.value)
-        pprint.pprint(data2add)
+
         wdPage = wdi_core.WDItemEngine(data=data2add,
                                      domain="pathways",
                                      fast_run=fast_run,
@@ -258,7 +257,6 @@ def get_PathwayElements(pathway, datatype, temp, prep):
         wd_query += "} ?item wdt:P351 ?id . }"
 
     wikidata_sparql.setQuery(wd_query)
-    # print(wd_query)
 
     wikidata_sparql.setReturnFormat(JSON)
     results = wikidata_sparql.query().convert()

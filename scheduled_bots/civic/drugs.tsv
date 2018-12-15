@@ -33,8 +33,9 @@ alisertib	Q15633917
 all-trans retinoic acid	Q29417	
 allogeneic hemopoietic stem-cell transplantation		
 alpelisib (nvp-byl719)	Q27074391	
-amg 232		
-amgmds3		
+alpelisib   Q27074391
+amg 232
+amgmds3 Q59770979
 aminoglutethimide	Q241150	
 amrubicin	Q4748723	
 amuvatinib	Q27074458	
@@ -163,8 +164,8 @@ fluorouracil	Q238512
 fluorouracil, 5-fu, carac, efudex, fluoroplex, adrucil	Q238512	
 flutamide	Q418669	
 folfiri regimen		
-folfox4		
-folfoxprotocol		
+folfox4	Q59771126
+folfox protocol
 foretinib	Q5469311	
 fulvestrant	Q5508491	
 g-573	Q27156806	
