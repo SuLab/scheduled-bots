@@ -200,13 +200,16 @@ def is_valid_evidence_item(variant_id, evidence_item):
         "Prognostic": {"Better Outcome", "Good Outcome", "Poor Outcome"}
     }
     if evidence_item['evidence_type'] not in allowed_evidence.keys():
-        panic(variant_id, "unknown evidence_type: {}".format(evidence_item['evidence_type']))
+        if evidence_item['evidence_type'] != "N/A":
+            panic(variant_id, "unknown evidence_type: {}".format(evidence_item['evidence_type']))
         return False
     if evidence_item['clinical_significance'] not in allowed_evidence[evidence_item['evidence_type']]:
-        panic(variant_id, "unknown clinical_significance: {}".format(evidence_item['clinical_significance']))
+        if evidence_item['clinical_significance'] != "N/A":
+            panic(variant_id, "unknown clinical_significance: {}".format(evidence_item['clinical_significance']))
         return False
     if evidence_item['evidence_direction'] not in {'Supports', 'Does Not Support'}:
-        panic(variant_id, "unknown evidence_direction: {}".format(evidence_item['evidence_direction']))
+        if evidence_item['evidence_direction'] != "N/A":
+            panic(variant_id, "unknown evidence_direction: {}".format(evidence_item['evidence_direction']))
         return False
     return True
 
