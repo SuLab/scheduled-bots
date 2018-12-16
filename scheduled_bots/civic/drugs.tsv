@@ -214,11 +214,12 @@ jq1 compound	Q3156953
 jqez5		
 jsi-124		
 jw55		
-ku-0060648		
+ku-0060648	Q59771381
 l-asparaginase		
 l-folinic acid	Q192464	
 lapatinib	Q420323	
-larotrectinib (loxo-101)	Q27081513	
+larotrectinib (loxo-101)	Q27081513
+larotrectinib   Q27081513
 lbh-589	Q7131441	
 lde225	Q22075856	
 lenalidomide	Q425681	
@@ -266,9 +267,10 @@ nintedanib	Q15149723
 nivolumab	Q7041828	
 notch1 antibody		
 nsc348884		
-nu7441	Q27088099	
-nutlin-3	Q7070462	
-nutlin-3a		
+nu7441	Q27088099
+nitlin-3    Q27165473
+nutlin-3b	Q7070462
+nutlin-3a   Q27166862
 nvp-ast487	Q27074554	
 o(6)-benzylguanine		
 oicr-9429	Q27088155	
@@ -335,8 +337,8 @@ ribociclib	Q27088552
 ridaforolimus	Q2151796	
 rilotumumab	Q7334301	
 rindopepimut	Q25104603	
-ro4987655		
-rociletinib	Q27088606	
+ro4987655   Q59779970
+rociletinib	Q27088606
 rucaparib	Q7376558	
 ruxolitinib	Q7383611	
 salinomycin	Q411909	
@@ -379,7 +381,7 @@ trametinib	Q7833138
 trastuzumab	Q412616	
 trastuzumab emtansine	Q3997863	
 trichostatin a (tsa)		
-unc1062		
+unc1062 Q27289755
 unc1999	Q27089090	
 uo126		
 valproic acid	Q240642	
