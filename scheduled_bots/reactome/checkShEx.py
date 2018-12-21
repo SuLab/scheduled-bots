@@ -12,7 +12,7 @@ from datetime import datetime
 import json
 
 def run_shex_manifest():
-    manifest = jsonasobj.loads(requests.get(os.environ['MANIFEST_URL']).text)
+    manifest = jsonasobj.loads(requests.get("https://raw.githubusercontent.com/SuLab/Genewiki-ShEx/master/pathways/reactome/manifest_all.json").text)
     print(os.environ['MANIFEST_URL'])
     f = open("/tmp/disease_shex_report.txt", "w")
     for case in manifest:
