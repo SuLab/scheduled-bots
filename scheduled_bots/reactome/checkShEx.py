@@ -36,10 +36,11 @@ def run_shex_manifest():
                         for result in results:
                             if result.result:
                                 print(str(result.focus) + ": CONFORMS")
-                                msg = wdi_helpers.format_msg(wdid, wdid, None)
+                                msg = wdi_helpers.format_msg(wdid, wdid, None, '', '')
+
                                 wdi_core.WDItemEngine.log("CONFORMS", msg)
                             else:
-                                msg = wdi_helpers.format_msg(wdid, wdid, None)
+                                msg = wdi_helpers.format_msg(wdid, wdid, None, '', '')
                                 wdi_core.WDItemEngine.log("ERROR", s)
 
 
