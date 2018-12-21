@@ -35,10 +35,10 @@ def run_shex_manifest():
                         results = evaluator.evaluate(rdf=slurpeddata, focus=wdid, debug=False)
                         for result in results:
                             if result.result:
-                                print(str(result.focus) + ": CONFORMS")
-                                msg = wdi_helpers.format_msg(wdid, wdid, None, '', '')
+                                print(str(result.focus) + ": INFO")
+                                msg = wdi_helpers.format_msg(wdid, wdid, None, 'CONFORMS', '')
 
-                                wdi_core.WDItemEngine.log("CONFORMS", msg)
+                                wdi_core.WDItemEngine.log("INFO", msg)
                             else:
                                 msg = wdi_helpers.format_msg(wdid, wdid, None, '', '')
                                 wdi_core.WDItemEngine.log("ERROR", s)
