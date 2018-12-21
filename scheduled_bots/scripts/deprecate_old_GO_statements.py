@@ -22,9 +22,10 @@ deprecated_qids = set([go_qid[go] for go in deprecated_curies if go in go_qid])
 # lets see if there are ones that don't have this ref model ...
 query = """
 select distinct ?item where {
-  ?item p:P686 ?s .
+  ?item p:P31|p:P686|p:P279 ?s .
   ?s prov:wasDerivedFrom ?ref .
   ?ref pr:P143 wd:Q22230760 .
+  filter not exists {?s wikibase:rank wikibase:DeprecatedRank}
   }
 """
 items = wdi_core.WDItemEngine.execute_sparql_query(query, as_dataframe=True)['item']
