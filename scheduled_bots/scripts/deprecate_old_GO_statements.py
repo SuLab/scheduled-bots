@@ -58,10 +58,12 @@ for qid in tqdm(deprecated_qids):
 
 query = """
 select ?item ?p where {
-  FILTER(STRSTARTS(STR(?p), "http://www.wikidata.org/prop/" ))
-  ?item ?p ?s .
+  ?item <http://www.wikidata.org/prop/P279>|<http://www.wikidata.org/prop/P31> ?s .
   ?s prov:wasDerivedFrom ?ref .
   ?ref pr:P143 wd:Q22230760 .
+  filter not exists {?s wikibase:rank wikibase:DeprecatedRank}
+  # ?s ?a ?value .
+  # FILTER(STRSTARTS(STR(?a), "http://www.wikidata.org/prop/statement" ))
 }
 """
 items = wdi_core.WDItemEngine.execute_sparql_query(query, as_dataframe=True)['item']
@@ -76,19 +78,24 @@ qid_old_ref = qid_old_ref - deprecated_qids
 # if the statement is not deprecated, remove the old ref, keeping any existing refs
 # example if it has two refs: https://www.wikidata.org/wiki/Q42895384
 # if the statement is not deprecated, has only one ref, and its the old ref, delete the statement
-# exmaple: https://www.wikidata.org/wiki/Q24476895 (instance of biological process)
+# example: https://www.wikidata.org/wiki/Q24476895 (instance of biological process)
+# make sure that the correct statement stays:
+# example: https://www.wikidata.org/wiki/Q14863082
 
-for qid in tqdm(sorted(list(qid_old_ref))[:5]):
+for qid in tqdm(sorted(list(qid_old_ref))):
 
     item = wdi_core.WDItemEngine(wd_item_id=qid)
     new_ss = []
     for s in item.statements:  # type: wdi_core.WDBaseDataType
         if s.get_rank() != "normal":
             continue
+        if s.get_prop_nr() not in {"P31", "P279"}:
+            continue
         delete_me = False
         for ref in s.references:
             if any([(x.get_prop_nr() == "P143") and (x.get_value() == 22230760) for x in ref]):
                 delete_me = True
+                #print(qid, s.get_prop_nr(), s.get_value())
         if delete_me and len(s.references) == 1:
             setattr(s, "remove", "")
             del s.id
@@ -96,7 +103,6 @@ for qid in tqdm(sorted(list(qid_old_ref))[:5]):
             del s.id
             s.set_references([ref for ref in s.references if
                             not any([(x.get_prop_nr() == "P143") and (x.get_value() == 22230760) for x in ref])])
-            print(s.get_value())
 
     new_item = wdi_core.WDItemEngine(wd_item_id=qid, data=item.statements, global_ref_mode="STRICT_OVERWRITE")
     new_item.write(login)
