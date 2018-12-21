@@ -30,11 +30,6 @@ except ImportError:
 core_props = get_default_core_props()
 core_props.update({PROPS['CIViC Variant ID']})
 
-__metadata__ = {
-    'name': 'ProteinBoxBot',
-    'maintainer': 'Andra',
-    'tags': ['variant'],
-}
 
 fast_run_base_filter = {PROPS['CIViC Variant ID']: ''}
 GENOME_BUILD_QUAL = wdi_core.WDItemID(ITEMS['Genome assembly GRCh37'], PROPS['genomic assembly'], is_qualifier=True)
