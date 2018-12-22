@@ -9,11 +9,11 @@ from pyshex import PrefixLibrary, ShExEvaluator
 from sparql_slurper import SlurpyGraph
 from wikidataintegrator import wdi_core, wdi_helpers
 from datetime import datetime
-
+import json
 
 def run_shex_manifest():
-    manifest = jsonasobj.loads(requests.get(
-        "https://raw.githubusercontent.com/SuLab/Genewiki-ShEx/master/pathways/reactome/manifest.json").text)
+    print(os.environ["SHEX_MANIFEST"])
+    manifest = jsonasobj.loads(requests.get(os.environ["SHEX_MANIFEST"]).text)
     for case in manifest:
         if case.data.startswith("Endpoint:"):
             sparql_endpoint = case.data.replace("Endpoint: ", "")
@@ -55,5 +55,6 @@ __metadata__['run_id'] = run_id
 log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
 if wdi_core.WDItemEngine.logger is not None:
     wdi_core.WDItemEngine.logger.handles = []
-wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header="",logger_name='reactome')
+wdi_core.WDItemEngine.setup_logging(log_dir=log_dir, log_name=log_name, header=json.dumps(__metadata__),
+                                    logger_name='reactome')
 run_shex_manifest()
