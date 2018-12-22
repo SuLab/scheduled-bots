@@ -36,7 +36,7 @@ def run_shex_manifest():
                                 wdi_core.WDItemEngine.log("INFO", msg)
                             else:
                                 msg = wdi_helpers.format_msg(wdid, wdid, None, '', '')
-                                wdi_core.WDItemEngine.log("ERROR", s)
+                                wdi_core.WDItemEngine.log("ERROR", msg)
 
 
                 except RuntimeError:
