@@ -59,7 +59,7 @@ for qid in tqdm(deprecated_qids):
 
 query = """
 select ?item ?p where {
-  ?item <http://www.wikidata.org/prop/P279>|<http://www.wikidata.org/prop/P31> ?s .
+  ?item p:P279|p:P31|p:P361|p:P527|p:P128 ?s .
   ?s prov:wasDerivedFrom ?ref .
   ?ref pr:P143 wd:Q22230760 .
   filter not exists {?s wikibase:rank wikibase:DeprecatedRank}
@@ -90,7 +90,7 @@ for qid in tqdm(sorted(list(qid_old_ref))):
     for s in item.statements:  # type: wdi_core.WDBaseDataType
         if s.get_rank() != "normal":
             continue
-        if s.get_prop_nr() not in {"P31", "P279"}:
+        if s.get_prop_nr() not in {"P31", "P279", "P361", "P527", "P128"}:
             continue
         delete_me = False
         for ref in s.references:
