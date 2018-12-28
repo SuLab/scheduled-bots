@@ -35,7 +35,7 @@ class GOGraph(Graph):
                     PROPS['has cause'], PROPS['location'], PROPS['part of'],
                     PROPS['has part'], PROPS['regulates (molecular biology)'],
                     PROPS['Gene Ontology ID']}
-    FAST_RUN = True
+    FAST_RUN = False
 
     PRED_PID_MAP = {
         'is_a': PROPS['subclass of'],

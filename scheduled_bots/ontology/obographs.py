@@ -214,10 +214,15 @@ class Node:
             return any(r.get_prop_nr() == stated_in and "Q" + str(r.get_value()) in releases for r in ref)
 
         qid = self.qid
+        if qid is None:
+            return None
         primary_ext_id_pid, primary_ext_id = cu.parse_curie(self.id_curie)
         primary_ext_id_pid = self.helper.get_pid(primary_ext_id_pid)
 
-        statements = frc.reconstruct_statements(qid)
+        if frc is None:
+            statements = wdi_core.WDItemEngine(wd_item_id=self.qid).statements
+        else:
+            statements = frc.reconstruct_statements(qid)
 
         s_remove = []
         s_deprecate = []
