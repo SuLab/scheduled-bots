@@ -639,6 +639,8 @@ class Graph:
     def remove_deprecated_statements(self, login):
         releases = self._get_old_releases()
         frc = self._get_fastrun_container()
+        if frc is None:
+            return None
 
         for node in self.nodes:
             node.remove_deprecated_statements(releases, frc, login)
