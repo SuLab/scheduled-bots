@@ -91,7 +91,9 @@ go_evidence_codes = {
     'IC': 'Q23190856',
     'ND': 'Q23190857',
     'IEA': 'Q23190881',
-    'IMR': 'Q23190842'
+    'IMR': 'Q23190842',
+    'HDA': 'Q60521899',
+    'HEP': 'Q60521293'
 }
 
 ###############
@@ -162,7 +164,19 @@ curators_wdids = {'AgBase': 'Q4690901',
                   'SGD': 'Q3460832',
                   'SYSCILIA_CCNET': 'Q28122997',
                   'UniProt': 'Q905695',
-                  'WormBase': 'Q3570042'}
+                  'WormBase': 'Q3570042',
+                  'PseudoCAP': 'Q60526133',
+                  'ARUK-UCL': 'Q60526173',
+                  'GOC-OWL': 'Q60527201',
+                  'SynGO': 'Q60527231',
+                  'SynGO-UCL': 'Q60527231',
+                  'YuBioLab':'Q60527361',
+                  'JCVI': 'Q1439786',
+                  'Mengo': 'Q60527548',
+                  'PAMGO_GAT': 'Q60527768',
+                  'RGD': 'Q7295410',
+                  'Roslin_Institute': 'Q1633976',
+                  'TIGR': 'Q1439786'}
 
 # These are for reference external IDs to use for GO annotations curators
 curator_ref = {'SGD': 'Saccharomyces Genome Database ID',

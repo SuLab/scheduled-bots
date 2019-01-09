@@ -1,14 +1,12 @@
-import subprocess
 import os
 import jsonasobj
-import pandas as pd
 import requests
-from SPARQLWrapper import SPARQLWrapper, JSON
 from ShExJSG import ShExC
 from pyshex import PrefixLibrary, ShExEvaluator
 from sparql_slurper import SlurpyGraph
 from wikidataintegrator import wdi_core, wdi_helpers
 from datetime import datetime
+
 import json
 
 def run_shex_manifest():
@@ -27,16 +25,18 @@ def run_shex_manifest():
                 wdid=row["item"]["value"]
                 slurpeddata = SlurpyGraph(sparql_endpoint)
                 try:
-                        results = evaluator.evaluate(rdf=slurpeddata, focus=wdid, debug=False)
+                        results = evaluator.evaluate(rdf=slurpeddata, focus=wdid, debug=True )
                         for result in results:
                             if result.result:
                                 print(str(result.focus) + ": INFO")
                                 msg = wdi_helpers.format_msg(wdid, wdid, None, 'CONFORMS', '')
 
                                 wdi_core.WDItemEngine.log("INFO", msg)
+                                print(result.reason)
                             else:
-                                msg = wdi_helpers.format_msg(wdid, wdid, None, '', '')
+                                msg = wdi_helpers.format_msg(wdid, wdid, None, '', result.reason)
                                 wdi_core.WDItemEngine.log("ERROR", msg)
+                                print(result.reason)
 
 
                 except RuntimeError:

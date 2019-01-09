@@ -40,7 +40,7 @@ except ImportError:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
 __metadata__ = {'name': 'GOBot',
-                'maintainer': 'GSS',
+                'maintainer': 'Andra',
                 'tags': ['protein', 'GO'],
                 'properties': []
                 }
