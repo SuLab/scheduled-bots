@@ -25,7 +25,7 @@ def run_shex_manifest():
                 wdid=row["item"]["value"]
                 slurpeddata = SlurpyGraph(sparql_endpoint)
                 try:
-                        results = evaluator.evaluate(rdf=slurpeddata, focus=wdid, debug=True )
+                        results = evaluator.evaluate(rdf=slurpeddata, focus=wdid, debug=os.environ["debug"] )
                         for result in results:
                             if result.result:
                                 print(str(result.focus) + ": INFO")
@@ -37,7 +37,6 @@ def run_shex_manifest():
                                 msg = wdi_helpers.format_msg(wdid, wdid, None, '', result.reason)
                                 wdi_core.WDItemEngine.log("ERROR", msg)
                                 print(result.reason)
-
 
                 except RuntimeError:
                     print("Continue after 1 minute, no validation happened on"+ wdid)
