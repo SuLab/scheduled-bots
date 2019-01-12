@@ -25,7 +25,11 @@ def run_shex_manifest():
                 wdid=row["item"]["value"]
                 slurpeddata = SlurpyGraph(sparql_endpoint)
                 try:
-                        results = evaluator.evaluate(rdf=slurpeddata, focus=wdid, debug=os.environ["debug"] )
+                        if os.environ["debug"] == "True":
+                            debug = True
+                        elif os.environ["debug"] == "False":
+                            debug = False
+                        results = evaluator.evaluate(rdf=slurpeddata, focus=wdid, debug=debug )
                         for result in results:
                             if result.result:
                                 print(str(result.focus) + ": INFO")
