@@ -32,11 +32,10 @@ def run_shex_manifest():
                                 msg = wdi_helpers.format_msg(wdid, wdid, None, 'CONFORMS', '')
 
                                 wdi_core.WDItemEngine.log("INFO", msg)
-                                print(result.reason)
                             else:
                                 msg = wdi_helpers.format_msg(wdid, wdid, None, '', result.reason)
                                 wdi_core.WDItemEngine.log("ERROR", msg)
-                                print(result.reason)
+
 
                 except RuntimeError:
                     print("Continue after 1 minute, no validation happened on"+ wdid)
