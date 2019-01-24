@@ -118,7 +118,6 @@ class MicrobialChromosomeBot:
 
         item_name = '{} {}'.format(organism_name, chrom_name)
         item_description = 'bacterial {}'.format(chr_type)
-        print(item_name)
         print(genome_id)
 
         retrieved = datetime.now()
@@ -134,7 +133,7 @@ class MicrobialChromosomeBot:
         # genome id
         statements.append(wdi_core.WDString(value=genome_id, prop_nr='P2249', references=[reference]))
 
-        wd_item = wdi_core.WDItemEngine(item_name=item_name, domain='chromosome', data=statements,
+        wd_item = wdi_core.WDItemEngine(data=statements,
                                         append_value=['P31'], fast_run=True,
                                         fast_run_base_filter={'P703': organism_qid, 'P2249': ''},
                                         core_props=core_props)

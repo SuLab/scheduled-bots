@@ -86,7 +86,7 @@ for r in tqdm(records):
                                      ref_handler=ref_handlers.update_retrieved_if_new_multiple_refs,
                                      fast_run_use_refs=True, fast_run=True, fast_run_base_filter={PROPS['MeSH ID']: ''})
     else:
-        item = wdi_core.WDItemEngine(data=s, item_name="foo", domain="bar",
+        item = wdi_core.WDItemEngine(data=s,
                                      ref_handler=ref_handlers.update_retrieved_if_new_multiple_refs,
                                      fast_run_use_refs=True, fast_run=True, fast_run_base_filter={PROPS['MeSH ID']: ''})
     if not item.get_label():

@@ -234,13 +234,13 @@ class OBOImporter(object):
                                                           references=[self.create_reference()]))
 
                 if go_id in self.local_qid_onto_map:
-                    wd_item = wdi_core.WDItemEngine(wd_item_id=self.local_qid_onto_map[go_id]['qid'], domain='obo',
+                    wd_item = wdi_core.WDItemEngine(wd_item_id=self.local_qid_onto_map[go_id]['qid'],
                                                     data=data, fast_run=self.fast_run,
                                                     fast_run_base_filter=self.fast_run_base_filter,
                                                     append_value=self.append_props,
                                                     global_ref_mode='STRICT_OVERWRITE')
                 else:
-                    wd_item = wdi_core.WDItemEngine(item_name='test', domain='obo', data=data, fast_run=self.fast_run,
+                    wd_item = wdi_core.WDItemEngine(data=data, fast_run=self.fast_run,
                                                     fast_run_base_filter=self.fast_run_base_filter,
                                                     global_ref_mode='STRICT_OVERWRITE')
                 if wd_item.get_label() == "":

@@ -206,9 +206,8 @@ for pwid in wpids:
             for statement in prep[key]:
                 data2add.append(statement)
                 print(statement.prop_nr, statement.value)
-        # wdPage = wdi_core.WDItemEngine( item_name=result["pwLabel"]["value"], data=data2add, server="www.wikidata.org", domain="genes", fast_run=fast_run, fast_run_base_filter=fast_run_base_filter)
-        wdPage = wdi_core.WDItemEngine(item_name=row[2], data=data2add, server="www.wikidata.org",
-                                       domain="pathways", fast_run_base_filter=fast_run_base_filter, fast_run_use_refs=True)
+        wdPage = wdi_core.WDItemEngine(data=data2add, server="www.wikidata.org",
+                                        fast_run_base_filter=fast_run_base_filter, fast_run_use_refs=True)
 
         wdPage.set_label(str(row[2]), lang="en")
         wdPage.set_description("biological pathway in human", lang="en")

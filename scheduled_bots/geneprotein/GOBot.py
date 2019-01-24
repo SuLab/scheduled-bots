@@ -265,7 +265,7 @@ def main(taxon, file, retrieved, log_dir="./logs", fast_run=True, write=True):
         # print(this_go)
         try:
             statements = make_go_statements(uniprot_id, this_go, go_map, pmid_map, external_id, retrieved)
-            wditem = wdi_core.WDItemEngine(wd_item_id=item_wdid, domain='protein', data=statements, fast_run=fast_run,
+            wditem = wdi_core.WDItemEngine(wd_item_id=item_wdid, data=statements, fast_run=fast_run,
                                            fast_run_base_filter={UNIPROT: "", "P703": organism_wdid},
                                            fast_run_use_refs=True,
                                            ref_handler=update_retrieved_if_new,

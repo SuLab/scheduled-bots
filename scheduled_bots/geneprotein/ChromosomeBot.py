@@ -152,7 +152,6 @@ class ChromosomeBot:
 
         item_name = '{} chromosome {}'.format(organism_info['name'], chrom_num)
         item_description = '{} chromosome'.format(organism_info['type']) if organism_info['type'] else "chromosome"
-        print(item_name)
         print(genome_id)
 
         reference = make_ref(self.retrieved, genome_id)
@@ -166,7 +165,7 @@ class ChromosomeBot:
         # genome id
         statements.append(wdi_core.WDString(value=genome_id, prop_nr='P2249', references=[reference]))
 
-        wd_item = wdi_core.WDItemEngine(item_name=item_name, domain='chromosome', data=statements,
+        wd_item = wdi_core.WDItemEngine(data=statements,
                                         append_value=['P31'], fast_run=True,
                                         fast_run_base_filter={'P703': organism_info['wdid'], 'P2249': ''},
                                         core_props=core_props)

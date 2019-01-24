@@ -109,7 +109,7 @@ class IPRTerm:
                                         references=[self.reference])]
 
         try:
-            wd_item = wdi_core.WDItemEngine(item_name=self.name, domain='interpro', data=statements,
+            wd_item = wdi_core.WDItemEngine(data=statements,
                                             append_value=["P279", "P31"],
                                             fast_run=fast_run, fast_run_base_filter=IPRTerm.fast_run_base_filter,
                                             global_ref_mode='CUSTOM', fast_run_use_refs=True,
@@ -151,7 +151,7 @@ class IPRTerm:
         if len(statements) == 1:
             return
 
-        wd_item = wdi_core.WDItemEngine(wd_item_id=self.wdid, domain='interpro', data=statements,
+        wd_item = wdi_core.WDItemEngine(wd_item_id=self.wdid, data=statements,
                                         append_value=['P279', 'P527', 'P361'],
                                         fast_run=True, fast_run_base_filter=IPRTerm.fast_run_base_filter,
                                         global_ref_mode='CUSTOM', fast_run_use_refs=True,

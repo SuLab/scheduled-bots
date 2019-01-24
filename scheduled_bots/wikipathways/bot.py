@@ -205,9 +205,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
                 print(statement.prop_nr, statement.value)
 
         wdPage = wdi_core.WDItemEngine(data=data2add,
-                                     domain="pathways",
                                      fast_run=fast_run,
-                                     item_name=row.pwLabel,
                                      fast_run_base_filter=fast_run_base_filter,
                                      fast_run_use_refs=True,
                                      ref_handler=update_retrieved_if_new_multiple_refs,

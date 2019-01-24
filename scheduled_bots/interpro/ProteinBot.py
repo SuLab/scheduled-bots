@@ -56,7 +56,7 @@ def create_for_one_protein(login, uniprot_id, doc, release_wdid, uniprot2wd, fas
             print("wdid_not_found " + uniprot_id + " " + uniprot2wd[uniprot_id])
             wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(uniprot_id, UNIPROT, None, "wdid_not_found"))
 
-        wd_item = wdi_core.WDItemEngine(wd_item_id=uniprot2wd[uniprot_id], domain="proteins", data=statements,
+        wd_item = wdi_core.WDItemEngine(wd_item_id=uniprot2wd[uniprot_id], data=statements,
                                         fast_run=True, fast_run_base_filter=fast_run_base_filter,
                                         append_value=[PROPS['has part'], PROPS['part of']],
                                         global_ref_mode='CUSTOM', fast_run_use_refs=True,

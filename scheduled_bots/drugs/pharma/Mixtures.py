@@ -66,7 +66,7 @@ class Mixtures:
         # rxnorm
         s.append(wdi_core.WDExternalID(rxcui, "P3345", references=make_ref(rxcui)))
 
-        item = wdi_core.WDItemEngine(item_name=label, data=s, domain="drugs")
+        item = wdi_core.WDItemEngine(data=s)
         if item.create_new_item:
             item.set_label(label)
         item.set_label(label)

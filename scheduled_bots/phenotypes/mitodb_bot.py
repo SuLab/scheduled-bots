@@ -56,9 +56,7 @@ class MitoBot:
 
         class SubCls(wdi_core.WDItemEngine):
             def __init__(self, *args, **kwargs):
-                kwargs['domain'] = "fake news"
                 kwargs['fast_run'] = False
-                kwargs['item_name'] = "foo"
                 kwargs['ref_handler'] = update_retrieved_if_new_multiple_refs
                 kwargs['core_props'] = core_props
                 kwargs['append_value'] = append_props

@@ -187,7 +187,7 @@ class GeneDiseaseBot(object):
             try:
                 gene_wd_item = wdi_core.WDItemEngine(wd_item_id=wdid,
                                                      data=[gdr.disease_wditem for gdr in gdrs],
-                                                     domain="genes",
+                                                      ,
                                                      append_value=[PROPS["genetic association"]],
                                                      fast_run=self.fast_run,
                                                      fast_run_base_filter=self.fast_run_base_gene_filter,
@@ -208,7 +208,7 @@ class GeneDiseaseBot(object):
             try:
                 disease_wd_item = wdi_core.WDItemEngine(wd_item_id=wdid,
                                                         data=[gdr.gene_wditem for gdr in gdrs],
-                                                        domain="diseases",
+                                                         ,
                                                         append_value=[PROPS["genetic association"]],
                                                         fast_run=self.fast_run,
                                                         fast_run_base_filter=self.fast_run_base_disease_filter,

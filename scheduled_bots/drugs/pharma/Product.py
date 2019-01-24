@@ -42,7 +42,7 @@ class Product:
         assert self.qid
         s = [wdi_core.WDItemID(ingredient_qid, 'P3781', references=make_ref(self.rxcui))]
         # purposely overwriting this
-        item = wdi_core.WDItemEngine(wd_item_id=self.qid, data=s, domain="drugs",
+        item = wdi_core.WDItemEngine(wd_item_id=self.qid, data=s,
                                      fast_run=True, fast_run_use_refs=True,
                                      fast_run_base_filter={"P3345": ""},
                                      ref_handler=ref_handlers.update_retrieved_if_new)
@@ -51,7 +51,7 @@ class Product:
         # and adding the inverse
         s = [wdi_core.WDItemID(self.qid, 'P3780', references=make_ref(self.rxcui))]
         # do not overwrite
-        item = wdi_core.WDItemEngine(wd_item_id=ingredient_qid, data=s, domain="drugs",
+        item = wdi_core.WDItemEngine(wd_item_id=ingredient_qid, data=s,
                                      fast_run=True, fast_run_use_refs=True,
                                      fast_run_base_filter={"P3345": ""},
                                      ref_handler=ref_handlers.update_retrieved_if_new,
@@ -67,7 +67,7 @@ class Product:
         s.append(wdi_core.WDItemID('Q28885102', 'P31', references=make_ref(self.rxcui)))  # pharma product
         s.append(wdi_core.WDExternalID(self.rxcui, "P3345", references=make_ref(self.rxcui)))
 
-        item = wdi_core.WDItemEngine(item_name=self.label, data=s, domain="drugs")
+        item = wdi_core.WDItemEngine(data=s,  )
         item.set_label(self.label)
         item.set_description("pharmaceutical product")
         item.write(self.login)

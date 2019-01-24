@@ -38,7 +38,7 @@ class Node:
         self.release_qid = graph.release_qid
         self.fast_run = graph.fast_run
         self.parse_wikilinks = graph.parse_wikilinks
-        self.domain = graph.domain
+
 
         self.lbl = node.get('lbl', None)
         self.type = node.get('type', None)
@@ -111,7 +111,7 @@ class Node:
             s.extend(self.create_xref_statements())
             s.extend(self.create_main_statements_nodepend())
 
-            wd_item = wdi_core.WDItemEngine(item_name=self.lbl, data=s, domain=self.domain,
+            wd_item = wdi_core.WDItemEngine(data=s,
                                             append_value=[PROPS['subclass of'], PROPS['instance of']],
                                             fast_run=self.fast_run,
                                             fast_run_base_filter={self.primary_ext_prop_qid: ''})
@@ -145,7 +145,7 @@ class Node:
             return None
         try:
             s = self.create_main_statements()
-            wd_item = wdi_core.WDItemEngine(wd_item_id=self.wd_item_id, data=s, domain=self.domain,
+            wd_item = wdi_core.WDItemEngine(wd_item_id=self.wd_item_id, data=s,
                                             append_value=[PROPS['subclass of'], PROPS['instance of']],
                                             fast_run=self.fast_run,
                                             fast_run_base_filter={self.primary_ext_prop_qid: ''})
@@ -250,7 +250,6 @@ class Graph:
         self.primary_ext_prop_qid = primary_ext_prop_qid
         self.edge_props = edge_props
         self.xref_props = xref_props
-        self.domain = domain
         self.default_label = default_label
         self.login = login
         self.fast_run = fast_run

@@ -160,7 +160,7 @@ class Node:
 
         try:
             self.item = wdi_core.WDItemEngine(
-                item_name=self.label, data=s, domain="this doesn't do anything",
+                data=s,
                 append_value=self.graph.APPEND_PROPS,
                 fast_run=self.graph.FAST_RUN,
                 fast_run_base_filter={primary_ext_id_pid: ''},
@@ -253,7 +253,7 @@ class Node:
             set, then all other statements get removed. It works if you do them seperately...
             """
             if s_deprecate:
-                wd_item = wdi_core.WDItemEngine(wd_item_id=qid, domain='none', data=s_deprecate, fast_run=False,
+                wd_item = wdi_core.WDItemEngine(wd_item_id=qid, data=s_deprecate, fast_run=False,
                                                 mediawiki_api_url=self.mediawiki_api_url,
                                                 sparql_endpoint_url=self.sparql_endpoint_url,
                                                 append_value=self.graph.APPEND_PROPS)
@@ -512,7 +512,7 @@ class Graph:
 
             # print("{}".format([(x.get_value(), x.get_prop_nr()) for x in ss]))
             item = wdi_core.WDItemEngine(
-                wd_item_id=node.qid, data=ss, domain="fake news",
+                wd_item_id=node.qid, data=ss,
                 append_value=self.APPEND_PROPS,
                 fast_run=self.FAST_RUN,
                 fast_run_base_filter={node.id_pid: ''},

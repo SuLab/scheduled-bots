@@ -49,7 +49,7 @@ def do_pharm_prod(drug_qid, brand_rxnorm, emea, url, brand_name):
 
     if not pd.isnull(brand_rxnorm):
         s.append(wdi_core.WDExternalID(str(int(brand_rxnorm)), "P3345"))
-    item = wdi_core.WDItemEngine(item_name=brand_name, data=s, domain="drugs", append_value=['P3781'])
+    item = wdi_core.WDItemEngine(data=s, append_value=['P3781'])
     item.set_label(brand_name)
     if item.get_description() == '':
         item.set_description("pharmaceutical product")
@@ -63,7 +63,7 @@ def do_compound(brand_qid, drug_qid, brand_name):
     # remove brand name from aliases if there
     ref = create_ref_statement(emea, url)
     s = [wdi_core.WDItemID(brand_qid, 'P3780', references=[ref])]
-    item = wdi_core.WDItemEngine(wd_item_id=drug_qid, data=s, domain="drugs", append_value=['P3780'])
+    item = wdi_core.WDItemEngine(wd_item_id=drug_qid, data=s, append_value=['P3780'])
     aliases = item.get_aliases()
     aliases = [x for x in aliases if brand_name.lower() != x.lower()]
     item.set_aliases(aliases, append=False)

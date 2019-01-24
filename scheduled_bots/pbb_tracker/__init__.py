@@ -44,7 +44,7 @@ def remove_deprecated_statements(item, release_wdid, props, login):
         print([(x.get_prop_nr(), x.value) for x in s_dep])
         print([(x.get_references()[0]) for x in s_dep])
         qid = item.wd_item_id
-        wd_item = wdi_core.WDItemEngine(wd_item_id=qid, domain='none', data=s_dep, fast_run=False)
+        wd_item = wdi_core.WDItemEngine(wd_item_id=qid, data=s_dep, fast_run=False)
         wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
 
 

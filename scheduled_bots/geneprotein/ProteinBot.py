@@ -227,7 +227,7 @@ class Protein:
 
         try:
             statements = [wdi_core.WDItemID(self.protein_wdid, PROPS['encodes'], references=[uniprot_ref])]
-            wd_item_gene = wdi_core.WDItemEngine(wd_item_id=self.gene_wdid, domain='genes', data=statements,
+            wd_item_gene = wdi_core.WDItemEngine(wd_item_id=self.gene_wdid,data=statements,
                                                  append_value=[PROPS['encodes']], fast_run=fast_run,
                                                  fast_run_base_filter={PROPS['Entrez Gene ID']: '',
                                                                        PROPS['found in taxon']: self.organism_info[
@@ -251,7 +251,7 @@ class Protein:
             self.create_description()
             self.create_aliases()
 
-            wd_item_protein = wdi_core.WDItemEngine(item_name=self.label, domain='proteins', data=self.statements,
+            wd_item_protein = wdi_core.WDItemEngine(data=self.statements,
                                                     append_value=[PROPS['instance of'], PROPS['encoded by']],
                                                     # PROPS['Ensembl Protein ID'], PROPS['RefSeq Protein ID']],
                                                     fast_run=fast_run,
