@@ -53,7 +53,7 @@ def create_item(inchi_key):
     core_ids = {'P662', 'P661', 'P683', 'P652', 'P235', 'P234', 'P715'}
     core_prop_matches = [True for x in wd_data if x.get_prop_nr() in core_ids]
     # assert len(core_prop_matches) >= 3
-    wd_item = wdi_core.WDItemEngine(item_name='drug', domain='drugs', data=wd_data,
+    wd_item = wdi_core.WDItemEngine(data=wd_data,
                                     append_value=['P31', 'P235', 'P233', 'P2017'])
     if wd_item.create_new_item:
         return None

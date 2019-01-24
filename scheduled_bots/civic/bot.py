@@ -162,7 +162,7 @@ def run_one(variant_id, retrieved, fast_run, write, login):
     name = variant_data["name"]
     label = variant_data["entrez_name"] + " " + name
     # pprint([x.get_json_representation() for x in data2add])
-    item = wdi_core.WDItemEngine(data=data2add,  fast_run=fast_run, item_name=label,
+    item = wdi_core.WDItemEngine(data=data2add, fast_run=fast_run,
                                  fast_run_base_filter=fast_run_base_filter, fast_run_use_refs=True,
                                  ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props)
     synonyms = []
