@@ -82,7 +82,7 @@ def create_missense_variant_item(hgvs, label, login, fast_run=True):
     s.append(wdi_core.WDItemID(gene, PROPS['biological variant of'], references=[ref]))
     s.append(wdi_core.WDExternalID(hgvs, PROPS['HGVS nomenclature'], references=[ref]))
 
-    item = wdi_core.WDItemEngine(item_name=label, data=s, domain="variant", fast_run=fast_run,
+    item = wdi_core.WDItemEngine(data=s, fast_run=fast_run,
                                  fast_run_base_filter={PROPS['HGVS nomenclature']: ''}, fast_run_use_refs=True,
                                  ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props)
     item.set_label(label)
@@ -138,7 +138,7 @@ def create_variant_annotation(variant_qid, association, drug_qid, prim_tt_qid, s
     s = wdi_core.WDItemID(drug_qid, association,
                           qualifiers=qualifiers,
                           references=[create_reference(source, evidence_level, login)])
-    item = wdi_core.WDItemEngine(data=[s], wd_item_id=variant_qid, domain='variant',
+    item = wdi_core.WDItemEngine(data=[s], wd_item_id=variant_qid,
                                  append_value=list(association_map.values()),
                                  fast_run=False, fast_run_use_refs=True,
                                  fast_run_base_filter={PROPS['HGVS nomenclature']: ''}, global_ref_mode='CUSTOM',
@@ -146,7 +146,7 @@ def create_variant_annotation(variant_qid, association, drug_qid, prim_tt_qid, s
 
     wdi_helpers.try_write(item, variant_qid, '', login)
 
-    item = wdi_core.WDItemEngine(wd_item_id=variant_qid, domain='variant')
+    item = wdi_core.WDItemEngine(wd_item_id=variant_qid)
     item = remove_old_statements(item)
     item.update(item.statements)
     wdi_helpers.try_write(item, variant_qid, '', login)

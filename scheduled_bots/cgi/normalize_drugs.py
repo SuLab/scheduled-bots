@@ -152,7 +152,7 @@ for name_str, items in combo_parts_qid.items():
     # instance of
     s.append(wdi_core.WDItemID(ITEMS['combination therapy'], PROPS['instance of']))
 
-    item = wdi_core.WDItemEngine(item_name=name, data=s, domain="asdf")
+    item = wdi_core.WDItemEngine(data=s)
     item.set_label(name)
     item.set_description(description)
     item.write(login)

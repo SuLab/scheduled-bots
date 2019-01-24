@@ -234,7 +234,7 @@ class DONode:
             self.s.extend(self.s_xref)
             self.create_main_statements()
             self.s.extend(self.s_main)
-            wd_item = wdi_core.WDItemEngine(item_name=self.lbl, data=self.s, domain="diseases",
+            wd_item = wdi_core.WDItemEngine(data=self.s,
                                             append_value=[PROPS['subclass of'], PROPS['instance of'],
                                                           PROPS['has cause'], PROPS['location'],
                                                           PROPS['OMIM ID'], PROPS['Orphanet ID'],
@@ -369,7 +369,7 @@ def remove_deprecated_statements(qid, frc, release_wdid, props, login):
         print(len(s_dep))
         print([(x.get_prop_nr(), x.value) for x in s_dep])
         print([(x.get_references()[0]) for x in s_dep])
-        wd_item = wdi_core.WDItemEngine(wd_item_id=qid, domain='none', data=s_dep, fast_run=False)
+        wd_item = wdi_core.WDItemEngine(wd_item_id=qid, data=s_dep, fast_run=False)
         wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
 
 

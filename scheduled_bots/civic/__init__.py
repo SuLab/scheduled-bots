@@ -134,7 +134,7 @@ class DrugCombo:
         # instance of combination therapy
         s.append(wdi_core.WDItemID("Q1304270", PROPS['instance of']))
 
-        item = wdi_core.WDItemEngine(item_name=name, data=s, domain="asdf")
+        item = wdi_core.WDItemEngine(data=s)
         item.set_label(name)
         item.set_description(description)
         success = try_write(item, record_id=";".join(self.component_qids), record_prop='', login=login)
