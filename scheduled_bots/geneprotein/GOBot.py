@@ -77,12 +77,11 @@ def make_go_ref(curator, pmid_map, external_id, uniprot_id, evidence_wdid, retri
 
     # reference URL
     # ref_url = "http://www.ebi.ac.uk/QuickGO/GAnnotation?protein={}".format(uniprot_id)
-    ref_url = "http://www.ebi.ac.uk/QuickGO/annotations?protein={}&geneProductId=UniProtKB:{}".format(uniprot_id,
-                                                                                                      uniprot_id)
-    reference.append(wdi_core.WDString(ref_url, 'P854', is_reference=True))
+    ref_url = "http://www.ebi.ac.uk/QuickGO/annotations?geneProductId=UniProtKB:{}".format(uniprot_id)
+    reference.append(wdi_core.WDString(ref_url, 'P854', is_reference=True)) # P854 = "reference URL"
 
     # ref determination method
-    reference.append(wdi_core.WDItemID(evidence_wdid, 'P459', is_reference=True))
+    reference.append(wdi_core.WDItemID(evidence_wdid, 'P459', is_reference=True)) # P459 = determination model
 
     return reference
 
