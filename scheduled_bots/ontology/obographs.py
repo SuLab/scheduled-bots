@@ -259,7 +259,7 @@ class Node:
                                                 append_value=self.graph.APPEND_PROPS)
                 wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
             if s_remove:
-                wd_item = wdi_core.WDItemEngine(wd_item_id=qid, domain='none', data=s_remove, fast_run=False,
+                wd_item = wdi_core.WDItemEngine(wd_item_id=qid, data=s_remove, fast_run=False,
                                                 mediawiki_api_url=self.mediawiki_api_url,
                                                 sparql_endpoint_url=self.sparql_endpoint_url)
                 wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
