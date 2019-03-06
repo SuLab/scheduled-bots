@@ -4,7 +4,7 @@ import requests
 import sys
 import os
 sys.path.append(os.path.abspath("WikidataIntegrator/wikidataintegrator"))
-import wdi_core
+from WikidataIntegrator.wikidataintegrator import wdi_core
 
 
 wdids = []
