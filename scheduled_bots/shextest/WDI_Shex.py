@@ -1,8 +1,11 @@
 from rdflib import Namespace, URIRef
 import pprint
 import requests
+import sys
+import os
+sys.path.append(os.path.abspath("/WikidataIntegrator/wikidataintegrator"))
 
-import WikidataIntegrator.wikidataintegrator.wdi_core as wdi_core
+import wdi_core as wdi_core
 
 wdids = []
 sparql_query = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n\nSELECT ?item WHERE { ?item wdt:P699 ?wpid . } LIMIT 10"
