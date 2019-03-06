@@ -3,9 +3,9 @@ import pprint
 import requests
 import sys
 import os
-sys.path.append(os.path.abspath("/WikidataIntegrator/wikidataintegrator"))
 
-import wdi_core as wdi_core
+from WikidataIntegrator.wikidataintegrator import wdi_core
+
 
 wdids = []
 sparql_query = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n\nSELECT ?item WHERE { ?item wdt:P699 ?wpid . } LIMIT 10"
