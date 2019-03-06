@@ -3,8 +3,8 @@ import pprint
 import requests
 import sys
 import os
-
-from WikidataIntegrator.wikidataintegrator import wdi_core
+sys.path.append(os.path.abspath("WikidataIntegrator/wikidataintegrator"))
+import wdi_core
 
 
 wdids = []
