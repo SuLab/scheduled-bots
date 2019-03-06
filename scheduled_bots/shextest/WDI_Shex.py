@@ -17,7 +17,7 @@ schema = requests.get(
 results = dict()
 for qid in wdids:
     print(qid)
-    results[qid] = wdi_core.check_shex_conformance(qid, schema)
+    results[qid] = wdi_core.WDItemEngine.check_shex_conformance(qid, schema)
 
 pprint.pprint(results)
 
