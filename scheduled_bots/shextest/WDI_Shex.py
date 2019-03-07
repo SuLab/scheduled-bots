@@ -39,13 +39,20 @@ for qid in wdids:
     print(qid)
     results[qid] = wdi_core.WDItemEngine.check_shex_conformance(qid, schema, output="all")
 
-pprint.pprint(results)
+# pprint.pprint(results)
+errors = dict()
+for qid in results.keys():
+    if not results[qid]["result"]:
+        print(results[qid]["reason"])
+        errors[qid] = results[qid]["reason"]
+
+pprint.pprint(errors)
 
 count = {"passing": 0, "failing": 0}
 for result in results.keys():
-    if results[result]["result"] == "Passing":
+    if results[result]["result"]:
         count["passing"] += 1
-    if results[result]["result"] == "Failing":
+    if not results[result]["result"]:
         count["failing"] += 1
 
 pprint.pprint(count)
