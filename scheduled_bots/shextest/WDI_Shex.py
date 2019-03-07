@@ -1,11 +1,29 @@
 from rdflib import Namespace, URIRef
+from sparql_slurper import SlurpyGraph
 import pprint
 import requests
-import sys
-import os
-sys.path.append(os.path.abspath("WikidataIntegrator/wikidataintegrator"))
-from WikidataIntegrator.wikidataintegrator import wdi_core
+import pyshex
+from wikidataintegrator import wdi_core
 
+"""
+def check_shex_conformance(qid, schema, endpoint="https://query.wikidata.org/sparql", debug=False):
+    results = dict()
+    results["wdid"] = qid
+    slurpeddata = SlurpyGraph(endpoint)
+    for p, o in slurpeddata.predicate_objects(qid):
+        # for a, b in slurpeddata.predicate_objects(o):
+        pass
+    for result in pyshex.ShExEvaluator(rdf=slurpeddata, schema=schema, focus=qid).evaluate():
+        shex_result = dict()
+        if result.result:
+            shex_result["result"] = "Passing"
+        else:
+            shex_result["result"] = "Failing"
+            print("reason: " + result.reason)
+        shex_result["reason"] = result.reason
+
+    return shex_result
+"""
 
 wdids = []
 sparql_query = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n\nSELECT ?item WHERE { ?item wdt:P699 ?wpid . } LIMIT 10"
@@ -27,9 +45,9 @@ pprint.pprint(results)
 
 count = {"passing": 0, "failing": 0}
 for result in results.keys():
-    if result["result"] == "Passing":
+    if results[result]["result"] == "Passing":
         count["passing"] += 1
-    if result["result"] == "Failing":
+    if results[result]["result"] == "Failing":
         count["failing"] += 1
 
 pprint.pprint(count)
