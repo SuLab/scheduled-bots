@@ -24,7 +24,7 @@ def check_shex_conformance(qid, schema, endpoint="https://query.wikidata.org/spa
 """
 
 wdids = []
-sparql_query = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n\nSELECT ?item WHERE { ?item wdt:P699 ?wpid . } LIMIT 10"
+sparql_query = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n\nSELECT ?item WHERE { ?item wdt:P699 ?wpid . } LIMIT 100"
 df = wdi_core.WDItemEngine.execute_sparql_query(sparql_query)
 for row in df["results"]["bindings"]:
     wdid = row["item"]["value"]
