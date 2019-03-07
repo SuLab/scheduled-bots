@@ -2,26 +2,16 @@ from rdflib import Namespace, URIRef
 import pprint
 import requests
 from wikidataintegrator import wdi_core
+import signal
 
-"""
-def check_shex_conformance(qid, schema, endpoint="https://query.wikidata.org/sparql", debug=False):
-    results = dict()
-    results["wdid"] = qid
-    slurpeddata = SlurpyGraph(endpoint)
-    for p, o in slurpeddata.predicate_objects(qid):
-        # for a, b in slurpeddata.predicate_objects(o):
-        pass
-    for result in pyshex.ShExEvaluator(rdf=slurpeddata, schema=schema, focus=qid).evaluate():
-        shex_result = dict()
-        if result.result:
-            shex_result["result"] = "Passing"
-        else:
-            shex_result["result"] = "Failing"
-            print("reason: " + result.reason)
-        shex_result["reason"] = result.reason
+class TimeoutException(Exception):   # Custom exception class
+    pass
 
-    return shex_result
-"""
+def timeout_handler(signum, frame):   # Custom signal handler
+    raise TimeoutException
+
+# Change the behavior of SIGALRM
+signal.signal(signal.SIGALRM, timeout_handler)
 
 wdids = []
 sparql_query = "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n\nSELECT ?item WHERE { ?item wdt:P699 ?wpid . }"
@@ -37,7 +27,15 @@ schema = requests.get(
 results = dict()
 for qid in wdids:
     print(qid)
-    results[qid] = wdi_core.WDItemEngine.check_shex_conformance(qid, schema, output="all")
+    signal.alarm(120)
+    try:
+        results[qid] = wdi_core.WDItemEngine.check_shex_conformance(qid, schema, output="all")
+    except TimeoutException:
+        print("timeout")
+        continue  # continue the for loop if function A takes more than 5 second
+    else:
+        # Reset the alarm
+        signal.alarm(0)
 
 # pprint.pprint(results)
 errors = dict()
