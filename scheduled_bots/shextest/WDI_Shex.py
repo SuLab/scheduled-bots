@@ -1,8 +1,6 @@
 from rdflib import Namespace, URIRef
-from sparql_slurper import SlurpyGraph
 import pprint
 import requests
-import pyshex
 from wikidataintegrator import wdi_core
 
 """
