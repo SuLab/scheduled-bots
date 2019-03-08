@@ -3,6 +3,7 @@ import pprint
 import requests
 from wikidataintegrator import wdi_core
 import signal
+import time
 
 class TimeoutException(Exception):   # Custom exception class
     pass
@@ -32,7 +33,11 @@ for qid in wdids:
         results[qid] = wdi_core.WDItemEngine.check_shex_conformance(qid, schema, output="all")
     except TimeoutException:
         print("timeout")
-        continue  # continue the for loop if function A takes more than 5 second
+        continue  # continue the for loop if function A takes more than 120 seconds
+    except ValueError:
+        print("SPARQL endpoint does not return values")
+        time.sleep(60)
+        continue
     else:
         # Reset the alarm
         signal.alarm(0)
