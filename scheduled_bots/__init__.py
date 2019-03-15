@@ -136,6 +136,8 @@ PROPS = {
     'ZFIN Gene ID': 'P3870',
     'Rat Genome Database ID': 'P3853',
     'cytogenetic location': 'P4196',
+    'has phenotype': 'P6532',
+    'observed in': 'P6531'
 }
 
 ITEMS = {

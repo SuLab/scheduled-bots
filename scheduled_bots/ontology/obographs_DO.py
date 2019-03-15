@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from scheduled_bots.ontology.obographs import Graph, Node
+from obographs import Graph, Node
 from wikidataintegrator import wdi_login
 from scheduled_bots import PROPS
 
@@ -35,8 +35,8 @@ class DOGraph(Graph):
                     PROPS['GARD rare disease ID']}
     FAST_RUN = True
 
-    PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': PROPS['anatomical location'],
-                    # 'http://purl.obolibrary.org/obo/RO_0002200': PROPS[],  # has phenotype
+    PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': PROPS['anatomical location'],#anatomical location doesn't have a RO#. This RO# is 'located_in'
+                    'http://purl.obolibrary.org/obo/RO_0002200': PROPS['has phenotype'],  # has phenotype
                     # 'http://purl.obolibrary.org/obo/IDO_0000664': PROPS[],  # has_material_basis_in
                     # 'http://purl.obolibrary.org/obo/RO_0003304': PROPS[],  # contributes to condition
                     # 'http://purl.obolibrary.org/obo/RO_0002451': PROPS[],  # transmitted by
@@ -89,5 +89,6 @@ if __name__ == "__main__":
         sparql_endpoint_url = 'https://query.wikidata.org/sparql'
         login = wdi_login.WDLogin(WDUSER, WDPASS)
 
-    g = DOGraph(args.json_path, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
-    g.run(login)
+print("Done running obographs_DO")
+#    g = DOGraph(args.json_path, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
+#    g.run(login)
