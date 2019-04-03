@@ -19,3 +19,7 @@ See [Bot Status](https://www.wikidata.org/w/index.php?title=User:ProteinBoxBot/B
 
 Code for detecting changes and creating robot templates is located here:
 https://github.com/SuLab/scheduled-bots/blob/master/scheduled_bots/disease_ontology/robot/run.py
+
+
+## Installation
+Install files from requirements.txt and WikiDataIntegrator via pip.  Install scheduled-bots by changing into the directory with the setup.py file and install it with `pip install -e .`
