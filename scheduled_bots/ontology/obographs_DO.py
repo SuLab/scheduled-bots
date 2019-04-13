@@ -26,13 +26,13 @@ class DOGraph(Graph):
     QID = "Q5282129"
     DEFAULT_DESCRIPTION = "human disease"
     APPEND_PROPS = {PROPS['subclass of'], PROPS['instance of'],
-                    PROPS['has cause'], PROPS['anatomical location'],
+                    PROPS['has cause'], PROPS['anatomical location'],PROPS['has phenotype']
                     PROPS['OMIM ID'], PROPS['Orphanet ID'],
                     PROPS['MeSH ID'], PROPS['ICD-10-CM'],
                     PROPS['ICD-10'], PROPS['ICD-9-CM'],
                     PROPS['ICD-9'], PROPS['NCI Thesaurus ID'],
                     PROPS['UMLS CUI'], PROPS['Disease Ontology ID'],
-                    PROPS['GARD rare disease ID']}
+                    PROPS['GARD rare disease ID'], PROPS['Human Phenotype Ontology ID']}
     FAST_RUN = True
 
     PRED_PID_MAP = {'http://purl.obolibrary.org/obo/RO_0001025': PROPS['anatomical location'],#anatomical location doesn't have a RO#. This RO# is 'located_in'
@@ -63,7 +63,7 @@ class DOGraph(Graph):
                                            'pred': restriction['propertyId'],
                                            'obj': restriction['fillerId']})
         self.edges.extend(edges_location)
-
+        # logical definition axioms are not all encompassing. A lot of information is stored in 'edges'.
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run wikidata disease ontology bot')
