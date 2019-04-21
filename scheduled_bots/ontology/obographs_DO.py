@@ -90,7 +90,9 @@ if __name__ == "__main__":
         sparql_endpoint_url = 'https://query.wikidata.org/sparql'
         login = wdi_login.WDLogin(WDUSER, WDPASS)
 
-print("Done running obographs_DO")
 
-g = DOGraph(args.json_path, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
-g.run(login)
+
+    g = DOGraph(args.json_path, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
+    g.run(login)
+    
+print("Done running obographs_DO")
