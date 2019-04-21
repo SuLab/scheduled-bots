@@ -58,6 +58,7 @@ PROPS = {
     'PubChem ID (CID)': 'P662',
     'PubMed ID': 'P698',
     'RTECS Number': 'P657',
+    'Rat Genome Database ID': 'P3853',
     'RefSeq RNA ID': 'P639',
     'Refseq Genome ID': 'P2249',
     'Refseq Protein ID': 'P637',
@@ -78,6 +79,7 @@ PROPS = {
     'chemical formula': 'P274',
     'chromosome': 'P1057',
     'curator': 'P1640',
+    'cytogenetic location': 'P4196',
     'determination method': 'P459',
     'develops from': 'P3094',
     'encodes': 'P688',
@@ -90,6 +92,7 @@ PROPS = {
     'genomic start': 'P644',
     'has cause': 'P828',
     'has part': 'P527',
+    'has phenotype': 'P6532',
     'homologene id': 'P593',
     'instance of': 'P31',
     'location': 'P276',
@@ -101,8 +104,10 @@ PROPS = {
     'negative diagnostic predictor': 'P3357',
     'negative prognostic predictor': 'P3359',
     'negative therapeutic predictor': 'P3355',
+    'observed in': 'P6531',
     'offical website': 'P856',
     'ortholog': 'P684',
+    'pathogen transmission process': 'P1060',
     'parent taxon': 'P171',
     'part of': 'P361',
     'positive diagnostic predictor': 'P3356',
@@ -133,11 +138,7 @@ PROPS = {
     'MGI Gene Symbol': 'P2394',
     'Wormbase Gene ID': 'P3860',
     'FlyBase Gene ID': 'P3852',
-    'ZFIN Gene ID': 'P3870',
-    'Rat Genome Database ID': 'P3853',
-    'cytogenetic location': 'P4196',
-    'has phenotype': 'P6532',
-    'observed in': 'P6531'
+    'ZFIN Gene ID': 'P3870'
 }
 
 ITEMS = {

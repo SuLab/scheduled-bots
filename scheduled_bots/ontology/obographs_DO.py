@@ -26,7 +26,8 @@ class DOGraph(Graph):
     QID = "Q5282129"
     DEFAULT_DESCRIPTION = "human disease"
     APPEND_PROPS = {PROPS['subclass of'], PROPS['instance of'],
-                    PROPS['has cause'], PROPS['anatomical location'],PROPS['has phenotype']
+                    PROPS['has cause'], PROPS['anatomical location'],
+                    PROPS['has phenotype'], PROPS['pathogen transmission process'],
                     PROPS['OMIM ID'], PROPS['Orphanet ID'],
                     PROPS['MeSH ID'], PROPS['ICD-10-CM'],
                     PROPS['ICD-10'], PROPS['ICD-9-CM'],
@@ -39,7 +40,7 @@ class DOGraph(Graph):
                     'http://purl.obolibrary.org/obo/RO_0002200': PROPS['has phenotype'],  # has phenotype
                     # 'http://purl.obolibrary.org/obo/IDO_0000664': PROPS[],  # has_material_basis_in
                     # 'http://purl.obolibrary.org/obo/RO_0003304': PROPS[],  # contributes to condition
-                    # 'http://purl.obolibrary.org/obo/RO_0002451': PROPS[],  # transmitted by
+                    'http://purl.obolibrary.org/obo/RO_0002451': PROPS['pathogen transmission process'],  # transmitted by
                     # 'http://purl.obolibrary.org/obo/RO_0001020': PROPS[],  # is allergic trigger for
                     'is_a': PROPS['subclass of']}
 
@@ -90,5 +91,6 @@ if __name__ == "__main__":
         login = wdi_login.WDLogin(WDUSER, WDPASS)
 
 print("Done running obographs_DO")
-#    g = DOGraph(args.json_path, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
-#    g.run(login)
+
+g = DOGraph(args.json_path, mediawiki_api_url=mediawiki_api_url, sparql_endpoint_url=sparql_endpoint_url)
+g.run(login)
