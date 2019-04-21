@@ -195,7 +195,7 @@ class Node:
         # todo: I want to avoid this from happening: https://www.wikidata.org/w/index.php?title=Q4553565&diff=676750840&oldid=647941942
 
         wdi_helpers.try_write(self.item, record_id=primary_ext_id, record_prop=primary_ext_id_pid,
-                              login=login, write=False)
+                              login=login, write=write)
 
         self.qid = self.item.wd_item_id
 
@@ -526,7 +526,7 @@ class Graph:
             this_pid, this_value = cu.parse_curie(cu.uri_to_curie(this_uri))
             this_pid = self.helper.get_pid(this_pid)
             wdi_helpers.try_write(item, record_id=this_value, record_prop=this_pid,
-                                  login=login, write=False)
+                                  login=login, write=write)
 
     def make_statement_from_edge(self, edge):
         # we can override this to define a custom statement creator that makes a specific
