@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from obographs import Graph, Node
+from scheduled_bots.ontology.obographs import Graph, Node
 from wikidataintegrator import wdi_login
 from scheduled_bots import PROPS
 
