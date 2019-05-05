@@ -12,6 +12,7 @@ bs4 = "*"
 pandas = "*"
 tqdm = "*"
 rdflib = "*"
+sparqlwrapper = "*"
 
 [requires]
 python_version = "3.6"
