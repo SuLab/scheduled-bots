@@ -12,7 +12,6 @@ from bs4 import BeautifulSoup, SoupStrainer
 from SPARQLWrapper import SPARQLWrapper, JSON
 import re
 
-
 import requests
 # from scheduled_bots.wikipathways import CHROMOSOME, IGNORE_SYNONYMS, DrugCombo, EVIDENCE_LEVEL, TRUST_RATING
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
