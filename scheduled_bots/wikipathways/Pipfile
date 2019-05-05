@@ -11,6 +11,7 @@ wikidataintegrator = "*"
 bs4 = "*"
 pandas = "*"
 tqdm = "*"
+rdflib = "*"
 
 [requires]
 python_version = "3.6"
