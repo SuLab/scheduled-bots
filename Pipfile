@@ -52,4 +52,4 @@ datetime = "*"
 bs4 = "*"
 
 [requires]
-python_version = "3.666666"
+python_version = "3.6"
