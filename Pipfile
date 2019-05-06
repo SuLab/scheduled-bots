@@ -50,6 +50,7 @@ sparqlwrapper = "*"
 rdflib = "*"
 datetime = "*"
 bs4 = "*"
+wikidataintegrator = "*"
 
 [requires]
 python_version = "3.6"
