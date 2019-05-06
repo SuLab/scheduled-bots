@@ -13,6 +13,7 @@ pandas = "*"
 tqdm = "*"
 rdflib = "*"
 sparqlwrapper = "*"
+sys = "*"
 
 [requires]
 python_version = "3.6"

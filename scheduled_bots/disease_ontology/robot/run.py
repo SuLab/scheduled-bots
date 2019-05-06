@@ -11,14 +11,17 @@ from functools import reduce
 import requests
 from itertools import chain
 import csv
+import sys
 import pandas as pd
 from rdflib import Graph
 from rdflib import URIRef, Literal
 from tqdm import tqdm
 
-from ../../scheduled_bots.disease_ontology.robot.utils import get_mesh_info, get_gard_info, get_ordo_info, get_omim_info
+from scheduled_bots.disease_ontology.robot.utils import get_mesh_info, get_gard_info, get_ordo_info, get_omim_info
 from wikidataintegrator.wdi_core import WDItemEngine
 from wikicurie import wikicurie
+
+sys.path.append("/")
 
 cu = wikicurie.CurieUtil()
 
