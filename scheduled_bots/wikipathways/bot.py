@@ -18,7 +18,7 @@ from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers import try_write
 
-from scheduled_bots import PROPS, ITEMS, get_default_core_props
+from ../../scheduled_bots import PROPS, ITEMS, get_default_core_props
 
 CACHE_SIZE = 10000
 CACHE_TIMEOUT_SEC = 300  # 5 min
