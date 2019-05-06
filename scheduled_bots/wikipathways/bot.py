@@ -11,14 +11,12 @@ from contextlib import closing
 from bs4 import BeautifulSoup, SoupStrainer
 from SPARQLWrapper import SPARQLWrapper, JSON
 import re
-import sys
 
 import requests
 # from scheduled
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers import try_write
-sys.path.append("/")
 
 from scheduled_bots import PROPS, ITEMS, get_default_core_props
 
