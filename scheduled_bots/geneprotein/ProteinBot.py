@@ -29,6 +29,7 @@ from datetime import datetime
 from itertools import chain
 
 from tqdm import tqdm
+import pprint
 
 from scheduled_bots import get_default_core_props, PROPS
 from scheduled_bots.geneprotein import HelperBot, descriptions_by_type
