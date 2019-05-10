@@ -514,6 +514,7 @@ if __name__ == "__main__":
 
     # get metadata about sources
     mgd = MyGeneDownloader()
+    pprint.pprint(mgd)
     metadata = mgd.get_metadata()['src_version']
 
     log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
