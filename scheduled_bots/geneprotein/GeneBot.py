@@ -39,7 +39,6 @@ from scheduled_bots.geneprotein.Downloader import MyGeneDownloader
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new
 from wikidataintegrator.wdi_fastrun import FastRunContainer
-import pprint
 
 core_props = get_default_core_props()
 
@@ -856,7 +855,6 @@ if __name__ == "__main__":
 
     # get metadata about sources
     mgd = MyGeneDownloader()
-    pprint.pprint(mgd.get_metadata())
     metadata = mgd.get_metadata()['src_version']
 
     if args.entrez:

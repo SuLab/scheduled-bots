@@ -29,7 +29,6 @@ from datetime import datetime
 from itertools import chain
 
 from tqdm import tqdm
-import pprint
 
 from scheduled_bots import get_default_core_props, PROPS
 from scheduled_bots.geneprotein import HelperBot, descriptions_by_type
@@ -515,8 +514,7 @@ if __name__ == "__main__":
 
     # get metadata about sources
     mgd = MyGeneDownloader()
-    pprint.pprint(mgd)
-    metadata = mgd.get_metadata()['src_version']
+    metadata = mgd.get_metadata()['src']['src_version']
 
     log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
     if wdi_core.WDItemEngine.logger is not None:
