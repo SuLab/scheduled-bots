@@ -21,14 +21,11 @@ from wikidataintegrator.wdi_helpers import try_write
 CACHE_SIZE = 10000
 CACHE_TIMEOUT_SEC = 300  # 5 min
 
-try:
-    from scheduled_bots.local import WDUSER, WDPASS
-except ImportError:
-    if "WDUSER" in os.environ and "WDPASS" in os.environ:
-        WDUSER = os.environ['WDUSER']
-        WDPASS = os.environ['WDPASS']
-    else:
-        raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
+if "WDUSER" in os.environ and "WDPASS" in os.environ:
+    WDUSER = os.environ['WDUSER']
+    WDPASS = os.environ['WDPASS']
+else:
+    raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
 PROPS = {
     'Wikipathways ID': 'P2410',
