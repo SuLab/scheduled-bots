@@ -30,7 +30,7 @@ bot = "CGIBot"
 version = "0.1.0"
 contact = "http://jenkins.sulab.org/job/CGI/"
 framework = "Wikidata integrator v0.3.1"
-
+useragent = bot+"/"+version+" (contact: "+contact+") " + framework
 try:
     from scheduled_bots.local import USER_AGENT
 except ImportError:
@@ -157,11 +157,11 @@ def create_variant_annotation(variant_qid, association, drug_qid, prim_tt_qid, s
                                  append_value=list(association_map.values()),
                                  fast_run=False, fast_run_use_refs=True,
                                  fast_run_base_filter={PROPS['HGVS nomenclature']: ''}, global_ref_mode='CUSTOM',
-                                 ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props, )
+                                 ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props,user_agent=useragent)
 
     wdi_helpers.try_write(item, variant_qid, '', login)
 
-    item = wdi_core.WDItemEngine(wd_item_id=variant_qid)
+    item = wdi_core.WDItemEngine(wd_item_id=variant_qid ,user_agent=useragent)
     item = remove_old_statements(item)
     item.update(item.statements)
     wdi_helpers.try_write(item, variant_qid, '', login)
