@@ -26,6 +26,12 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
+bot = "DOID Bot"
+version = "0.1.0"
+contact = "http://jenkins.sulab.org/job/Disease_Ontology/"
+framework = "Wikidata integrator v0.3.1"
+useragent = bot+"/"+version+" (contact: "+contact+") " + framework
+
 
 
 wdi_property_store.wd_properties[PROPS['OMIM ID']]['core_id'] = False
@@ -247,7 +253,8 @@ class DONode:
                                             fast_run_base_filter={'P699': ''},
                                             fast_run_use_refs=True,
                                             global_ref_mode='CUSTOM',
-                                            ref_handler=update_retrieved_if_new
+                                            ref_handler=update_retrieved_if_new,
+                                            user_agent=useragent
                                             )
             wd_item.fast_run_container.debug = False
             if wd_item.get_label(lang="en") == "":
