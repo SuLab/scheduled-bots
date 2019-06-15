@@ -18,6 +18,14 @@ from wikidataintegrator.wdi_helpers import try_write
 CACHE_SIZE = 10000
 CACHE_TIMEOUT_SEC = 300  # 5 min
 
+# SET USER AGENT suggested format: CIViCBot/1.0 (contact andra@micelio.be) Wikidata/v0.3.1
+
+bot = "CIViCBot"
+version = "0.1.0"
+contact = "http://jenkins.sulab.org/job/CIViC//"
+framework = "Wikidata integrator v0.3.1"
+useragent = bot+"/"+version+" (contact: "+contact+") " + framework
+
 try:
     from scheduled_bots.local import WDUSER, WDPASS
 except ImportError:
@@ -164,7 +172,7 @@ def run_one(variant_id, retrieved, fast_run, write, login):
     # pprint([x.get_json_representation() for x in data2add])
     item = wdi_core.WDItemEngine(data=data2add, fast_run=fast_run,
                                  fast_run_base_filter=fast_run_base_filter, fast_run_use_refs=True,
-                                 ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props)
+                                 ref_handler=update_retrieved_if_new_multiple_refs, user_agent=useragent, core_props=core_props)
     synonyms = []
     if name not in IGNORE_SYNONYMS:
         synonyms.append(name)
