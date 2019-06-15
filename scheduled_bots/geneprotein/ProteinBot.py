@@ -233,7 +233,8 @@ class Protein:
                                                                        PROPS['found in taxon']: self.organism_info[
                                                                            'wdid']},
                                                  global_ref_mode="CUSTOM", ref_handler=update_retrieved_if_new,
-                                                 core_props=core_props)
+                                                 core_props=core_props, user_agent=['ProteinBoxBot running on WDI see: http://jenkins.sulab.org'])
+            test = wdi_core.WDItemEngine(user_agent=['ProteinBoxBot running WDI'])
             wdi_helpers.try_write(wd_item_gene, self.external_ids['UniProt ID'], PROPS['UniProt ID'], self.login,
                                   write=write)
         except Exception as e:
