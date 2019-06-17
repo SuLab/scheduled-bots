@@ -26,14 +26,6 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-bot = "DOID Bot"
-version = "0.1.0"
-contact = "http://jenkins.sulab.org/job/Disease_Ontology/"
-framework = "Wikidata integrator v0.3.1"
-useragent = bot+"/"+version+" (contact: "+contact+") " + framework
-
-
-
 wdi_property_store.wd_properties[PROPS['OMIM ID']]['core_id'] = False
 wdi_property_store.wd_properties[PROPS['MeSH ID']]['core_id'] = False
 wdi_property_store.wd_properties[PROPS['Orphanet ID']]['core_id'] = False
