@@ -71,6 +71,15 @@ __metadata__ = {
     'tags': ['gene'],
 }
 
+# SET USER AGENT suggested format: CGIBot/1.0 (contact andra@micelio.be) Wikidata/v0.3.1
+
+bot = "CGIBot"
+version = "0.1.0"
+contact = "http://jenkins.sulab.org/job/CGI/"
+framework = "Wikidata integrator v0.3.1"
+useragent = bot+"/"+version+" (contact: "+contact+") " + framework
+
+
 # If the source is "entrez", the reference identifier to be used is "Ensembl Gene ID" (P594)
 source_ref_id = {
     'ensembl': "Ensembl Gene ID",
@@ -302,6 +311,7 @@ class Gene:
                                                   fast_run=fast_run, fast_run_base_filter=self.fast_run_base_filter,
                                                   fast_run_use_refs=True, ref_handler=update_retrieved_if_new,
                                                   global_ref_mode="CUSTOM",
+                                                  user_agent=useragent,
                                                   core_props=core_props)
 
         self.wd_item_gene = self.set_label_desc_aliases(self.wd_item_gene)
@@ -652,7 +662,7 @@ class GeneBot:
         entrez_qid = {entrez: qid for entrez, qid in entrez_qid.items() if entrez not in self.failed}
         print(len(entrez_qid))
         filter = {PROPS['Entrez Gene ID']: '', PROPS['found in taxon']: self.organism_info['wdid']}
-        frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter=filter, use_refs=True)
+        frc = FastRunContainer(wdi_core.WDBaseDataType, wdi_core.WDItemEngine, base_filter=filter, use_refs=True, user_agent=useragent)
         frc.clear()
         props = [PROPS[x] for x in FASTRUN_PROPS]
         for qid in tqdm(entrez_qid.values()):
@@ -728,7 +738,7 @@ def remove_deprecated_statements(qid, frc, releases, last_updated, props, login)
         print(len(s_dep))
         print([(x.get_prop_nr(), x.value) for x in s_dep])
         print([(x.get_references()[0]) for x in s_dep])
-        wd_item = wdi_core.WDItemEngine(wd_item_id=qid, data=s_dep, fast_run=False)
+        wd_item = wdi_core.WDItemEngine(wd_item_id=qid, data=s_dep, fast_run=False, user_agent=useragent)
         wdi_helpers.try_write(wd_item, '', '', login, edit_summary="remove deprecated statements")
 
 
