@@ -24,21 +24,6 @@ except ImportError:
     else:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-# SET USER AGENT suggested format: CGIBot/1.0 (contact andra@micelio.be) Wikidata/v0.3.1
-
-bot = "CGIBot"
-version = "0.1.0"
-contact = "http://jenkins.sulab.org/job/CGI/"
-framework = "Wikidata integrator v0.3.1"
-
-try:
-    from scheduled_bots.local import USER_AGENT
-except ImportError:
-    if "USER_AGENT" in os.environ:
-        USER_AGENT = os.environ["USER_AGENT"]
-    else:
-        raise ValueError("USER_AGENT must be specified in local.py or as environment variable")
-
 # map association column
 association_map = {
     'Responsive': 'P3354',  # positive therapeutic predictor
@@ -99,7 +84,7 @@ def create_missense_variant_item(hgvs, label, login, fast_run=True):
 
     item = wdi_core.WDItemEngine(data=s, fast_run=fast_run,
                                  fast_run_base_filter={PROPS['HGVS nomenclature']: ''}, fast_run_use_refs=True,
-                                 ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props, user_agent=config['USER_AGENT_DEFAULT'])
+                                 ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props)
     item.set_label(label)
     item.set_description("genetic variant")
     wdi_helpers.try_write(item, hgvs, PROPS['HGVS nomenclature'], login)
@@ -157,7 +142,7 @@ def create_variant_annotation(variant_qid, association, drug_qid, prim_tt_qid, s
                                  append_value=list(association_map.values()),
                                  fast_run=False, fast_run_use_refs=True,
                                  fast_run_base_filter={PROPS['HGVS nomenclature']: ''}, global_ref_mode='CUSTOM',
-                                 ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props, )
+                                 ref_handler=update_retrieved_if_new_multiple_refs, core_props=core_props)
 
     wdi_helpers.try_write(item, variant_qid, '', login)
 
