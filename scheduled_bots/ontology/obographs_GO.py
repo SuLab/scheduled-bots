@@ -5,11 +5,6 @@ from scheduled_bots.ontology.obographs import Graph, Node
 from wikidataintegrator import wdi_login, wdi_core, wdi_helpers
 from scheduled_bots import PROPS
 
-bot = "GO Bot"
-version = "0.1.0"
-contact = "http://jenkins.sulab.org/job/Gene_Ontology"
-framework = "Wikidata integrator v0.3.1"
-useragent = bot+"/"+version+" (contact: "+contact+") " + framework
 
 def ec_formatter(ec_number):
     splits = ec_number.split('.')

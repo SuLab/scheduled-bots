@@ -511,11 +511,6 @@ class Graph:
                 continue
 
             # print("{}".format([(x.get_value(), x.get_prop_nr()) for x in ss]))
-            bot = "OBO Bot"
-            version = "0.1.0"
-            contact = "http://jenkins.sulab.org/job/obographs/"
-            framework = "Wikidata integrator v0.3.1"
-            useragent = bot + "/" + version + " (contact: " + contact + ") " + framework
             item = wdi_core.WDItemEngine(
                 wd_item_id=node.qid, data=ss,
                 append_value=self.APPEND_PROPS,
@@ -526,7 +521,6 @@ class Graph:
                 ref_handler=self.ref_handler,
                 sparql_endpoint_url=self.sparql_endpoint_url,
                 mediawiki_api_url=self.mediawiki_api_url,
-                user_agent=useragent,
                 core_props=self.CORE_IDS
             )
             this_pid, this_value = cu.parse_curie(cu.uri_to_curie(this_uri))
