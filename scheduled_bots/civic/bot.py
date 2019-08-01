@@ -15,6 +15,8 @@ from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers import try_write
 
+import pprint
+
 CACHE_SIZE = 10000
 CACHE_TIMEOUT_SEC = 300  # 5 min
 
@@ -272,7 +274,7 @@ def make_statements_from_evidence(variant_id, evidence_item, login, write):
         return []
 
     ## Reference
-    pmid = evidence_item["source"]["pubmed_id"]
+    pmid = evidence_item["source"]["citation_id"]
     pmid_qid, _, _ = wdi_helpers.PublicationHelper(pmid.replace("PMID:", ""), id_type="pmid",
                                                    source="europepmc").get_or_create(login if write else None)
     if not pmid_qid:
