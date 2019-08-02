@@ -21,6 +21,7 @@ from wikidataintegrator.wdi_helpers import try_write
 CACHE_SIZE = 10000
 CACHE_TIMEOUT_SEC = 300  # 5 min
 
+print("Logging in...")
 if "WDUSER" in os.environ and "WDPASS" in os.environ:
     WDUSER = os.environ['WDUSER']
     WDPASS = os.environ['WDPASS']
@@ -44,7 +45,7 @@ ITEMS = {
     'Homo sapiens': 'Q15978631'
 }
 
-core_props = get_default_core_props()
+#core_props = get_default_core_props()
 #core_props.update({PROPS['WikiPathways ID']})
 
 __metadata__ = {
