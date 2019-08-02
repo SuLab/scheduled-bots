@@ -52,11 +52,8 @@ for result in results["results"]["bindings"]:
     data.append(wdi_core.WDString(mv_results["hits"][0]["dbsnp"]["rsid"],prop_nr="P6861",qualifiers=[edition_qualifier]))
     dbsnp_reference = create_reference(mv_results["hits"][0]["dbsnp"]["rsid"])
     for reference in mv_results["hits"][0]["dbsnp"]["citations"]:
-        print(reference)
         pmid_qid, _, _ = wdi_helpers.PublicationHelper(reference, id_type="pmid",
                                                        source="europepmc").get_or_create(login if True else None)
-
-        print(pmid_qid)
         if pmid_qid:
             data.append(wdi_core.WDItemID(value=pmid_qid, prop_nr="P1343", references=[copy.deepcopy(dbsnp_reference)]))
     page = wdi_core.WDItemEngine(wd_item_id=result["qid"]["value"].replace("http://www.wikidata.org/entity/", ""),data=data)
