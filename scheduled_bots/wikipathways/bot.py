@@ -60,6 +60,7 @@ __metadata__ = {
 }
 
 fast_run_base_filter = {'P2410': ''}
+fast_run = True
 
 def create_reference(pathway_id, retrieved):
     refStatedIn = wdi_core.WDItemID(value=ITEMS['Wikipathways'], prop_nr=PROPS['stated in'], is_reference=True)
