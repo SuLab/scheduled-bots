@@ -14,6 +14,7 @@ import re
 
 import requests
 # from scheduled
+from scheduled_bots import PROPS, ITEMS, get_default_core_props
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers import try_write
@@ -39,6 +40,9 @@ PROPS = {
     'curator': 'P1640',
     'retrieved': 'P813'
 }
+
+core_props = get_default_core_props()
+core_props.update({PROPS['Wikipathways ID']})
 
 ITEMS = {
     'Wikipathways': 'Q7999828',
