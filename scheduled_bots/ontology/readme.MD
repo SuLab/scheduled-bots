@@ -7,3 +7,9 @@
  ** This README is work in progress. **
  
  ### Step 1. Creating a JSON model of an OWL file
+ #### Disease Ontology
+ The Disease Ontology, available as OWL file at http://purl.obolibrary.org/obo/doid.owl is downloaded and parsed in a [designated python script]https://github.com/SuLab/scheduled-bots/blob/master/scheduled_bots/disease_ontology/trigger.py)
+ Here is it is 
+ 1. Downloaded
+ 
+  

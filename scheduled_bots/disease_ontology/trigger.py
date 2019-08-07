@@ -40,14 +40,14 @@ def main():
     else:
         with open("doid.json") as f:
             d = json.load(f)
-        current_release = get_release_obographs(d)
+        current_release = get_release_obographs(d) # download
     print("current release: {}".format(current_release))
     latest_release = get_latest_release()
     print("latest release: {}".format(latest_release))
 
     if current_release != latest_release:
         print("downloading new release & triggering job")
-        os.system("wget -N {}".format(URL.format(latest_release)))
+        os.system("wget -N {}".format(URL.format(latest_release))) # here the latest release of the disease ontology is deleted
         os.system("touch TRIGGER")
     else:
         print("not running job")
