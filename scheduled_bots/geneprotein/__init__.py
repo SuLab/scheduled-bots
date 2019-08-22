@@ -28,6 +28,13 @@ descriptions_by_type = {
     'scRNA': 'small conditional RNA in the species {}'
 }
 
+not_worth_adding = {
+    "none",
+    "None",
+    "gene",
+    "Gene"
+}
+
 human_chromosome_map = {
     '1': 'Q430258',
     '10': 'Q840737',

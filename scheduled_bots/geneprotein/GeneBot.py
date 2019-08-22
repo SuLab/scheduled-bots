@@ -51,7 +51,7 @@ FASTRUN_PROPS = {'Entrez Gene ID', 'strand orientation', 'Saccharomyces Genome D
 DAYS = 120
 update_retrieved_if_new = partial(update_retrieved_if_new, days=DAYS)
 
-from scheduled_bots.geneprotein import HelperBot, organisms_info, type_of_gene_map, descriptions_by_type
+from scheduled_bots.geneprotein import HelperBot, organisms_info, type_of_gene_map, descriptions_by_type, not_worth_adding
 from scheduled_bots.geneprotein.ChromosomeBot import ChromosomeBot
 from scheduled_bots.geneprotein.MicrobialChromosomeBot import MicrobialChromosomeBot
 from scheduled_bots.geneprotein.HelperBot import make_ref_source, parse_mygene_src_version, source_items
@@ -133,7 +133,7 @@ class Gene:
             aliases.append(self.external_ids['NCBI Locus tag'])
         if 'alias' in self.record:
             aliases.extend(self.record['alias']['@value'])
-        aliases = set(aliases) - {self.label} - set(descriptions_by_type.keys())
+        aliases = set(aliases) - {self.label} - set(descriptions_by_type.keys()) - set(not_worth_adding)
         self.aliases = list(aliases)
 
     def set_label_desc_aliases(self, wditem):
