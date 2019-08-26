@@ -32,7 +32,10 @@ not_worth_adding = {
     "none",
     "None",
     "gene",
-    "Gene"
+    "Gene",
+    "unknown",
+    "Unknown",
+    "null"
 }
 
 human_chromosome_map = {
