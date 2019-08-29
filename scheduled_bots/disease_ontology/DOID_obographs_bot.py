@@ -29,7 +29,7 @@ except ImportError:
 
 
 wdi_property_store.wd_properties[PROPS['OMIM ID']]['core_id'] = False
-wdi_property_store.wd_properties[PROPS['MeSH ID']]['core_id'] = False
+#wdi_property_store.wd_properties[PROPS['MeSH ID']]['core_id'] = False
 wdi_property_store.wd_properties[PROPS['Orphanet ID']]['core_id'] = False
 wdi_property_store.wd_properties[PROPS['NCI Thesaurus ID']]['core_id'] = False
 
@@ -54,7 +54,7 @@ class DOGraph:
                  'ICD9CM': 'P1692',
                  'ICD9': 'P493',
                  'MSH': 'P486',
-                 'MESH': 'P486',
+                  #             'MESH': 'P486',
                  'NCI': 'P1748',
                  'OMIM': 'P492',
                  # 'SNOMEDCT_US_2016_03_01': ''  # can't put in wikidata...
@@ -238,7 +238,8 @@ class DONode:
                                             append_value=[PROPS['subclass of'], PROPS['instance of'],
                                                           PROPS['has cause'], PROPS['location'],
                                                           PROPS['OMIM ID'], PROPS['Orphanet ID'],
-                                                          PROPS['MeSH ID'], PROPS['ICD-10-CM'],
+                                                          # PROPS['MeSH ID'],
+                                                          PROPS['ICD-10-CM'],
                                                           PROPS['ICD-10'], PROPS['ICD-9-CM'],
                                                           PROPS['ICD-9'], PROPS['NCI Thesaurus ID'],
                                                           PROPS['UMLS CUI']

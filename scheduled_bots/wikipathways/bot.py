@@ -19,6 +19,7 @@ from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from wikidataintegrator.wdi_helpers import try_write
 
+wdi_core.WDItemEngine.execute_sparql_query()
 CACHE_SIZE = 10000
 CACHE_TIMEOUT_SEC = 300  # 5 min
 
@@ -82,6 +83,7 @@ def main(retrieved, fast_run, write):
     temp = Graph()
     url = 'http://data.wikipathways.org/current/rdf'
     page = requests.get(url).text
+    wdi_core.WDItemEngine.execute_sparql_query
     files = []
     for link in BeautifulSoup(page, "lxml", parse_only=SoupStrainer('a')):
         address = str(link).split("\"")
