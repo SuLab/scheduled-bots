@@ -53,7 +53,7 @@ class DOGraph:
                  'ICD10': 'P494',
                  'ICD9CM': 'P1692',
                  'ICD9': 'P493',
-                 'MSH': 'P486',
+                  #'MSH': 'P486',
                   #             'MESH': 'P486',
                  'NCI': 'P1748',
                  'OMIM': 'P492',
