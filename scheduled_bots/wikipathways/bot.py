@@ -218,7 +218,6 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
                 edit_summary="Updated a Wikipathways pathway", login=login, write=write)
 
 def get_PathwayElements(pathway, datatype, temp, prep):
-    wikidata_sparql = SPARQLWrapper("https://query.wikidata.org/sparql")
     query = """PREFIX wp:      <http://vocabularies.wikipathways.org/wp#>
            PREFIX rdfs:    <http://www.w3.org/2000/01/rdf-schema#>
            PREFIX dcterms: <http://purl.org/dc/terms/>
@@ -254,10 +253,7 @@ def get_PathwayElements(pathway, datatype, temp, prep):
     if datatype == "GeneProduct":
         wd_query += "} ?item wdt:P351 ?id . }"
 
-    wikidata_sparql.setQuery(wd_query)
-
-    wikidata_sparql.setReturnFormat(JSON)
-    results = wikidata_sparql.query().convert()
+    results = wdi_core.WDItemEngine.execute_sparql_query(wdi_core)
     for result in results["results"]["bindings"]:
         if "P527" not in prep.keys():
             prep["P527"] = []
