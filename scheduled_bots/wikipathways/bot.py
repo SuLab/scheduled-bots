@@ -253,7 +253,7 @@ def get_PathwayElements(pathway, datatype, temp, prep):
     if datatype == "GeneProduct":
         wd_query += "} ?item wdt:P351 ?id . }"
 
-    results = wdi_core.WDItemEngine.execute_sparql_query(wdi_core)
+    results = wdi_core.WDItemEngine.execute_sparql_query(wd_query)
     for result in results["results"]["bindings"]:
         if "P527" not in prep.keys():
             prep["P527"] = []
