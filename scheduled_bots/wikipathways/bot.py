@@ -253,7 +253,7 @@ def get_PathwayElements(pathway, datatype, temp, prep):
     if datatype == "GeneProduct":
         wd_query += "} ?item wdt:P351 ?id . }"
 
-    results = wdi_core.WDItemEngine.execute_sparql_query(wd_query)
+    results = wdi_core.WDItemEngine.execute_sparql_query(wd_query,)
     for result in results["results"]["bindings"]:
         if "P527" not in prep.keys():
             prep["P527"] = []
@@ -271,7 +271,7 @@ if __name__ == "__main__":
     log_dir = "./logs"
     run_id = datetime.now().strftime('%Y%m%d_%H:%M')
     __metadata__['run_id'] = run_id
-    fast_run = False if args.no_fastrun else False
+    fast_run = False if args.no_fastrun else True
     retrieved = datetime.now()
 
     log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
