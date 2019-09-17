@@ -9,7 +9,6 @@ SELECT * WHERE {
 }
 """
 kg = Graph()
-kg.
 results = wdi_core.WDItemEngine.execute_sparql_query(query)
 i =0
 for qid in results["results"]["bindings"]:
