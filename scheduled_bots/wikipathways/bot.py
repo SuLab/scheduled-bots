@@ -138,13 +138,14 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
             PREFIX gpml:    <http://vocabularies.wikipathways.org/gpml#>
             PREFIX dcterms: <http://purl.org/dc/terms/>
-        SELECT DISTINCT ?pathway ?pwId ?pwLabel
+        SELECT DISTINCT ?pathway ?pwId ?pwLabel ?description
         WHERE {
            VALUES ?pwId {"""
     query += "\"" + pathway_id + "\"^^xsd:string}"
     query += """
            ?pathway a wp:Pathway ;
                     dc:title ?pwLabel ;
+                    dcterms:description ?description ;
                     dcterms:identifier ?pwId ;
                     <http://vocabularies.wikipathways.org/wp#isAbout> ?details ;
                     wp:organismName "Homo sapiens"^^xsd:string .
@@ -212,7 +213,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
                                      core_props=core_props)
 
         wdPage.set_label(str(row[2]), lang="en")
-        wdPage.set_description("biological pathway in human", lang="en")
+        wdPage.set_description(str(row[3]), lang="en")
 
         try_write(wdPage, record_id=pathway_id, record_prop=PROPS['Wikipathways ID'],
                 edit_summary="Updated a Wikipathways pathway", login=login, write=write)
