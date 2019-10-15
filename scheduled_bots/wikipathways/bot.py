@@ -296,23 +296,24 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             # P921 = main subject
             #prep["P921"].append(wdi_core.WDString(poid, prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
 
-        cell_type_ontology_query = """
-                PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
-                PREFIX dcterms: <http://purl.org/dc/terms/>
-                SELECT ?cellTypeOntologyTerm
-                WHERE {
-                  ?pathwayRDF wp:cellTypeOntologyTag ?cellTypeOntologyTerm ;
-                    foaf:page ?pathway ;
-                    dcterms:identifier \"""" + pathway_id + """\"^^xsd:string . 
-                }
-                """
-        cell_type_ontology_query_res = temp.query(cell_type_ontology_query)
-        prep["P927"] = []
-        for row in cell_type_ontology_query_res:
-            cell_type_ontology_iri = str(row[0])
-            ctoid = cell_type_ontology_iri.replace("http://purl.obolibrary.org/obo/CL_", "CL:")
-            print("ctoid")
-            print(ctoid)
+        #TODO: Propose Cell Type Ontology ID as new property, add release item, associate terms with WD items.
+        #cell_type_ontology_query = """
+        #        PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
+        #        PREFIX dcterms: <http://purl.org/dc/terms/>
+        #        SELECT ?cellTypeOntologyTerm
+        #        WHERE {
+        #          ?pathwayRDF wp:cellTypeOntologyTag ?cellTypeOntologyTerm ;
+        #            foaf:page ?pathway ;
+        #            dcterms:identifier \"""" + pathway_id + """\"^^xsd:string . 
+        #        }
+        #        """
+        #cell_type_ontology_query_res = temp.query(cell_type_ontology_query)
+        #prep["P927"] = []
+        #for row in cell_type_ontology_query_res:
+        #    cell_type_ontology_iri = str(row[0])
+        #    ctoid = cell_type_ontology_iri.replace("http://purl.obolibrary.org/obo/CL_", "CL:")
+        #    print("ctoid")
+        #    print(ctoid)
 
             # P927 = anatomical location
             #prep["P927"].append(wdi_core.WDString(ctoid, prop_nr='P927', references=[copy.deepcopy(pathway_reference)]))
