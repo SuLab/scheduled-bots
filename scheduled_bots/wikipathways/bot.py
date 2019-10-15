@@ -230,28 +230,42 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
 
         author_query = """
                 PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
-                SELECT ?author ?authorName ?authorQIRI
+                SELECT ?author ?authorName ?authorHomepage ?authorQIRI
                 WHERE {
                   <http://identifiers.org/wikipathways/""" + pathway_id + """> dc:creator ?author .
                   ?author a                    foaf:Person ;
                   foaf:name            ?authorName ;
-                  owl:sameAs           ?authorQIRI .
+                  foaf:homepage            ?authorHomepage .
+                  OPTIONAL { ?author    owl:sameAs.     ?authorQIRI . }
                 }
                 """
         author_query_res = temp.query(author_query)
-        prep["P50"] = []
+        prep["P2093"] = []
         for row in author_query_res:
-            author_iri = str(row[0])
             author_name = str(row[1])
             print("author_name")
             print(author_name)
-            author_qiri = str(row[2])
-            author_qid = author_qiri.replace("https://www.wikidata.org/wiki/", "")
-            print("author_qid")
-            print(author_qid)
+            author_homepage = str(row[2])
+            print("author_homepage")
+            print(author_homepage)
 
-            # P50 = author
-            #prep["P50"].append(wdi_core.WDString(author_qid, prop_nr='P50', references=[copy.deepcopy(pathway_reference)]))
+            # P2093 = author name string
+            #prep["P2093"].append(wdi_core.WDString(author_name, prop_nr='P2093', references=[copy.deepcopy(pathway_reference)]))
+   
+        prep["P50"] = []
+        if row[3] != NULL: # TODO: only if row[3] exists (authorQIRI)
+            for row in author_query_res:  
+                author_iri = str(row[0])
+                author_name = str(row[1])
+                print("author_name")
+                print(author_name)
+                author_qiri = str(row[3])
+                author_qid = author_qiri.replace("https://www.wikidata.org/wiki/", "")
+                print("author_qid")
+                print(author_qid)
+
+                # P50 = author
+                #prep["P50"].append(wdi_core.WDString(author_qid, prop_nr='P50', references=[copy.deepcopy(pathway_reference)]))
 
         disease_ontology_query = """
                 PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
