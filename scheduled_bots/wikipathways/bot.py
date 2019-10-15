@@ -39,9 +39,9 @@ PROPS = {
     'PubMed ID': 'P698',
     'curator': 'P1640',
     'retrieved': 'P813',
-    'Disease Ontology ID': 'P699',
     'medical condition': 'P1050',
     'author': 'P50',
+    'author name string': 'P2093',
     'main subject': 'P921',
     'anatomical location': 'P927'
 }
@@ -285,9 +285,8 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             print("doid")
             print(doid)
 
-            # P699 = Disease Ontology ID
             # P1050 = medical condition
-            #prep["P1050"].append(wdi_core.WDString(doid, prop_nr='P699', references=[copy.deepcopy(pathway_reference)]))
+            #prep["P1050"].append(wdi_core.WDString(doid, prop_nr='P1050', references=[copy.deepcopy(pathway_reference)]))
 
         pw_ontology_query = """
                 PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
