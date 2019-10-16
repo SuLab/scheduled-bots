@@ -236,11 +236,12 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
                   ?author a                    foaf:Person ;
                   foaf:name            ?authorName ;
                   foaf:homepage            ?authorHomepage .
-                  OPTIONAL { ?author    owl:sameAs.     ?authorQIRI . }
+                  OPTIONAL { ?author    owl:sameAs     ?authorQIRI . }
                 }
                 """
         author_query_res = temp.query(author_query)
         prep["P2093"] = []
+        prep["P50"] = []
         for row in author_query_res:
             author_name = str(row[1])
             print("author_name")
@@ -251,18 +252,17 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
 
             # P2093 = author name string
             #prep["P2093"].append(wdi_core.WDString(author_name, prop_nr='P2093', references=[copy.deepcopy(pathway_reference)]))
-   
-        prep["P50"] = []
-        if row[3] != NULL: # TODO: only if row[3] exists (authorQIRI)
-            for row in author_query_res:  
-                author_iri = str(row[0])
-                author_name = str(row[1])
-                print("author_name")
-                print(author_name)
-                author_qiri = str(row[3])
-                author_qid = author_qiri.replace("https://www.wikidata.org/wiki/", "")
-                print("author_qid")
-                print(author_qid)
+
+            if row[3] != NULL: # TODO: only if row[3] exists (authorQIRI)
+                for row in author_query_res:
+                    author_iri = str(row[0])
+                    author_name = str(row[1])
+                    print("author_name")
+                    print(author_name)
+                    author_qiri = str(row[3])
+                    author_qid = author_qiri.replace("https://www.wikidata.org/wiki/", "")
+                    print("author_qid")
+                    print(author_qid)
 
                 # P50 = author
                 #prep["P50"].append(wdi_core.WDString(author_qid, prop_nr='P50', references=[copy.deepcopy(pathway_reference)]))
