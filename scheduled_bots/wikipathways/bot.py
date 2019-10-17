@@ -230,11 +230,12 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
 
         author_query = """
                 PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
-                SELECT ?author ?authorName ?authorHomepage ?authorQIRI
+                SELECT ?author ?authorName ?authorOrder ?authorHomepage ?authorQIRI
                 WHERE {
                   <http://identifiers.org/wikipathways/""" + pathway_id + """> dc:creator ?author .
                   ?author a                    foaf:Person ;
                   foaf:name            ?authorName ;
+                  pq:series_ordinal            ?authorOrder ;
                   foaf:homepage            ?authorHomepage .
                   OPTIONAL { ?author    owl:sameAs     ?authorQIRI . }
                 """
@@ -246,7 +247,10 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             author_name = str(row[1])
             print("author_name")
             print(author_name)
-            author_homepage = str(row[2])
+            author_order = str(row[2])
+            print("author_order")
+            print(author_order)
+            author_homepage = str(row[3])
             print("author_homepage")
             print(author_homepage)
 
