@@ -315,7 +315,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             pwontology_pathway_annotations[pathway_id].append({"poid": poid, "qid": poid_qid[poid]})
 
             # P921 = main subject
-            prep["P921"].append(wdi_core.WDItem(qid[poid], prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
+            prep["P921"].append(wdi_core.WDItem(poid_qid[poid], prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
 
         #TODO: Propose Cell Type Ontology ID as new property, add release item, associate terms with WD items.
         #cell_type_ontology_query = """
