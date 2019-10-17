@@ -251,7 +251,8 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             print(author_homepage)
 
             # P2093 = author name string
-            prep["P2093"].append(wdi_core.WDString(author_name, prop_nr='P2093', references=[copy.deepcopy(pathway_reference)]))
+            author_url_qualifier = wdi_core.WDString(value=author_homepage, prop_nr="P2699", is_qualifier=True)
+            prep["P2093"].append(wdi_core.WDString(author_name, prop_nr='P2093', qualifiers=[copy.deepcopy(author_url_qualifier)], references=[copy.deepcopy(pathway_reference)]))
 
         prep["P50"] = []
         if row[3] != 'None': # TODO: only if row[3] exists (authorQIRI)
