@@ -116,14 +116,12 @@ def main(retrieved, fast_run, write):
             print("size: "+str(len(temp)))
 
     # Disease Ontology
-    disease_pathway_annotations = dict()
     doid_qid_query = wdi_core.WDItemEngine.execute_sparql_query("SELECT * WHERE {?qid wdt:P699 ?doid . }")
     doid_qid = dict()
     for result in doid_qid_query["results"]["bindings"]:
         doid_qid[result["doid"]["value"]] = result["qid"]["value"].replace("http://www.wikidata.org/entity/", "")
 
     # Pathway Ontology
-    pwontology_pathway_annotations = dict()
     poid_qid_query = wdi_core.WDItemEngine.execute_sparql_query("SELECT * WHERE {?qid wdt:P7333 ?poid . }")
     poid_qid = dict()
     for result in poid_qid_query["results"]["bindings"]:
@@ -290,7 +288,6 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             doid = disease_ontology_iri.replace("http://purl.obolibrary.org/obo/DOID_", "DOID:")
             print("doid")
             print(doid)
-            disease_pathway_annotations[pathway_id].append({"doid": doid, "qid": doid_qid[doid]})
 
             # P1050 = medical condition
             prep["P1050"].append(wdi_core.WDItem(doid_qid[doid], prop_nr='P1050', references=[copy.deepcopy(pathway_reference)]))
@@ -312,7 +309,6 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             poid = pw_ontology_iri.replace("http://purl.obolibrary.org/obo/PW_", "PW:")
             print("poid")
             print(poid)
-            pwontology_pathway_annotations[pathway_id].append({"poid": poid, "qid": poid_qid[poid]})
 
             # P921 = main subject
             prep["P921"].append(wdi_core.WDItem(poid_qid[poid], prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
