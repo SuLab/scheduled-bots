@@ -116,8 +116,11 @@ def main(retrieved, fast_run, write):
             u = requests.get(file)
             with closing(u), zipfile.ZipFile(io.BytesIO(u.content)) as archive:
                 for member in archive.infolist():
+                    if "_" in str(member.filename):
+                        continue
+                    print("parsing: " + member.filename)
                     nt_content = archive.read(member)
-                    temp.parse(data=nt_content.decode(), format="turtle")
+                    temp.parse(data=nt_content, format="turtle")
             print("size: "+str(len(temp)))
 
         if "rdf-wp" in file:  # get the most accurate file
@@ -231,6 +234,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             else:
                 if 'P2860' not in prep.keys():
                     prep["P2860"] = []
+                print(pmid_qid)
                 prep['P2860'].append(wdi_core.WDItemID(value=str(pmid_qid), prop_nr='P2860', references=[copy.deepcopy(pathway_reference)]))
 
         author_query = """
@@ -242,11 +246,11 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
                   foaf:name            ?authorName ;
                   foaf:homepage            ?authorHomepage .
                   OPTIONAL { ?author    owl:sameAs     ?authorQIRI . }
+                }
                 """
         author_query_res = temp.query(author_query)
         prep["P2093"] = []
 
-        authors = {pathway_id: {"author_strings": [], "authors_qid": []}}
         for row in author_query_res:
             author_name = str(row[1])
             print("author_name")
@@ -293,7 +297,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             print(doid)
 
             # P1050 = medical condition
-            prep["P1050"].append(wdi_core.WDItem(doid_qid[doid], prop_nr='P1050', references=[copy.deepcopy(pathway_reference)]))
+            prep["P1050"].append(wdi_core.WDItemID(doid_qid[doid], prop_nr='P1050', references=[copy.deepcopy(pathway_reference)]))
             
         pw_ontology_query = """
                 PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
@@ -314,7 +318,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             print(poid)
 
             # P921 = main subject
-            prep["P921"].append(wdi_core.WDItem(poid_qid[poid], prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
+            #prep["P921"].append(wdi_core.WDItemID(poid_qid[poid], prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
 
         #TODO: Propose Cell Type Ontology ID as new property, add release item, associate terms with WD items.
         #cell_type_ontology_query = """
