@@ -67,6 +67,17 @@ __metadata__ = {
 fast_run_base_filter = {'P2410': ''}
 fast_run = True
 
+# populate ontology dictionaries
+# Disease Ontology
+doid_qid_query = wdi_core.WDItemEngine.execute_sparql_query("SELECT * WHERE {?qid wdt:P699 ?doid . }")
+doid_qid = dict()
+for result in doid_qid_query["results"]["bindings"]:
+    doid_qid[result["doid"]["value"]] = result["qid"]["value"].replace("http://www.wikidata.org/entity/", "")
+
+# Pathway Ontology
+poid_qid_query = wdi_core.WDItemEngine.execute_sparql_query("SELECT * WHERE {?qid wdt:P7333 ?poid . }")
+poid_qid = dict()
+
 def create_reference(pathway_id, retrieved):
     refStatedIn = wdi_core.WDItemID(value=ITEMS['Wikipathways'], prop_nr=PROPS['stated in'], is_reference=True)
     timeStringNow = retrieved.strftime("+%Y-%m-%dT00:00:00Z")
@@ -85,6 +96,9 @@ def panic(pathway_id, msg='', msg_type=''):
 def main(retrieved, fast_run, write):
     login = wdi_login.WDLogin(WDUSER, WDPASS)
     temp = Graph()
+    # TODO add try catch to catch api errors while downloading. Currently when there is API glitch, an UTF error is report, which is only because it gets empty content.
+    # TODO add progress indicator of the download
+
     url = 'http://data.wikipathways.org/current/rdf'
     page = requests.get(url).text
     files = []
@@ -115,17 +129,6 @@ def main(retrieved, fast_run, write):
                     temp.parse(data=nt_content.decode(), format="turtle")
             print("size: "+str(len(temp)))
 
-    # Disease Ontology
-    doid_qid_query = wdi_core.WDItemEngine.execute_sparql_query("SELECT * WHERE {?qid wdt:P699 ?doid . }")
-    doid_qid = dict()
-    for result in doid_qid_query["results"]["bindings"]:
-        doid_qid[result["doid"]["value"]] = result["qid"]["value"].replace("http://www.wikidata.org/entity/", "")
-
-    # Pathway Ontology
-    poid_qid_query = wdi_core.WDItemEngine.execute_sparql_query("SELECT * WHERE {?qid wdt:P7333 ?poid . }")
-    poid_qid = dict()
-    for result in poid_qid_query["results"]["bindings"]:
-        poid_qid[result["poid"]["value"]] = result["qid"]["value"].replace("http://www.wikidata.org/entity/", "")
 
     wp_query = """prefix dcterm: <http://purl.org/dc/terms/>
             prefix wp: <http://vocabularies.wikipathways.org/wp#>
@@ -353,6 +356,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
 
         try_write(wdPage, record_id=pathway_id, record_prop=PROPS['Wikipathways ID'],
                 edit_summary="Updated a Wikipathways pathway", login=login, write=write)
+        sys.exit() ## Temp edit to only do one write
 
 def get_PathwayElements(pathway, datatype, temp, prep):
     query = """PREFIX wp:      <http://vocabularies.wikipathways.org/wp#>
