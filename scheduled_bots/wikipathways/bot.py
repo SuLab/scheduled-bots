@@ -38,7 +38,12 @@ PROPS = {
     'found in taxon': 'P703',
     'PubMed ID': 'P698',
     'curator': 'P1640',
-    'retrieved': 'P813'
+    'retrieved': 'P813',
+    'medical condition': 'P1050',
+    'author': 'P50',
+    'author name string': 'P2093',
+    'main subject': 'P921',
+    'anatomical location': 'P927'
 }
 
 core_props = get_default_core_props()
@@ -91,8 +96,16 @@ def main(retrieved, fast_run, write):
                 if filename not in files:
                     if filename != "./":
                         files.append(url + filename)
-    wpids = []
     for file in set(files):
+        if "rdf-authors" in file:  # get the most accurate file
+            print(file)
+            u = requests.get(file)
+            with closing(u), zipfile.ZipFile(io.BytesIO(u.content)) as archive:
+                for member in archive.infolist():
+                    nt_content = archive.read(member)
+                    temp.parse(data=nt_content.decode(), format="turtle")
+            print("size: "+str(len(temp)))
+
         if "rdf-wp" in file:  # get the most accurate file
             print(file)
             u = requests.get(file)
@@ -101,6 +114,18 @@ def main(retrieved, fast_run, write):
                     nt_content = archive.read(member)
                     temp.parse(data=nt_content.decode(), format="turtle")
             print("size: "+str(len(temp)))
+
+    # Disease Ontology
+    doid_qid_query = wdi_core.WDItemEngine.execute_sparql_query("SELECT * WHERE {?qid wdt:P699 ?doid . }")
+    doid_qid = dict()
+    for result in doid_qid_query["results"]["bindings"]:
+        doid_qid[result["doid"]["value"]] = result["qid"]["value"].replace("http://www.wikidata.org/entity/", "")
+
+    # Pathway Ontology
+    poid_qid_query = wdi_core.WDItemEngine.execute_sparql_query("SELECT * WHERE {?qid wdt:P7333 ?poid . }")
+    poid_qid = dict()
+    for result in poid_qid_query["results"]["bindings"]:
+        poid_qid[result["poid"]["value"]] = result["qid"]["value"].replace("http://www.wikidata.org/entity/", "")
 
     wp_query = """prefix dcterm: <http://purl.org/dc/terms/>
             prefix wp: <http://vocabularies.wikipathways.org/wp#>
@@ -111,6 +136,7 @@ def main(retrieved, fast_run, write):
                  wp:organism <http://purl.obolibrary.org/obo/NCBITaxon_9606> .
               }"""
 
+    wpids = []
     qres = temp.query(wp_query)
     for row in qres:
         wpids.append(str(row[0]))
@@ -153,17 +179,22 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
     qres3 = temp.query(query)
 
     for row in qres3:
+        #pathway_iri = str(row[0])
+        pw_id = str(row[1])
+        pw_label = str(row[2])
+        description = str(row[3])
+
         # P31 = instance of
         prep["P31"] = [
             wdi_core.WDItemID(value="Q4915012", prop_nr="P31", references=[copy.deepcopy(pathway_reference)])]
 
-        prep["P1476"] = [wdi_core.WDMonolingualText(value=str(row[2]), prop_nr="P1476", references=[copy.deepcopy(pathway_reference)])]
+        prep["P1476"] = [wdi_core.WDMonolingualText(value=pw_label, prop_nr="P1476", references=[copy.deepcopy(pathway_reference)])]
 
         # P2410 = WikiPathways ID
         prep["P2410"] = [wdi_core.WDString(pathway_id, prop_nr='P2410', references=[copy.deepcopy(pathway_reference)])]
 
         # P2888 = exact match
-        prep["P2888"] = [wdi_core.WDUrl("http://identifiers.org/wikipathways/" + str(row[1]), prop_nr='P2888',
+        prep["P2888"] = [wdi_core.WDUrl("http://identifiers.org/wikipathways/" + pw_id, prop_nr='P2888',
                                         references=[copy.deepcopy(pathway_reference)])]
 
         query = """
@@ -199,6 +230,111 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
                     prep["P2860"] = []
                 prep['P2860'].append(wdi_core.WDItemID(value=str(pmid_qid), prop_nr='P2860', references=[copy.deepcopy(pathway_reference)]))
 
+        author_query = """
+                PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
+                SELECT ?author ?authorName ?authorHomepage ?authorQIRI
+                WHERE {
+                  <http://identifiers.org/wikipathways/""" + pathway_id + """> dc:creator ?author .
+                  ?author a                    foaf:Person ;
+                  foaf:name            ?authorName ;
+                  foaf:homepage            ?authorHomepage .
+                  OPTIONAL { ?author    owl:sameAs     ?authorQIRI . }
+                """
+        author_query_res = temp.query(author_query)
+        prep["P2093"] = []
+
+        authors = {pathway_id: {"author_strings": [], "authors_qid": []}}
+        for row in author_query_res:
+            author_name = str(row[1])
+            print("author_name")
+            print(author_name)
+            author_homepage = str(row[2])
+            print("author_homepage")
+            print(author_homepage)
+
+            # P2093 = author name string
+            author_url_qualifier = wdi_core.WDString(value=author_homepage, prop_nr="P2699", is_qualifier=True)
+            prep["P2093"].append(wdi_core.WDString(author_name, prop_nr='P2093', qualifiers=[copy.deepcopy(author_url_qualifier)], references=[copy.deepcopy(pathway_reference)]))
+
+        prep["P50"] = []
+        if row[3] != 'None': # TODO: only if row[3] exists (authorQIRI)
+            for row in author_query_res:
+                author_iri = str(row[0])
+                author_name = str(row[1])
+                print("author_name")
+                print(author_name)
+                author_qiri = str(row[3])
+                author_qid = author_qiri.replace("https://www.wikidata.org/wiki/", "")
+                print("author_qid")
+                print(author_qid)
+
+            # P50 = author
+            prep["P50"].append(wdi_core.WDString(author_qid, prop_nr='P50', references=[copy.deepcopy(pathway_reference)]))
+
+        disease_ontology_query = """
+                PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                SELECT ?diseaseOntologyTerm
+                WHERE {
+                  ?pathwayRDF wp:diseaseOntologyTag ?diseaseOntologyTerm ;
+                    foaf:page ?pathway ;
+                    dcterms:identifier \"""" + pathway_id + """\"^^xsd:string . 
+                }
+                """
+        disease_ontology_query_res = temp.query(disease_ontology_query)
+        prep["P1050"] = []
+        for row in disease_ontology_query_res:
+            disease_ontology_iri = str(row[0])
+            doid = disease_ontology_iri.replace("http://purl.obolibrary.org/obo/DOID_", "DOID:")
+            print("doid")
+            print(doid)
+
+            # P1050 = medical condition
+            prep["P1050"].append(wdi_core.WDItem(doid_qid[doid], prop_nr='P1050', references=[copy.deepcopy(pathway_reference)]))
+            
+        pw_ontology_query = """
+                PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                SELECT ?pwOntologyTerm
+                WHERE {
+                  ?pathwayRDF wp:pathwayOntologyTag ?pwOntologyTerm ;
+                    foaf:page ?pathway ;
+                    dcterms:identifier \"""" + pathway_id + """\"^^xsd:string . 
+                }
+                """
+        pw_ontology_query_res = temp.query(pw_ontology_query)
+        prep["P921"] = []
+        for row in pw_ontology_query_res:
+            pw_ontology_iri = str(row[0])
+            poid = pw_ontology_iri.replace("http://purl.obolibrary.org/obo/PW_", "PW:")
+            print("poid")
+            print(poid)
+
+            # P921 = main subject
+            prep["P921"].append(wdi_core.WDItem(poid_qid[poid], prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
+
+        #TODO: Propose Cell Type Ontology ID as new property, add release item, associate terms with WD items.
+        #cell_type_ontology_query = """
+        #        PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
+        #        PREFIX dcterms: <http://purl.org/dc/terms/>
+        #        SELECT ?cellTypeOntologyTerm
+        #        WHERE {
+        #          ?pathwayRDF wp:cellTypeOntologyTag ?cellTypeOntologyTerm ;
+        #            foaf:page ?pathway ;
+        #            dcterms:identifier \"""" + pathway_id + """\"^^xsd:string . 
+        #        }
+        #        """
+        #cell_type_ontology_query_res = temp.query(cell_type_ontology_query)
+        #prep["P927"] = []
+        #for row in cell_type_ontology_query_res:
+        #    cell_type_ontology_iri = str(row[0])
+        #    ctoid = cell_type_ontology_iri.replace("http://purl.obolibrary.org/obo/CL_", "CL:")
+        #    print("ctoid")
+        #    print(ctoid)
+
+            # P927 = anatomical location
+        #    prep["P927"].append(wdi_core.WDItem(qid[ctoid], prop_nr='P927', references=[copy.deepcopy(pathway_reference)]))
+
         data2add = []
         for key in prep.keys():
             for statement in prep[key]:
@@ -212,8 +348,8 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
                                      ref_handler=update_retrieved_if_new_multiple_refs,
                                      core_props=core_props)
 
-        wdPage.set_label(str(row[2]), lang="en")
-        wdPage.set_description(str(row[3]), lang="en")
+        wdPage.set_label(pw_label, lang="en")
+        wdPage.set_description(description, lang="en")
 
         try_write(wdPage, record_id=pathway_id, record_prop=PROPS['Wikipathways ID'],
                 edit_summary="Updated a Wikipathways pathway", login=login, write=write)
