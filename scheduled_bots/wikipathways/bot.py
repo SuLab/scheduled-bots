@@ -11,7 +11,7 @@ from contextlib import closing
 from bs4 import BeautifulSoup, SoupStrainer
 from SPARQLWrapper import SPARQLWrapper, JSON
 import re
-
+import tqdm
 import requests
 # from scheduled
 from scheduled_bots import PROPS, ITEMS, get_default_core_props
@@ -264,7 +264,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             prep["P2093"].append(wdi_core.WDString(author_name, prop_nr='P2093', qualifiers=[copy.deepcopy(author_url_qualifier)], references=[copy.deepcopy(pathway_reference)]))
 
         prep["P50"] = []
-        if row[3] != 'None': # TODO: only if row[3] exists (authorQIRI)
+        if row[3] != 'None': # only if row[3] exists (authorQIRI)
             for row in author_query_res:
                 author_iri = str(row[0])
                 author_name = str(row[1])
