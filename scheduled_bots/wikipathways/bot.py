@@ -77,6 +77,8 @@ for result in doid_qid_query["results"]["bindings"]:
 # Pathway Ontology
 poid_qid_query = wdi_core.WDItemEngine.execute_sparql_query("SELECT * WHERE {?qid wdt:P7333 ?poid . }")
 poid_qid = dict()
+for result in poid_qid_query["results"]["bindings"]:
+    poid_qid[result["poid"]["value"]] = result["qid"]["value"].replace("http://www.wikidata.org/entity/", "")
 
 def create_reference(pathway_id, retrieved):
     refStatedIn = wdi_core.WDItemID(value=ITEMS['Wikipathways'], prop_nr=PROPS['stated in'], is_reference=True)
