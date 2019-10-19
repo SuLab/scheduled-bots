@@ -299,7 +299,8 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             print(doid)
 
             # P1050 = medical condition
-            prep["P1050"].append(wdi_core.WDItemID(doid_qid[doid], prop_nr='P1050', references=[copy.deepcopy(pathway_reference)]))
+            if doid_qid.get(doid) != None:  #skip if qid is missing
+                prep["P1050"].append(wdi_core.WDItemID(doid_qid[doid], prop_nr='P1050', references=[copy.deepcopy(pathway_reference)]))
             
         pw_ontology_query = """
                 PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
@@ -320,7 +321,8 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             print(poid)
 
             # P921 = main subject
-            #prep["P921"].append(wdi_core.WDItemID(poid_qid[poid], prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
+            if poid_qid.get(poid) != None:  #skip if qid is missing
+                prep["P921"].append(wdi_core.WDItemID(poid_qid[poid], prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
 
         #TODO: Propose Cell Type Ontology ID as new property, add release item, associate terms with WD items.
         #cell_type_ontology_query = """
