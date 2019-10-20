@@ -11,7 +11,7 @@ from contextlib import closing
 from bs4 import BeautifulSoup, SoupStrainer
 from SPARQLWrapper import SPARQLWrapper, JSON
 import re
-
+import tqdm
 import requests
 # from scheduled
 from scheduled_bots import PROPS, ITEMS, get_default_core_props
@@ -77,6 +77,8 @@ for result in doid_qid_query["results"]["bindings"]:
 # Pathway Ontology
 poid_qid_query = wdi_core.WDItemEngine.execute_sparql_query("SELECT * WHERE {?qid wdt:P7333 ?poid . }")
 poid_qid = dict()
+for result in poid_qid_query["results"]["bindings"]:
+    poid_qid[result["poid"]["value"]] = result["qid"]["value"].replace("http://www.wikidata.org/entity/", "")
 
 def create_reference(pathway_id, retrieved):
     refStatedIn = wdi_core.WDItemID(value=ITEMS['Wikipathways'], prop_nr=PROPS['stated in'], is_reference=True)
@@ -189,6 +191,13 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
         pw_id = str(row[1])
         pw_label = str(row[2])
         description = str(row[3])
+        
+        ## clean up descriptions
+        description = re.sub(r'https?:\/\/.*[\s\r\n]','',description)
+        description = description.replace('\n',' ').replace('\r',' ').replace('\'\'\'','').replace('\'\'','').replace('[','').replace(']','')
+        description = description.replace('Proteins on this pathway have targeted assays available via the Portal','')
+        description = (description[:246]+'...') if len(description) > 246 else description
+        description = 'biological pathway in human' if len(description) < 20 else description
 
         # P31 = instance of
         prep["P31"] = [
@@ -264,7 +273,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             prep["P2093"].append(wdi_core.WDString(author_name, prop_nr='P2093', qualifiers=[copy.deepcopy(author_url_qualifier)], references=[copy.deepcopy(pathway_reference)]))
 
         prep["P50"] = []
-        if row[3] != 'None': # TODO: only if row[3] exists (authorQIRI)
+        if row[3] != 'None': # only if row[3] exists (authorQIRI)
             for row in author_query_res:
                 author_iri = str(row[0])
                 author_name = str(row[1])
@@ -297,7 +306,8 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             print(doid)
 
             # P1050 = medical condition
-            prep["P1050"].append(wdi_core.WDItemID(doid_qid[doid], prop_nr='P1050', references=[copy.deepcopy(pathway_reference)]))
+            if doid_qid.get(doid) != None:  #skip if qid is missing
+                prep["P1050"].append(wdi_core.WDItemID(doid_qid[doid], prop_nr='P1050', references=[copy.deepcopy(pathway_reference)]))
             
         pw_ontology_query = """
                 PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
@@ -318,7 +328,8 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             print(poid)
 
             # P921 = main subject
-            #prep["P921"].append(wdi_core.WDItemID(poid_qid[poid], prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
+            if poid_qid.get(poid) != None:  #skip if qid is missing
+                prep["P921"].append(wdi_core.WDItemID(poid_qid[poid], prop_nr='P921', references=[copy.deepcopy(pathway_reference)]))
 
         #TODO: Propose Cell Type Ontology ID as new property, add release item, associate terms with WD items.
         #cell_type_ontology_query = """
