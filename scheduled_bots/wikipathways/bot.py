@@ -191,6 +191,13 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
         pw_id = str(row[1])
         pw_label = str(row[2])
         description = str(row[3])
+        
+        ## clean up descriptions
+        description = re.sub(r'https?:\/\/.*[\s\r\n]','',description)
+        description = description.replace('\n',' ').replace('\r',' ').replace('\'\'\'','').replace('\'\'','').replace('[','').replace(']','')
+        description = description.replace('Proteins on this pathway have targeted assays available via the Portal','')
+        description = (description[:246]+'...') if len(description) > 246 else description
+        description = 'biological pathway in human' if len(description) < 20 else description
 
         # P31 = instance of
         prep["P31"] = [
