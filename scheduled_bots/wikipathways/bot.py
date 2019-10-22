@@ -259,6 +259,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
                 """
         author_query_res = temp.query(author_query)
         prep["P2093"] = []
+        prep["P50"] = []
 
         for row in author_query_res:
             author_name = str(row[1])
@@ -272,9 +273,8 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
             author_url_qualifier = wdi_core.WDString(value=author_homepage, prop_nr="P2699", is_qualifier=True)
             prep["P2093"].append(wdi_core.WDString(author_name, prop_nr='P2093', qualifiers=[copy.deepcopy(author_url_qualifier)], references=[copy.deepcopy(pathway_reference)]))
 
-        prep["P50"] = []
-        if row[3] != 'None': # only if row[3] exists (authorQIRI)
-            for row in author_query_res:
+
+            if row[3] != None: # only if row[3] exists (authorQIRI)
                 author_iri = str(row[0])
                 author_name = str(row[1])
                 print("author_name")
