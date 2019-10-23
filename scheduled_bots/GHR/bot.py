@@ -212,19 +212,19 @@ for i in tqdm(range(len(inheritance_avail))):
 #### Add GHR disease/conditions urls (once property has been created and approved)
 ## Load successfully mapped GHR disease urls
 mapped_orpha_urls = wd_orpha_no_dups.merge(no_orphanet_dups,on='Orphanet',how='inner')
-"""
+
 i=0
 for i in tqdm(range(len(mapped_orpha_urls))):
     disease_qid = mapped_orpha_urls.iloc[i]['WDID']
     ghr_url = mapped_orpha_urls.iloc[i]['url']
     ghr_id = mapped_orpha_urls.iloc[0]['url'].replace("https://ghr.nlm.nih.gov/condition/","")
     reference = create_reference(ghr_url)
-    url_prop = "PXXX" ## to be filled in once a property is assigned
+    url_prop = "P7464" 
     statement = [wdi_core.WDString(value=ghr_id, prop_nr=url_prop, references=[copy.deepcopy(reference)])]
     item = wdi_core.WDItemEngine(wd_item_id=disease_qid, data=statement, append_value=url_prop,
                                global_ref_mode='CUSTOM', ref_handler=update_retrieved_if_new_multiple_refs)
     item.write(login)
     i=i+1
-"""
+
 
 
