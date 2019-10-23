@@ -13,8 +13,9 @@ def create_reference():
     refStatedIn = wdi_core.WDItemID(value="Q70116865", prop_nr="P248", is_reference=True)
     timeStringNow = datetime.now().strftime("+%Y-%m-%dT00:00:00Z")
     refRetrieved = wdi_core.WDTime(timeStringNow, prop_nr="P813", is_reference=True)
-    
-    return [refStatedIn, refRetrieved]
+    refStatedIn2 = wdi_core.WDItemID(value="Q21008030", prop_nr="P248", is_reference=True)
+    refRetrieved2 = wdi_core.WDTime(timeStringNow, prop_nr="P813", is_reference=True)    
+    return [refStatedIn, refRetrieved, refStatedIn2, refRetrieved2]
 
 
 
