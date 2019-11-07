@@ -1,0 +1,68 @@
+	raw_drug_name	source_name	drug_UMLS_CUI	drug_ChEBI_ID	drug_cas#	predicate_raw	predicate_aggregate	predicate_string	indication_raw_string	umls_phen_cui	umls_phen_PT	drug_cas_wdid	drug_chebi_wdid	drug_cui_wdid	phen_cui_wdid
+2135	chlorphenesin carbamate	ChEBI	C0055467	3643.0	886-74-8	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q27106156	Q27106156	Q27106156	Q10860644
+2280	cyclobenzaprine hydrochloride	ChEBI	C0125988	3997.0	6202-23-9	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q27106282	Q27106282	Q27106282	Q10860644
+2281	cyclobenzaprine hydrochloride	PDR	C0125988	3997.0	6202-23-9	causes			MUSCLE RELAXANTS; SKELETAL MUSCLE RELAXANTS & COMBINATIONS	C0026836	Muscle Relaxation Phase	Q27106282	Q27106282	Q27106282	Q10860644
+3575	orphenadrine citrate	ChEBI	C0029310	7790.0	4682-36-4	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q27107584	Q27107584	Q27107584	Q10860644
+3579	orphenadrine citrate	PDR	C0029310	7790.0	4682-36-4	causes			MUSCLE RELAXANTS; SKELETAL MUSCLE RELAXANTS & COMBINATIONS	C0026836	Muscle Relaxation Phase	Q27107584	Q27107584	Q27107584	Q10860644
+3582	orphenadrine hydrochloride	ChEBI	C0699481	60902.0	341-69-5	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q27129640	Q27129640	Q27129640	Q10860644
+3626	pancuronium bromide	ChEBI	C0030311	7908.0	15500-66-0	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q27107612	Q27107612	Q27107612	Q10860644
+3945	rivastigmine tartrate	ChEBI	C0772415	64358.0	129101-54-8	causes			neuroprotective agent	C0598958	Neuroprotective Effect	Q27133236	Q27133236	Q27133236	Q1981368
+3947	rocuronium bromide	PDR	C0069632	8885.0	119302-91-9	causes			MUSCLE RELAXANTS; NEUROMUSCULAR BLOCKING AGENTS	C0026836	Muscle Relaxation Phase	Q27108171	Q27108171	Q27108171	Q10860644
+7153	baclofen	ChEBI	C0004609	2972.0	1134-47-0	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q413717	Q413717	Q413717	Q10860644
+7156	Baclofen	MeSH_PA	C0004609	2972.0	1134-47-0	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q413717	Q413717	Q413717	Q10860644
+8389	carisoprodol	ChEBI	C0007248	3419.0	78-44-4	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q416905	Q416905	Q416905	Q10860644
+8391	Carisoprodol	MeSH_PA	C0007248	3419.0	78-44-4	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q416905	Q416905	Q416905	Q10860644
+9025	chlormezanone	ChEBI	C0008223	3619.0	80-77-3	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q5102983	Q5102983	Q5102983	Q10860644
+9028	Chlormezanone	MeSH_PA	C0008223	3619.0	80-77-3	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q5102983	Q5102983	Q5102983	Q10860644
+9115	chlorphenesin	ChEBI	C0008280	3642.0	104-29-0	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q5103226	Q5103226	Q5103226	Q10860644
+9116	Chlorphenesin	MeSH_PA	C0008280	3642.0	104-29-0	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q5103226	Q5103226	Q5103226	Q10860644
+9191	chlorzoxazone	ChEBI	C0008296	3655.0	95-25-0	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q3294630	Q3294630	Q3294630	Q10860644
+9194	Chlorzoxazone	MeSH_PA	C0008296	3655.0	95-25-0	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q3294630	Q3294630	Q3294630	Q10860644
+9287	cilostazol	ChEBI	C0055729	31401.0	73963-72-1	causes			neuroprotective agent	C0598958	Neuroprotective Effect	Q258591	Q258591	Q258591	Q1981368
+9294	cilostazol	MeSH_PA	C0055729	31401.0	73963-72-1	causes			Neuroprotective Agents	C0598958	Neuroprotective Effect	Q258591	Q258591	Q258591	Q1981368
+9860	creatine	ChEBI	C0010286	16919.0	57-00-1	causes			neuroprotective agent	C0598958	Neuroprotective Effect	Q223600	Q223600	Q223600	Q1981368
+9949	cyclobenzaprine	ChEBI	C0056732	3996.0	303-53-7	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q5198674	Q5198674	Q5198674	Q10860644
+9955	cyclobenzaprine	MeSH_PA	C0056732	3996.0	303-53-7	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q5198674	Q5198674	Q5198674	Q10860644
+10251	dantrolene	ChEBI	C0010976	4317.0	7261-97-4	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q421274	Q421274	Q421274	Q10860644
+10252	Dantrolene	MeSH_PA	C0010976	4317.0	7261-97-4	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q421274	Q421274	Q421274	Q10860644
+10670	Diazepam	MeSH_PA	C0012010	49575.0	439-14-5	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q210402	Q210402	Q210402	Q10860644
+10676	diazepam	PDR	C0012010	49575.0	439-14-5	causes			MUSCLE RELAXANTS; SKELETAL MUSCLE RELAXANTS & COMBINATIONS	C0026836	Muscle Relaxation Phase	Q210402	Q210402	Q210402	Q10860644
+11441	dyphylline	ChEBI	C0013360	4728.0	479-18-5	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q1073333	Q1073333	Q1073333	Q10860644
+12411	felbamate	ChEBI	C0060135	4995.0	25451-15-4	causes			neuroprotective agent	C0598958	Neuroprotective Effect	Q421301	Q421301	Q421301	Q1981368
+15443	Mechlorethamine	MeSH_PA	C0025033	28925.0	51-75-2	causes			Poisons	C0032343	Poisoning	Q418011	Q418011	Q418011	Q114953
+15592	memantine	ChEBI	C0025242	64312.0	19982-08-2	causes			neuroprotective agent	C0598958	Neuroprotective Effect	Q412189	Q412189	Q412189	Q1981368
+15808	Methaqualone	DrugBank	C0025627	6821.0	72-44-6	causes			For the treatment of insomnia, and as a sedative and muscle relaxant.	C0026836	Muscle Relaxation Phase	Q423912	Q423912	Q423912	Q10860644
+16007	Methylprednisolone	MeSH_PA	C0025815	6888.0	83-43-2	causes			Neuroprotective Agents	C0598958	Neuroprotective Effect	Q417222	Q417222	Q417222	Q1981368
+17084	nitroglycerin	ChEBI	C0017887	28787.0	55-63-0	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q162867	Q162867	Q162867	Q10860644
+17543	orphenadrine	ChEBI	C0029309	7789.0	83-98-7	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q3292273	Q3292273	Q3292273	Q10860644
+17550	Orphenadrine	MeSH_PA	C0029309	7789.0	83-98-7	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q3292273	Q3292273	Q3292273	Q10860644
+17720	oxybutynin	ChEBI	C0069805	7856.0	5633-20-5	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q1060922	Q1060922	Q1060922	Q10860644
+17850	pancuronium	ChEBI	C0030310	7907.0	16974-53-1	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q424297	Q424297	Q424297	Q10860644
+17852	Pancuronium	DrugBank	C0030310	7907.0	16974-53-1	causes			Used as a muscle relaxant during anesthesia and surgical procedures.	C0026836	Muscle Relaxation Phase	Q424297	Q424297	Q424297	Q10860644
+18505	Pipecuronium	DrugBank	C0071102	8230.0	68399-58-6	causes			Used as a muscle relaxant during anesthesia and surgical procedures.	C0026836	Muscle Relaxation Phase	Q20817188	Q20817188	Q20817188	Q10860644
+19530	quinine	ChEBI	C0034417	15854.0	130-95-0	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q189522	Q189522	Q189522	Q10860644
+19535	Quinine	MeSH_PA	C0034417	15854.0	130-95-0	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q189522	Q189522	Q189522	Q10860644
+19635	rasagiline	ChEBI	C0525678	63620.0	136236-51-6	causes			neuroprotective agent	C0598958	Neuroprotective Effect	Q420685	Q420685	Q420685	Q1981368
+19638	rasagiline	MeSH_PA	C0525678	63620.0	136236-51-6	causes			Neuroprotective Agents	C0598958	Neuroprotective Effect	Q420685	Q420685	Q420685	Q1981368
+19828	Riluzole	MeSH_PA	C0073379	8863.0	1744-22-5	causes			Neuroprotective Agents	C0598958	Neuroprotective Effect	Q415744	Q415744	Q415744	Q1981368
+19906	rivastigmine	ChEBI	C0649350	8874.0	123441-03-2	causes			neuroprotective agent	C0598958	Neuroprotective Effect	Q411887	Q411887	Q411887	Q1981368
+19908	rivastigmine	MeSH_PA	C0649350	8874.0	123441-03-2	causes			Neuroprotective Agents	C0598958	Neuroprotective Effect	Q411887	Q411887	Q411887	Q1981368
+20595	Strychnine	MeSH_PA	C0202474	28973.0	57-24-9	causes			Poisons	C0032343	Poisoning	Q194406	Q194406	Q194406	Q114953
+20600	succinylcholine	ChEBI	C0038627	45652.0	306-40-1	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q424378	Q424378	Q424378	Q10860644
+20601	Succinylcholine	DrugBank	C0038627	45652.0	306-40-1	causes			Used in surgical procedures where a rapid onset and brief duration of muscle relaxation is needed (includes intubation, endoscopies, and ECT).	C0026836	Muscle Relaxation Phase	Q424378	Q424378	Q424378	Q10860644
+21434	Thiopental	DrugBank	C0039925	102166.0	76-75-5	causes			For use as the sole anesthetic agent for brief (15 minute) procedures, for induction of anesthesia prior to administration of other anesthetic agents, to supplement regional anesthesia, to provide hypnosis during balanced anesthesia with other agents for analgesia or muscle relaxation, for the control of convulsive states during or following inhalation anesthesia or local anesthesia, in neurosurgical patients with increased intracranial pressure, and for narcoanalysis and narcosynthesis in psychiatric disorders.	C0026836	Muscle Relaxation Phase	Q55186498	Q55186498	Q55186498	Q10860644
+21694	tizanidine	ChEBI	C0146011	63629.0	51322-75-9	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q423538	Q423538	Q423538	Q10860644
+21699	tizanidine	MeSH_PA	C0146011	63629.0	51322-75-9	causes			Muscle Relaxants, Central	C0026836	Muscle Relaxation Phase	Q423538	Q423538	Q423538	Q10860644
+21808	tolterodine	ChEBI	C0388753	9622.0	124937-51-5	causes			muscle relaxant	C0026836	Muscle Relaxation Phase	Q424312	Q424312	Q424312	Q10860644
+21834	topiramate	MeSH_PA	C0076829	63631.0	97240-79-4	causes			Neuroprotective Agents	C0598958	Neuroprotective Effect	Q221174	Q221174	Q221174	Q1981368
+24414	huperzine A	MeSH_PA	C0063033	78330.0	102518-79-6	causes			Neuroprotective Agents	C0598958	Neuroprotective Effect	Q425198	Q425198	Q425198	Q1981368
+24691	6alpha-methylprednisolone	ChEBI	C0025815	6888.0	83-43-2	causes			neuroprotective agent	C0598958	Neuroprotective Effect	Q417222	Q417222	Q417222	Q1981368
+25322	nicotinamide	ChEBI	C0028027	17154.0	98-92-0	causes			neuroprotective agent	C0598958	Neuroprotective Effect	Q192423	Q192423	Q192423	Q1981368
+26535	Cyclopentolate	WHO_ATC	C0010582	4024.0	512-15-2	causes			MYDRIATICS AND CYCLOPLEGICS	C0235238	Cycloplegia	Q867332	Q867332	Q867332	Q1147596
+26536	Ephedrine	WHO_ATC	C0014479	15407.0	299-42-3	causes			MYDRIATICS AND CYCLOPLEGICS	C0235238	Cycloplegia	Q219626	Q219626	Q219626	Q1147596
+26539	Phenylephrine	WHO_ATC	C0031469	8093.0	59-42-7	causes			MYDRIATICS AND CYCLOPLEGICS	C0235238	Cycloplegia	Q421910	Q421910	Q421910	Q1147596
+26540	Scopolamine	WHO_ATC	C0036442	16794.0	51-34-3	causes			MYDRIATICS AND CYCLOPLEGICS	C0235238	Cycloplegia	Q337188	Q337188	Q337188	Q1147596
+27019	CYCLOPENTOLATE HYDROCHLORIDE	WHO_DD	C0357664	4025.0	5870-29-1	causes			MYDRIATICS AND CYCLOPLEGICS	C0235238	Cycloplegia	Q27266147	Q27266147	Q27266147	Q1147596
+27306	HOMATROPINE METHYLBROMIDE	WHO_DD	C0062923	50373.0	80-49-9	causes			MYDRIATICS AND CYCLOPLEGICS	C0235238	Cycloplegia	Q2605497	Q2605497	Q2605497	Q1147596
+27664	PHENYLEPHRINE HYDROCHLORIDE	WHO_DD	C0031470	8094.0	61-76-7	causes			MYDRIATICS AND CYCLOPLEGICS	C0235238	Cycloplegia	Q27107758	Q27107758	Q27107758	Q1147596
+28014	TYRAMINE	WHO_DD	C0041479	15760.0	51-67-2	causes			MYDRIATICS AND CYCLOPLEGICS	C0235238	Cycloplegia	Q165930	Q165930	Q165930	Q1147596
