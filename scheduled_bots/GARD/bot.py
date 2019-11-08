@@ -47,10 +47,9 @@ gard_results = requests.get('https://api.rarediseases.info.nih.gov/api/diseases'
 
 ## Parse GARD data
 gard_df = pd.read_json(gard_results.text)
-key_of_interest = "mainPropery"
+key_of_interest = "mainPropery"  ## Note it's misspelled in GARD, treated as a variable in case it gets fixed
 
 gard_id_list = gard_df['diseaseId'].unique().tolist()
-#gard_id_list = [13018,5658,10095] ## Iteration test
 fail_list = []
 no_syns = []
 no_idens = []
@@ -58,7 +57,7 @@ identifier_df = pd.DataFrame(columns=['diseaseId','identifierId','identifierType
 synonyms_df = pd.DataFrame(columns=['diseaseId','name','source'])
 
 i=0
-while i <len(gard_id_list):
+while i < len(gard_id_list):
     try:
         sample_result = requests.get('https://api.rarediseases.info.nih.gov/api/diseases/'+str(gard_df.iloc[i]['diseaseId']),
                                    headers=header_info)
@@ -120,11 +119,11 @@ for eachidtype in property_list:
     sparqlQuery = sparql_start + prop_id_dict[eachidtype] + ' ?identifierId'+sparql_end
     result = wdi_core.WDItemEngine.execute_sparql_query(sparqlQuery)
     i=0
-    while i in <len(result["results"]["bindings"]):
+    while i in < len(result["results"]["bindings"]):
         id_id = result["results"]["bindings"][i]['identifierId']["value"]
         wdid = result["results"]["bindings"][i]["item"]["value"].replace("http://www.wikidata.org/entity/", "")
         identifier_megalist.append({'WDID':wdid,'identifierId':id_id, 'identifierType':eachidtype})
-	i=i+1
+    i=i+1
     time.sleep(2)
         
 identifier_megadf = pd.DataFrame(identifier_megalist)
@@ -185,7 +184,7 @@ result = wdi_core.WDItemEngine.execute_sparql_query(sparqlQuery)
 gard_alias_in_wd_list = []
 
 i=0
-while i <len(result["results"]["bindings"]):
+while i < len(result["results"]["bindings"]):
     gard_id = result["results"]["bindings"][i]["GARD"]["value"]
     wdid = result["results"]["bindings"][i]["item"]["value"].replace("http://www.wikidata.org/entity/", "")
     label = result["results"]["bindings"][i]["itemLabel"]["value"]
@@ -224,7 +223,7 @@ synonyms_to_add = synonyms_to_inspect.drop_duplicates(subset=['diseaseId','name'
 gard_alias_revision_list = []
 
 i=0
-while i <len(gard_to_auto_add):
+while i < len(gard_to_auto_add):
     disease_qid = synonyms_to_add.iloc[i]['WDID']
     disease_alias = synonyms_to_add.iloc[i]['name']
     wikidata_item = wdi_core.WDItemEngine(wd_item_id=disease_qid)
@@ -236,15 +235,29 @@ while i <len(gard_to_auto_add):
 
 
 
-
 ######################################################################################
 
-## Export the revision made by the bot
+## Export the revisions made by the bot and any failures
 
 with open('data/mapping_revisions.txt','w') as outwritelog:
     for eachrevid in gard_map_revision_list:
         outwritelog.write(str(eachrevid)+'\n')
- 
+
+        
 with open('data/alias_revisions.txt','w') as aliaslog:
     for eachrevid in gard_alias_revision_list:
         aliaslog.write(str(eachrevid)+'\n')
+        
+        
+with open('data/no_syns.txt','w') as outwrite:
+    for eachentry in no_syns:
+        outwrite.write(str(eachentry)+'\n')
+
+        
+with open('data/no_idens.txt','w') as idenwrite:
+    for eachiden in no_idens:
+        idenwrite.write(str(eachiden)+'\n')
+
+gard_to_auto_add.to_cav('data/gard_ids_attempted.tsv',sep='\t',inplace=True)
+gard_to_suggest.to_csv('data/gard_ids_found_not_attempted.tsv',sep='\t',inplace=True)
+        
