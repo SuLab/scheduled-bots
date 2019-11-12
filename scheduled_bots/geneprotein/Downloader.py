@@ -7,7 +7,7 @@ from mygene import MyGeneInfo
 
 
 class MyGeneDownloader:
-    def __init__(self, url="http://mygene.info/v3/", q=None, fields=None):
+    def __init__(self, url="https://mygene.info/v3/", q=None, fields=None):
         self.base_url = url
         self.q = "__all__" if not q else q
         self.entrezonly = True
