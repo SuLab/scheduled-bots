@@ -146,20 +146,25 @@ for index, row in df.iterrows():
                                                    ref_handler=update_retrieved_if_new_multiple_refs, 
                                                    append_value=["P2293"])
         wikidata_MONDOitem.get_wd_json_representation()
+
+        # Looks at recent write to see it if matches the last revision
+        if wikidata_MONDOitem.lastrevid is None: # Only need to do based on HGNC or MONDO
+            df.at[index, 'Status'] = "skipped" # enters 'skipped'
         
-        ### Write message for combination successfully logged, and enter 'complete' in Status column
-        HGNC_name = df.loc[index, 'Gene'] 
-        MONDO_name = df.loc[index, 'Disease']
+        # Write message for combination successfully logged, and enter 'complete' in Status column
+        else:
+            HGNC_name = df.loc[index, 'Gene'] # To output gene name > HGNC ID
+            MONDO_name = df.loc[index, 'Disease']
+                
+            print(colored(HGNC_name,"blue"), "Gene with HGNC ID", 
+                  colored(HGNC,"blue"), "logged as Qid",
+                  colored(wikidata_HGNCitem.write(login),"blue"),
+                  "and")
+            print(colored(MONDO_name,"green"), "Disease with MONDO ID", 
+                  colored(MONDO,"green"), "logged as Qid",
+                  colored(wikidata_MONDOitem.write(login),"green"))
         
-        print(colored(HGNC_name,"blue"), "Gene with HGNC ID", 
-              colored(HGNC,"blue"), "logged as Qid",
-              colored(wikidata_HGNCitem.write(login),"blue"),
-              "and")
-        print(colored(MONDO_name,"green"), "Disease with MONDO ID", 
-              colored(MONDO,"green"), "logged as Qid",
-              colored(wikidata_MONDOitem.write(login),"green"))
-        
-        df.at[index, 'Status'] = "complete" 
+            df.at[index, 'Status'] = "complete" 
         
 end_time = time.time() # Captures when loop run ends
 print("The total time of this loop is:", end_time - start_time, "seconds, or", (end_time - start_time)/60, "minutes")
