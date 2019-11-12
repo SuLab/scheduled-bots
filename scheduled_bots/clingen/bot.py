@@ -16,10 +16,10 @@
 
 # Relevant modules and libraries
 ### Installations by shell 
-get_ipython().system("pip install --upgrade pip")
-get_ipython().system('pip3 install tqdm')
-get_ipython().system('pip3 install termcolor')
-get_ipython().system('pip3 install wikidataintegrator')
+#get_ipython().system("pip install --upgrade pip")
+#get_ipython().system('pip3 install tqdm')
+#get_ipython().system('pip3 install termcolor')
+#get_ipython().system('pip3 install wikidataintegrator')
 
 ### Installations by python
 from wikidataintegrator import wdi_core, wdi_login 
