@@ -23,3 +23,5 @@ https://github.com/SuLab/scheduled-bots/blob/master/scheduled_bots/disease_ontol
 
 ## Installation
 Install files from requirements.txt and WikiDataIntegrator via pip.  Install scheduled-bots by changing into the directory with the setup.py file and install it with `pip install -e .`
+
+To import from scheduled-bots, you may also need to add that same directory to your system path with `sys.path.insert(0, '<path>')`.
