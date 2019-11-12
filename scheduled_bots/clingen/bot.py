@@ -156,13 +156,13 @@ for index, row in df.iterrows():
             HGNC_name = df.loc[index, 'Gene'] # To output gene name > HGNC ID
             MONDO_name = df.loc[index, 'Disease']
                 
-            print(colored(HGNC_name,"blue"), "Gene with HGNC ID", 
-                  colored(HGNC,"blue"), "logged as Qid",
-                  colored(wikidata_HGNCitem.write(login),"blue"),
-                  "and")
-            print(colored(MONDO_name,"green"), "Disease with MONDO ID", 
-                  colored(MONDO,"green"), "logged as Qid",
-                  colored(wikidata_MONDOitem.write(login),"green"))
+            #print(colored(HGNC_name,"blue"), "Gene with HGNC ID",
+            #      colored(HGNC,"blue"), "logged as Qid",
+            #      colored(wikidata_HGNCitem.write(login),"blue"),
+            #      "and")
+            #print(colored(MONDO_name,"green"), "Disease with MONDO ID",
+            #      colored(MONDO,"green"), "logged as Qid",
+            #      colored(wikidata_MONDOitem.write(login),"green"))
         
             df.at[index, 'Status'] = "complete" 
         
