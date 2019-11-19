@@ -6,7 +6,6 @@ import requests
 from datetime import datetime
 import copy
 
-datasrc = 'data/FinalReferenceStandard200Labels.csv'
 exppath = 'results/'
 
 
@@ -95,7 +94,10 @@ def write_adrs(run_list):
         spl_url = fda_base_spl_url+spl_drug_id
         source_type = run_list.iloc[i]['Section Display Name']
         reference = create_reference(spl_url,source_type)
-        statement = [wdi_core.WDItemID(value=drug_qid, prop_nr="P5642", references=[copy.deepcopy(reference)])]
+        treat_qualifier = wdi_core.WDItemID(value="Q179661", prop_nr="P1013", is_qualifier=True)
+        effect_qualifier = wdi_core.WDItemID(value="Q217690", prop_nr="P1542", is_qualifier=True)        
+        statement = [wdi_core.WDItemID(value=drug_qid, prop_nr="P5642", qualifiers=[treat_qualifier, effect_qualifier],
+                                       references=[copy.deepcopy(reference)])]
         wikidata_item = wdi_core.WDItemEngine(wd_item_id=disease_qid, data=statement, append_value="P5642",
                                global_ref_mode='CUSTOM', ref_handler=update_retrieved_if_new_multiple_refs)
         wikidata_item.write(login, edit_summary='added ADR relationship from FDA SPLs')  
@@ -109,28 +111,56 @@ def write_adrs(run_list):
 
 ###### Main Script
 
-#### Initial Run
+#### Determine the source based on the run
+with open('data/run_no.txt', 'r') as run_file:
+    for line in run_file:
+        run_number = int(line.strip())
+
+if run_number ==0:
+    datasrc = 'data/FinalReferenceStandard200Labels.csv'
+else:
+    datasrc = exppath+'qid_missing_not_attempted.tsv
+
 print("run started: ",datetime.now())
 spl_adr_raw = read_csv(datasrc, delimiter="|", header=0, dtype={'Index':int,'PT ID':str,'LLT ID':str}).fillna('None')
-wdid_umls_df_unique = disease_search(spl_adr_raw) ## Pull QIDS using UMLS CUIS
-spl_with_disease_wdids = spl_adr_raw.merge(wdid_umls_df_unique, on='UMLS CUI', how='left') ## Merge the mapping table
-drug_list = spl_with_disease_wdids['Drug Name'].unique().tolist() ## Pull QIDS using drug labels
+
+## Pull QIDS using UMLS CUIS
+wdid_umls_df_unique = disease_search(spl_adr_raw)
+
+## Merge the mapping table to the original table
+spl_with_disease_wdids = spl_adr_raw.merge(wdid_umls_df_unique, on='UMLS CUI', how='left')
+
+## Pull QIDS using drug labels
+if run_number == 0:
+    drug_list = spl_with_disease_wdids['Drug Name'].unique().tolist()
+else:
+    drug_list = []
+    with open(exppath+'drug_match_failed.txt','r') as drug_match_failed:
+        for line in drug_match_failed:
+            drug_list.append(line+'\n')
+
 drug_wdid_df, drug_match_failed = drug_search(drug_list)
 
 ## Merge the results to generate the table of entries to write
 df_to_write = spl_with_disease_wdids.merge(drug_wdid_df, on='Drug Name',how = 'left')
 all_data_available = df_to_write.loc[(~df_to_write['disease_WDID'].isnull()) & 
                                      (~df_to_write['drug_WDID'].isnull())]
+
 not_attempted = df_to_write.loc[(df_to_write['disease_WDID'].isnull()) | 
                                      (df_to_write['drug_WDID'].isnull())]
+
 ## Make the writes
-run_list = all_data_available[0:3] ## test run
-#run_list = all_data_available
+run_list = all_data_available
 wd_edit_results = write_adrs(run_list)
 
 #### Export the results of the run
+
 ## Results of the drug search
 drug_wdid_df.to_csv(exppath+'drug_wdid_df.tsv',sep='\t',header=True)
+
+with open(exppath+'drug_match_failed.txt','w') as store_it:
+    for eachfailure in drug_match_failed:
+        store_it.write(eachfailure+'\n')
 
 ## Results of the actual run
 wd_edit_results.to_csv(exppath+'run_results.tsv',sep='\t',header=True)
@@ -138,44 +168,8 @@ wd_edit_results.to_csv(exppath+'run_results.tsv',sep='\t',header=True)
 ## Failures to attempt in the future
 not_attempted.to_csv(exppath+'qid_missing_not_attempted.tsv',sep='\t',header=True)
 
-with open(exppath+'drug_match_failed.txt','w') as store_it:
-    for eachfailure in drug_match_failed:
-        store_it.write(eachfailure+'\n')
-
 print("run completed: ",datetime.now())
+run_number = run_number + 1
 
-
-
-
-#### Subsequent Runs 
-print("run started: ",datetime.now())
-
-datasrce = exppath+'qid_missing_not_attempted.tsv
-drug_list = []
-with open(exppath+'drug_match_failed.txt','r') as drug_match_failed:
-    for line in drug_match_failed:
-        drug_list.append(line+'\n')
-
-spl_adr_raw = read_csv(datasrc, delimiter="|", header=0, dtype={'Index':int,'PT ID':str,'LLT ID':str}).fillna('None')
-wdid_umls_df_unique = disease_search(spl_adr_raw)
-spl_with_disease_wdids = spl_adr_raw.merge(wdid_umls_df_unique, on='UMLS CUI', how='left')
-drug_wdid_df, drug_match_failed = drug_search(drug_list)
-df_to_write = spl_with_disease_wdids.merge(drug_wdid_df, on='Drug Name',how = 'left')
-
-all_data_available = df_to_write.loc[(~df_to_write['disease_WDID'].isnull()) & 
-                                     (~df_to_write['drug_WDID'].isnull())]
-
-not_attempted = df_to_write.loc[(df_to_write['disease_WDID'].isnull()) | 
-                                     (df_to_write['drug_WDID'].isnull())]
-
-run_list = all_data_available
-wd_edit_results = write_adrs(run_list)
-
-#### Export the results of the run
-drug_wdid_df.to_csv(exppath+'drug_wdid_df-'+str(datetime.now().strftime("+%Y-%m-%dT00:00:00Z"))+'.tsv',sep='\t',header=True)
-wd_edit_results.to_csv(exppath+'run_results-'+str(datetime.now().strftime("+%Y-%m-%dT00:00:00Z"))+'.tsv',sep='\t',header=True)
-not_attempted.to_csv(exppath+'qid_missing_not_attempted.tsv',sep='\t',header=True)
-with open(exppath+'drug_match_failed.txt','w') as store_it:
-    for eachfailure in drug_match_failed:
-        store_it.write(eachfailure+'\n')
-print("run completed: ",datetime.now())
+with open('data/run_no.txt', 'w') as run_file:
+    run_file.write(str(run_number))
