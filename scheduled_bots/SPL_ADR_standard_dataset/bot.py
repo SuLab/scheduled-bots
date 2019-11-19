@@ -33,7 +33,6 @@ def disease_search(spl_adr_raw):
 def drug_search(drug_list):
     pharm_start = 'SELECT ?item ?itemLabel WHERE {?item wdt:P31 wd:Q28885102; rdfs:label ?itemLabel.  FILTER(CONTAINS(LCASE(?itemLabel), "'
     med_start = 'SELECT ?item ?itemLabel WHERE {?item wdt:P31 wd:Q12140; rdfs:label ?itemLabel. FILTER(CONTAINS(LCASE(?itemLabel), "'
-    chem_start = 'SELECT ?item ?itemLabel WHERE {?item wdt:P31 wd:Q11173; rdfs:label ?itemLabel. FILTER(CONTAINS(LCASE(?itemLabel), "'
     query_end = '"@en)).}'
     drug_wdid_list = []
     drug_match_failed = []
@@ -56,15 +55,7 @@ def drug_search(drug_list):
                 drug_wdid_list.append({'Drug Name':drug_list[i], 'drug_WDID':drug_qid, 'drug_wd_label':drug_label, 
                                        'instance_of':'medication'})
             except:
-                try:
-                    sparqlQuery = chem_start+query_subject+query_end
-                    result = wdi_core.WDItemEngine.execute_sparql_query(sparqlQuery)
-                    drug_qid = result["results"]["bindings"][0]["item"]["value"].replace("http://www.wikidata.org/entity/", "")
-                    drug_label = result["results"]["bindings"][0]["itemLabel"]["value"]
-                    drug_wdid_list.append({'Drug Name':drug_list[i], 'drug_WDID':drug_qid, 'drug_wd_label':drug_label, 
-                                           'instance_of':'chemical'}) 
-                except:
-                    drug_match_failed.append(drug_list[i])
+                drug_match_failed.append(drug_list[i])
         i=i+1
     drug_wdid_df = pd.DataFrame(drug_wdid_list)    
     return drug_wdid_df, drug_match_failed
