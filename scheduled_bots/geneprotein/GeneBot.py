@@ -860,6 +860,8 @@ if __name__ == "__main__":
     for source in src.keys():
         metadata[source] = src[source]["version"]
 
+    # metadata = mgd.get_metadata()['src']['src_version'] # Can be deleted if fix above works
+
     if args.entrez:
         main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
              write=not args.dummy, entrez=args.entrez)
