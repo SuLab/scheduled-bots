@@ -52,7 +52,7 @@ class Node:
         self.pids = set()  # set of pids this node used
 
         self.qid = None
-        self.xrefs = set()
+        # self.xrefs = set()
         self.item = None
         self.bpv = defaultdict(set)
 
@@ -68,8 +68,8 @@ class Node:
         if 'basicPropertyValues' in meta:
             for basicPropertyValue in meta['basicPropertyValues']:
                 self.bpv[basicPropertyValue['pred']].add(basicPropertyValue['val'])
-        if 'xrefs' in meta:
-            self.xrefs = set([x['val'] for x in meta['xrefs']])
+        #if 'xrefs' in meta:
+        #    self.xrefs = set([x['val'] for x in meta['xrefs']])
         self.descr = meta.get('definition', dict()).get('val')
         self.deprecated = meta.get('deprecated', False)
         self.synonyms = set(x['val'] for x in meta.get('synonyms', list()))

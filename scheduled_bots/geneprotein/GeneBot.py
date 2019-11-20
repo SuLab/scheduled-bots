@@ -855,7 +855,10 @@ if __name__ == "__main__":
 
     # get metadata about sources
     mgd = MyGeneDownloader()
-    metadata = mgd.get_metadata()['src']['src_version']
+    metadata = dict()
+    src = mgd.get_metadata()['src']
+    for source in src.keys():
+        metadata[source] = src[source]["version"]
 
     if args.entrez:
         main(taxon, metadata, run_id=run_id, log_dir=log_dir, fast_run=fast_run,
