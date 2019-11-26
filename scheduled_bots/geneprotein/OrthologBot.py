@@ -163,7 +163,10 @@ if __name__ == "__main__":
 
     # get metadata about sources
     mgd = MyGeneDownloader()
-    metadata = mgd.get_metadata()['src']['src_version']
+    metadata = dict()
+    src = mgd.get_metadata()['src']
+    for source in src.keys():
+        metadata[source] = src[source]["version"]
 
     log_name = '{}-{}.log'.format(__metadata__['name'], run_id)
     if wdi_core.WDItemEngine.logger is not None:
