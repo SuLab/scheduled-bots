@@ -400,8 +400,9 @@ def get_PathwayElements(pathway, datatype, temp, prep):
 
 
     # Check for existence of the ids in wikidata
+
     wd_query = "SELECT DISTINCT * WHERE {VALUES ?id {"
-    wd_query += " ".join(ids)
+    wd_query += " ".join(list(set(ids)))
     if datatype == "Metabolite":
         wd_query += "} ?item wdt:P662 ?id . }"
     if datatype == "GeneProduct":
