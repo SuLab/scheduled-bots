@@ -102,6 +102,20 @@ def write_adrs(run_list):
 
 ###### Main Script
 
+
+## Login for Scheduled bot
+print("Logging in...")
+try:
+    from scheduled_bots.local import WDUSER, WDPASS
+except ImportError:
+    if "WDUSER" in os.environ and "WDPASS" in os.environ:
+        WDUSER = os.environ['WDUSER']
+        WDPASS = os.environ['WDPASS']
+    else:
+        raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
+
+
+
 #### Determine the source based on the run
 with open('data/run_no.txt', 'r') as run_file:
     for line in run_file:
