@@ -77,7 +77,7 @@ non_prop_chems = prop_65_irrelevant['Title'].tolist()
 prop65_chems = cols_of_interest.loc[~cols_of_interest['Title'].isin(non_prop_chems)].copy()
 
 ## To convert the title to a url stub, lower case it, strip out parenthesis, brackets, and commas, and replace spaces with dashes
-prop65_chems['url_stub'] = prop65_chems['Title'].str.lower().str.replace("[","").str.replace("]","").str.replace(",","").str.replace("(","").str.replace(")","").str.strip("]").str.replace(".","").str.replace(" ","-")
+prop65_chems['url_stub'] = prop65_chems['Title'].str.lower().str.replace("[","").str.replace("]","").str.replace(",","").str.replace("(","").str.replace(")","").str.strip("]").str.replace(".","").str.replace("&","").str.replace(" ","-")
 prop65_chems.to_csv('data/prop65_chems.tsv',sep='\t',header=True, encoding='utf-8')
 
 mixnmatch_cat = prop65_chems[['url_stub','Title','CAS Number']].copy()
@@ -118,7 +118,12 @@ CA65_in_wd = pd.DataFrame(CA65_in_wd_list)
 ## Remove items matched via mix n match from update
 prop_65_less_mixnmatch = prop_65_matches.loc[~prop_65_matches['Entry ID'].isin(CA65_in_wd['Entry ID'].tolist())]
 
-prop65_to_add = prop_65_less_mixnmatch
+## Remove items with known url issues
+bad_urls = read_csv('data/bad_urls.tsv',delimiter='\t',header=0, encoding='utf-8',index_col=0)
+bad_urls_cas = bad_urls['CAS Number'].tolist()
+prop_65_less_bad_urls = prop_65_less_mixnmatch.loc[~prop_65_less_mixnmatch['CAS Number'].isin(bad_urls_cas)]
+
+prop65_to_add = prop_65_less_bad_urls
 url_base = 'https://oehha.ca.gov/chemicals/'
 list_prop = "P7524" 
 

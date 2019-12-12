@@ -162,6 +162,14 @@ while i < len(result["results"]["bindings"]):
 CA65_in_wd = pd.DataFrame(CA65_in_wd_list)
 
 
+## Account for bad urls
+bad_urls = read_csv('data/bad_urls.tsv',delimiter='\t',header=0, encoding='utf-8',index_col=0)
+bad_CA65_in_wd = CA65_in_wd.loc[CA65_in_wd['WDID'].isin(bad_urls['WDID'].tolist())]
+bad_url_stubs = bad_CA65_in_wd.merge(bad_urls, on='WDID')
+bad_CA65_in_wd = CA65_in_wd.loc[CA65_in_wd['WDID'].isin(bad_urls['WDID'].tolist())]
+prop65_chems['url_stub'].loc[prop65_chems['CAS Number'].isin(bad_url_stubs['CAS Number'])] = bad_url_stubs['url_stub'].values
+
+
 ## Perform left merge for currently listed and partially delisted items
 prop_65_mapped = prop65_chems.merge(CA65_in_wd, on='url_stub', how='left')
 prop_65_mapped['devtox current'] = prop_65_mapped['Chemical listed under Proposition 65 as causing'].str.contains("Development")
