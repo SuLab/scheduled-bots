@@ -47,10 +47,18 @@ except ImportError:
         raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
 
+## Files should be downloaded to data/downloads
+downloadpath = 'data/downloads/'
+
+## Get the latest file
+filelist = []
+for eachfilename in os.listdir(downloadpath):
+    filelist.append(downloadpath+eachfilename)
+
+datasrc = max(filelist, key=os.path.getctime)      
+        
 
 ## Add Prop 65 CA IDs from CA OEHHA chemicals list Wikidata
-datasrc = 'data/OEHHA-2019-11-1.csv'
-
 chem_list = read_csv(datasrc, encoding = 'unicode_escape', header=0) 
 
 ## Pull out only columns of interest for our task
