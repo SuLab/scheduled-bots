@@ -25,17 +25,21 @@
 from wikidataintegrator import wdi_core, wdi_login 
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from datetime import datetime
-from termcolor import colored 
+#from termcolor import colored 
 
 import pandas as pd
 import numpy as np
 
-import os 
+#import ssl
+#ssl._create_default_https_context = ssl._create_unverified_context
+
+import os
 import copy 
 import time 
 
 # Login for running WDI
-
+os.environ["WDUSER"] = "Username" # Uses os package to call and set the environment for wikidata username
+os.environ["WDPASS"] = "password"
 print("Logging in...") 
 
 ### Conditional that outputs error command if not in the local python environment
@@ -51,7 +55,7 @@ login = wdi_login.WDLogin(WDUSER, WDPASS)
 
 # ClinGen gene-disease validity data
 ### Read as csv
-df = pd.read_csv('https://search.clinicalgenome.org/kb/gene-validity.csv', skiprows=6, header=None)  
+df = pd.read_csv('https://search.clinicalgenome.org/kb/gene-validity.csv', skiprows=6, header=None)
 
 ### Label column headings
 df.columns = ['Gene', 'HGNC Gene ID', 'Disease', 'MONDO Disease ID','SOP','Classification','Report Reference URL','Report Date']
@@ -97,11 +101,11 @@ for index, row in df.iterrows():
     ### Conditional utilizing length value for output table, accounts for absent/present combos
     if HGNC_qlength == 1:
         HGNC_qid = result_HGNC["results"]["bindings"][0]["gene"]["value"].replace("http://www.wikidata.org/entity/", "")
-        df.at[index, 'Gene QID'] = HGNC_qid 
-    if HGNC_qlength < 1: 
+        df.at[index, 'Gene QID'] = HGNC_qid # Input HGNC Qid in 'Gene QID' cell  
+    if HGNC_qlength < 1: # If no Qid
         df.at[index, 'Status'] = "error" 
         df.at[index, 'Gene QID'] = "absent"  
-    if HGNC_qlength > 1: 
+    if HGNC_qlength > 1: # If multiple Qid
         df.at[index, 'Status'] = "error" 
         df.at[index, 'Gene QID'] = "multiple"
         
@@ -121,12 +125,12 @@ for index, row in df.iterrows():
         df.at[index, 'Definitive'] = "no" 
         continue 
     else: 
-        df.at[index, 'Definitive'] = "yes" 
+        df.at[index, 'Definitive'] = "yes"
   
-    ### Conditional continues to write into WikiData only if 1 Qid for each + Definitive classification 
+    ### Conditional continues to write into WikiData only if 1 Qid for each + Definitive classification  
     if HGNC_qlength == 1 & MONDO_qlength == 1:
         
-        ### Call upon create_reference() function created   
+        ### Call upon create_reference() function created
         reference = create_reference() 
         
         # Add disease value to gene item page, and gene value to disease item page (symmetry)
@@ -150,16 +154,15 @@ for index, row in df.iterrows():
         # Write message for combination successfully logged, and enter 'complete' in Status column
         HGNC_name = df.loc[index, 'Gene'] # To output gene name > HGNC ID
         MONDO_name = df.loc[index, 'Disease']
-                
-        #print(colored(HGNC_name,"blue"), "Gene with HGNC ID",
+        df.at[index, 'Status'] = "complete" 
+        
+        #print(colored(HGNC_name,"blue"), "Gene with HGNC ID", 
         #      colored(HGNC,"blue"), "logged as Qid",
         #      colored(wikidata_HGNCitem.write(login),"blue"),
         #      "and")
-        #print(colored(MONDO_name,"green"), "Disease with MONDO ID",
+        #print(colored(MONDO_name,"green"), "Disease with MONDO ID", 
         #      colored(MONDO,"green"), "logged as Qid",
         #      colored(wikidata_MONDOitem.write(login),"green"))
-        
-        df.at[index, 'Status'] = "complete" 
         
 end_time = time.time() # Captures when loop run ends
 print("The total time of this loop is:", end_time - start_time, "seconds, or", (end_time - start_time)/60, "minutes")
