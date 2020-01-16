@@ -38,8 +38,6 @@ import copy
 import time 
 
 # Login for running WDI
-os.environ["WDUSER"] = "Username" # Uses os package to call and set the environment for wikidata username
-os.environ["WDPASS"] = "password"
 print("Logging in...") 
 
 ### Conditional that outputs error command if not in the local python environment
