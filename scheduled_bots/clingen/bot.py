@@ -25,10 +25,12 @@
 from wikidataintegrator import wdi_core, wdi_login 
 from wikidataintegrator.ref_handlers import update_retrieved_if_new_multiple_refs
 from datetime import datetime
-from termcolor import colored 
 
 import pandas as pd
 import numpy as np
+
+#import ssl
+#ssl._create_default_https_context = ssl._create_unverified_context
 
 import os 
 import copy 
@@ -36,7 +38,7 @@ import time
 
 # Login for running WDI
 
-print("Logging in...") 
+print("Logging in...")
 
 ### Conditional that outputs error command if not in the local python environment
 if "WDUSER" in os.environ and "WDPASS" in os.environ: 
@@ -97,11 +99,11 @@ for index, row in df.iterrows():
     ### Conditional utilizing length value for output table, accounts for absent/present combos
     if HGNC_qlength == 1:
         HGNC_qid = result_HGNC["results"]["bindings"][0]["gene"]["value"].replace("http://www.wikidata.org/entity/", "")
-        df.at[index, 'Gene QID'] = HGNC_qid 
-    if HGNC_qlength < 1: 
+        df.at[index, 'Gene QID'] = HGNC_qid # Input HGNC Qid in 'Gene QID" cell
+    if HGNC_qlength < 1: # If no Qid
         df.at[index, 'Status'] = "error" 
         df.at[index, 'Gene QID'] = "absent"  
-    if HGNC_qlength > 1: 
+    if HGNC_qlength > 1: # If multiple Qid
         df.at[index, 'Status'] = "error" 
         df.at[index, 'Gene QID'] = "multiple"
         
@@ -150,14 +152,6 @@ for index, row in df.iterrows():
         # Write message for combination successfully logged, and enter 'complete' in Status column
         HGNC_name = df.loc[index, 'Gene'] # To output gene name > HGNC ID
         MONDO_name = df.loc[index, 'Disease']
-                
-        #print(colored(HGNC_name,"blue"), "Gene with HGNC ID",
-        #      colored(HGNC,"blue"), "logged as Qid",
-        #      colored(wikidata_HGNCitem.write(login),"blue"),
-        #      "and")
-        #print(colored(MONDO_name,"green"), "Disease with MONDO ID",
-        #      colored(MONDO,"green"), "logged as Qid",
-        #      colored(wikidata_MONDOitem.write(login),"green"))
         
         df.at[index, 'Status'] = "complete" 
         
