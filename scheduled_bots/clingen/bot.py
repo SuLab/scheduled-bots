@@ -56,7 +56,7 @@ login = wdi_login.WDLogin(WDUSER, WDPASS)
 df = pd.read_csv('https://search.clinicalgenome.org/kb/gene-validity.csv', skiprows=6, header=None)  
 
 ### Label column headings
-df.columns = ['Gene', 'HGNC Gene ID', 'Disease', 'MONDO Disease ID','SOP','Classification','Report Reference URL','Report Date']
+df.columns = ['Gene', 'HGNC Gene ID', 'Disease', 'MONDO Disease ID', 'Inheritance', 'SOP','Classification','Report Reference URL','Report Date']
 
 ### Create time stamp of when downloaded (error if isoformat() used)
 timeStringNow = datetime.now().strftime("+%Y-%m-%dT00:00:00Z")
