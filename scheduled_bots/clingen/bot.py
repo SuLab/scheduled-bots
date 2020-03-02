@@ -6,7 +6,8 @@
 ### ClinGen (Clinical Genome Resource) develops curated data of genetic associations 
 ### CC0 https://clinicalgenome.org/docs/terms-of-use/
 
-### This scheduled bot operates through WDI to integrate ClinGen Gene-Disease Validity Data 
+### This scheduled bot operates weekly through WDI to integrate ClinGen Gene-Disease Validity Data  
+### http://jenkins.sulab.org/ 
 ### https://github.com/SuLab/GeneWikiCentral/issues/116 
 ### https://search.clinicalgenome.org/kb/gene-validity/ 
 
@@ -37,7 +38,6 @@ import copy
 import time 
 
 # Login for running WDI
-
 print("Logging in...")
 
 ### Conditional that outputs error command if not in the local python environment
@@ -56,7 +56,7 @@ login = wdi_login.WDLogin(WDUSER, WDPASS)
 df = pd.read_csv('https://search.clinicalgenome.org/kb/gene-validity.csv', skiprows=6, header=None)  
 
 ### Label column headings
-df.columns = ['Gene', 'HGNC Gene ID', 'Disease', 'MONDO Disease ID','SOP','Classification','Report Reference URL','Report Date']
+df.columns = ['Gene', 'HGNC Gene ID', 'Disease', 'MONDO Disease ID', 'Inheritance', 'SOP','Classification','Report Reference URL','Report Date']
 
 ### Create time stamp of when downloaded (error if isoformat() used)
 timeStringNow = datetime.now().strftime("+%Y-%m-%dT00:00:00Z")
@@ -139,7 +139,8 @@ for index, row in df.iterrows():
                                                   global_ref_mode='CUSTOM', # parameter that looks within 180 days
                                                   ref_handler=update_retrieved_if_new_multiple_refs, 
                                                   append_value=["P2293"])
-        wikidata_HGNCitem.get_wd_json_representation() # Gives json structure that submitted to API, helpful for debugging 
+        wikidata_HGNCitem.get_wd_json_representation() # Gives json structure that submitted to API, helpful for debugging
+        wikidata_HGNCitem.write(login)
         
         statement_MONDO = [wdi_core.WDItemID(value=HGNC_qid, prop_nr="P2293", references=[copy.deepcopy(reference)])] 
         wikidata_MONDOitem = wdi_core.WDItemEngine(wd_item_id=MONDO_qid, 
@@ -148,10 +149,7 @@ for index, row in df.iterrows():
                                                    ref_handler=update_retrieved_if_new_multiple_refs, 
                                                    append_value=["P2293"])
         wikidata_MONDOitem.get_wd_json_representation()
-        
-        # Write message for combination successfully logged, and enter 'complete' in Status column
-        HGNC_name = df.loc[index, 'Gene'] # To output gene name > HGNC ID
-        MONDO_name = df.loc[index, 'Disease']
+        wikidata_MONDOitem.write(login)
         
         df.at[index, 'Status'] = "complete" 
         
