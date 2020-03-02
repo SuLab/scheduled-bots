@@ -44,7 +44,7 @@ class MicrobialChromosomeBot:
         # but oh wait, it has no ref genome column
         url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/prokaryotes.txt"
         subprocess.check_output(['wget', '-N', url])
-        df = pd.read_csv("prokaryotes.txt", sep="\t", dtype=object, header=0)
+        df = pd.read_csv("prokaryotes.txt", sep="\t", dtype=object, header=0, error_bad_lines=False)
         df = df[df['Assembly Accession'].isin(accessions)]
         df = df.rename(columns={df.columns[0]: df.columns[0][1:]})
         # columns = ['Organism/Name', 'TaxID', 'BioProject Accession', 'BioProject ID', 'Group', 'SubGroup', 'Size (Mb)',
