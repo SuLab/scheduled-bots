@@ -137,7 +137,7 @@ for index, row in df.iterrows():
         wikidata_HGNCitem = wdi_core.WDItemEngine(wd_item_id=HGNC_qid, 
                                                   data=statement_HGNC, 
                                                   global_ref_mode='CUSTOM', # parameter that looks within 180 days
-                                                  ref_handler=update_retrieved_if_new_multiple_refs, 
+                                                  ref_handler=update_retrieved_if_new_multiple_refs(days=30),
                                                   append_value=["P2293"])
         wikidata_HGNCitem.get_wd_json_representation() # Gives json structure that submitted to API, helpful for debugging
         wikidata_HGNCitem.write(login)
@@ -146,7 +146,7 @@ for index, row in df.iterrows():
         wikidata_MONDOitem = wdi_core.WDItemEngine(wd_item_id=MONDO_qid, 
                                                    data=statement_MONDO, 
                                                    global_ref_mode='CUSTOM',
-                                                   ref_handler=update_retrieved_if_new_multiple_refs, 
+                                                   ref_handler=update_retrieved_if_new_multiple_refs(days=30),
                                                    append_value=["P2293"])
         wikidata_MONDOitem.get_wd_json_representation()
         wikidata_MONDOitem.write(login)
