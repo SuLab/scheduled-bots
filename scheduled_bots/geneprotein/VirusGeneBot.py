@@ -1,9 +1,10 @@
 from wikidataintegrator import wdi_core, wdi_login
 import copy
 import os
-import datetime
+from datetime import datetime
 import json
 import pprint
+import requests
 
 """
 Authors:
@@ -33,7 +34,7 @@ if "WDUSER" in os.environ and "WDPASS" in os.environ:
 else:
     raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-lgoin = wdi_login.WDLogin(user=WDUSER, pass=WDPASS)
+login = wdi_login.WDLogin(WDUSER, WDPASS)
 
 taxid = "2697049"
 genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species="+taxid).text)
@@ -48,23 +49,29 @@ for hit in genelist["hits"]:
   statements = []
 
   # instance of gene
-  statements.append(wdi_core.WDItemID(value="Q20747295", prop="P31", references=[copy.deepcopy(ncbi_reference)]))
+
+  statements.append(wdi_core.WDItemID(value="Q7187", prop_nr="P31", references=[copy.deepcopy(ncbi_reference)]))
 
   if geneinfo["type_of_gene"] == "protein-coding":
-      statements.append(wdi_core.WDItemID(value="wd:Q20747295", prop="P279", references=[copy.deepcopy(ncbi_reference)]))
+      statements.append(wdi_core.WDItemID(value="Q20747295", prop_nr="P279", references=[copy.deepcopy(ncbi_reference)]))
   # found in taxon
-  statements.append(wdi_core.WDItemID(taxid, prop="P703", references=[copy.deepcopy(ncbi_reference)]))
+  statements.append(wdi_core.WDItemID(value="Q82069695", prop_nr="P703", references=[copy.deepcopy(ncbi_reference)]))
 
 
   ## identifiers
+  # ncbi locus tag identifer
+  if "locus_tag" in geneinfo.keys():
+    statements.append(wdi_core.WDString(geneinfo["locus_tag"], prop_nr="P2393", references=[copy.deepcopy(ncbi_reference)]))
+
   # ncbi identifer
-  statements.append(wdi_core.WDString(geneinfo["entrezgene"], prop="P351", references=[copy.deepcopy(ncbi_reference)]))
+  statements.append(wdi_core.WDString(geneinfo["entrezgene"], prop_nr="P351", references=[copy.deepcopy(ncbi_reference)]))
 
 
-  item = wdi_core.WDItemEngine()
-  item.set_label(gene_info["name"], lang="en")
-  item.set_description("", lang="en")
+  item = wdi_core.WDItemEngine(data=statements)
+  item.set_label(geneinfo["name"], lang="en")
+  item.set_description("SARS-CoV-2 gene", lang="en") ## TODO needs to be changed when running other genes
 
-  pprint.pprint(item.get_wd_json_representation())
+  #pprint.pprint(item.get_wd_json_representation())
+  print(item.write(login))
   # item.write(login)
 

@@ -691,7 +691,7 @@ class MicrobeGeneBot(ChromosomalGeneBot):
     GENE_CLASS = MicrobeGene
 
 class VirusGeneBot():
-    GENE_CLASS = VirusGene
+    pass
 
 def remove_deprecated_statements(qid, frc, releases, last_updated, props, login):
     """
