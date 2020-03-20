@@ -409,6 +409,10 @@ class ChromosomalGene(Gene):
 
         return s
 
+class VirusGene(Gene):
+    """
+    Virus
+    """
 
 class MicrobeGene(Gene):
     """
