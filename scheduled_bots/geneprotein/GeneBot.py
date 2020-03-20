@@ -80,7 +80,7 @@ source_ref_id = {
 
 class Gene:
     """
-    Generic gene class. Subclasses: Human, Mammal, Microbe
+    Generic gene class. Subclasses: Human, Mammal, Microbe, Virus
     """
 
     def __init__(self, record, organism_info, login):
@@ -695,6 +695,8 @@ class HumanGeneBot(ChromosomalGeneBot):
 class MicrobeGeneBot(ChromosomalGeneBot):
     GENE_CLASS = MicrobeGene
 
+class VirusGeneBot()
+    GENE_CLASS = VirusGene
 
 def remove_deprecated_statements(qid, frc, releases, last_updated, props, login):
     """
