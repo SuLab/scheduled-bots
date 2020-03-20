@@ -50,15 +50,16 @@ for hit in genelist["hits"]:
   # instance of gene
   statements.append(wdi_core.WDItemID(value="Q20747295", prop="P31", references=[copy.deepcopy(ncbi_reference)]))
 
+  if geneinfo["type_of_gene"] == "protein-coding":
+      statements.append(wdi_core.WDItemID(value="wd:Q20747295", prop="P279", references=[copy.deepcopy(ncbi_reference)]))
   # found in taxon
   statements.append(wdi_core.WDItemID(taxid, prop="P703", references=[copy.deepcopy(ncbi_reference)]))
 
-  # encodes
 
   ## identifiers
   # ncbi identifer
   statements.append(wdi_core.WDString(geneinfo["entrezgene"], prop="P351", references=[copy.deepcopy(ncbi_reference)]))
-  statements.append(wdi_core.WDItemID(""))
+
 
   item = wdi_core.WDItemEngine()
   item.set_label(gene_info["name"], lang="en")
