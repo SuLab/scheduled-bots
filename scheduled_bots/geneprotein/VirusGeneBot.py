@@ -7,9 +7,9 @@ import pprint
 
 """
 Authors:
-  Jasper Koehorst (stuppie' at 'gmail.com )
-  Andra Waagmeester (andra' at ' micelio.be)
-  Egon Willighagen (sebastian.burgstaller' at 'gmail.com
+  Jasper Koehorst (ORCID:0000-0001-8172-8981 )
+  Andra Waagmeester (ORCID:0000-0001-9773-4008)
+  Egon Willighagen (ORCID:0000-0001-7542-0286)
 
 This bot uses of the WikidataIntegrator.
 
