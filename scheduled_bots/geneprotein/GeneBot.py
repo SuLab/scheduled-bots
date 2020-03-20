@@ -80,7 +80,7 @@ source_ref_id = {
 
 class Gene:
     """
-    Generic gene class. Subclasses: Human, Mammal, Microbe, Virus
+    Generic gene class. Subclasses: Human, Mammal, Microbe
     """
 
     def __init__(self, record, organism_info, login):
@@ -409,10 +409,6 @@ class ChromosomalGene(Gene):
 
         return s
 
-class VirusGene(Gene):
-    """
-    Virus
-    """
 
 class MicrobeGene(Gene):
     """
@@ -644,7 +640,6 @@ class GeneBot:
 
     def cleanup(self, releases, last_updated):
         """
-
         :param releases:
         :param last_updated:
         :param failed: list of entrez ids to skip
@@ -695,7 +690,7 @@ class HumanGeneBot(ChromosomalGeneBot):
 class MicrobeGeneBot(ChromosomalGeneBot):
     GENE_CLASS = MicrobeGene
 
-class VirusGeneBot()
+class VirusGeneBot():
     GENE_CLASS = VirusGene
 
 def remove_deprecated_statements(qid, frc, releases, last_updated, props, login):
