@@ -14,10 +14,20 @@ Authors:
 
 This bot uses of the WikidataIntegrator.
 
-Taxa ran: 2697049, 1415852, 227859, 349342, 305407
+Taxa ran: 2697049, 1415852, 227859, 349342, 305407, 1335626
+
+This bot is a first attempt to automatically maintain genomics data on Wikidata from authoritittive resources on the 
+SARS-CoV-2 virus. SARS-CoV-2 belongs to the broad family of viruses known as coronaviruses. This bot addresses the
+seven known coronavirus to infect people.
+
+The bot roughly works as follows:
+1. Check if the taxonid of the virus is already covered in Wikidata
+2. Get list of genes from https://mygene.info/
+3. Create or check items on Wikidats for each annotated gene
 """
 
 
+## Functions to create references
 def createNCBIGeneReference(ncbiGeneId, retrieved):
     refStatedIn = wdi_core.WDItemID(value="Q20641742", prop_nr="P248", is_reference=True)
     timeStringNow = retrieved.strftime("+%Y-%m-%dT00:00:00Z")
@@ -35,8 +45,11 @@ def createNCBITaxReference(ncbiTaxId, retrieved):
     ncbi_reference = [refStatedIn, refRetrieved, refNcbiTaxID]
     return ncbi_reference
 
-retrieved = datetime.now()
 
+retrieved = datetime.now() # Get currentdate to use as timestamp
+
+
+## Login to Wikidata
 print("Logging in...")
 if "WDUSER" in os.environ and "WDPASS" in os.environ:
     WDUSER = os.environ['WDUSER']
@@ -46,13 +59,11 @@ else:
 
 login = wdi_login.WDLogin(WDUSER, WDPASS)
 
-taxid = "305407"
+## Provide the taxonomy id from NCBI taxonomy and create or update the related Wikidata item
+taxid = "1335626"
 ncbiTaxref = createNCBITaxReference(taxid, retrieved)
-genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species="+taxid).text)
-print()
 ncbiTaxon = json.loads(requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=taxonomy&id={}&format=json".format(taxid)).text)
 
-pprint.pprint(genelist)
 taxonitemStatements = []
 ## instance of
 taxonitemStatements.append(wdi_core.WDItemID(value="Q16521", prop_nr="P31", references=[copy.deepcopy(ncbiTaxref)]))
@@ -71,6 +82,9 @@ if item.get_description(lang="en") == "":
 found_in_taxID = item.write(login)
 print(found_in_taxID)
 
+## Get list of genes from https://mygene.info/ and create or update items on Wikidats for each annotated gene
+genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species="+taxid).text)
+pprint.pprint(genelist)
 for hit in genelist["hits"]:
   ncbi_reference = createNCBIGeneReference(hit["entrezgene"], retrieved)
   print(hit["entrezgene"])
@@ -102,7 +116,7 @@ for hit in genelist["hits"]:
   item.set_label(geneinfo["name"], lang="en")
   item.set_description(scientificName+" gene", lang="en")
 
-  #pprint.pprint(item.get_wd_json_representation())
-  print(item.write(login))
-  # item.write(login)
+  #pprint.pprint(item.get_wd_json_representation()) ## get json for test purposes
+  print(item.write(login)) # write the wikidata item and return the QID
+
 
