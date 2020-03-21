@@ -153,6 +153,7 @@ def refseq():
 
 
 def parse_genbank(genbank_file):
+  statements = []
   # Genbank file is compressed, read directly from gzip
   handle = gzip.open(genbank_file, 'rt')
   # Parse as genbank file
@@ -161,7 +162,30 @@ def parse_genbank(genbank_file):
       print(repr(seq_record.seq))
       print(len(seq_record))
       for feature in seq_record.features:
-        print(feature)
+        if feature.type == "gene":
+          statements += location(feature)
+          statements += qualifiers(feature)
+
+def qualifiers(feature):
+  statements = []
+  gene = feature.qualifiers['gene']
+  locus_tag = feature.qualifiers['locus_tag']
+  statements += xref(feature.qualifiers['db_xref'])
+  return statements
+
+
+def xref(db_xref):
+  statements = []
+  return statements
+
+
+def location(feature):
+  statements = []
+  # Add the location statements
+  strand = feature.location.strand
+  start = feature.location.start
+  end = feature.location.end
+  return statements
 
 
 if __name__ == '__main__':
