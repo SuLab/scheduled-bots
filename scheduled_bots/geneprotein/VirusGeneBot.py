@@ -24,6 +24,8 @@ The bot roughly works as follows:
 1. Check if the taxonid of the virus is already covered in Wikidata
 2. Get list of genes from https://mygene.info/
 3. Create or check items on Wikidats for each annotated gene
+
+The bot aligns with the following schema: https://www.wikidata.org/wiki/EntitySchema:E165
 """
 
 
