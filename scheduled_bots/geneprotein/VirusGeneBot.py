@@ -14,7 +14,7 @@ Authors:
 
 This bot uses of the WikidataIntegrator.
 
-Taxa ran: 2697049, 1415852, 227859, 349342
+Taxa ran: 2697049, 1415852, 227859, 349342, 305407
 """
 
 
@@ -46,17 +46,18 @@ else:
 
 login = wdi_login.WDLogin(WDUSER, WDPASS)
 
-taxid = "349342"
+taxid = "305407"
 ncbiTaxref = createNCBITaxReference(taxid, retrieved)
 genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species="+taxid).text)
+print()
 ncbiTaxon = json.loads(requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=taxonomy&id={}&format=json".format(taxid)).text)
 
 pprint.pprint(genelist)
 taxonitemStatements = []
 ## instance of
-taxonitemStatements.append(wdi_core.WDItemID(value="Q16521", prop_nr="P31"))
+taxonitemStatements.append(wdi_core.WDItemID(value="Q16521", prop_nr="P31", references=[copy.deepcopy(ncbiTaxref)]))
 ## NCBI tax id
-taxonitemStatements.append(wdi_core.WDExternalID(value=taxid, prop_nr="P685"))
+taxonitemStatements.append(wdi_core.WDExternalID(value=taxid, prop_nr="P685", references=[copy.deepcopy(ncbiTaxref)]))
 ## scientificname
 scientificName = ncbiTaxon["result"][taxid]['scientificname']
 taxonitemStatements.append(wdi_core.WDString(scientificName, prop_nr="P225", references=[copy.deepcopy(ncbiTaxref)]))
@@ -65,6 +66,8 @@ if item.get_label() == "":
     item.set_label(label=scientificName, lang="en")
 if item.get_label() != scientificName:
     item.set_aliases(aliases=[scientificName])
+if item.get_description(lang="en") == "":
+    item.set_description(description="strain of virus", lang="en")
 found_in_taxID = item.write(login)
 print(found_in_taxID)
 
