@@ -193,6 +193,7 @@ def parse_genbank(genbank_file, wd_item_id_taxon):
           gene(feature, wd_item_id_taxon)
         if feature.type == "CDS":
           cds(feature, wd_item_id_taxon)
+          return
 
 def gene(feature, wd_item_id_taxon):
   statements = []
@@ -266,15 +267,15 @@ def location(feature):
   strand = feature.location.strand # P2548 # forward - Q22809680 # reverse - Q22809711
   if strand == 1:
     statements.append(wdi_core.WDItemID("Q22809680", prop_nr="P2548", references=[copy.deepcopy(ncbi_reference)]))
-  else if strand == -1:
+  elif strand == -1:
     statements.append(wdi_core.WDItemID("Q22809711", prop_nr="P2548", references=[copy.deepcopy(ncbi_reference)]))
   else:
     print(strand)
-    something went wrong with strand type
+    stop
   
   # P644 genomic start and P645 genomic end
-  statements.append(wdi_core.WDString(feature.location.start, prop_nr="P644", references=[copy.deepcopy(ncbi_reference)]))
-  statements.append(wdi_core.WDString(feature.location.end, prop_nr="P645", references=[copy.deepcopy(ncbi_reference)]))  
+  statements.append(wdi_core.WDString(str(feature.location.start), prop_nr="P644", references=[copy.deepcopy(ncbi_reference)]))
+  statements.append(wdi_core.WDString(str(feature.location.end), prop_nr="P645", references=[copy.deepcopy(ncbi_reference)]))  
   return statements
 
 
