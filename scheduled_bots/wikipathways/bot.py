@@ -103,7 +103,7 @@ def main(retrieved, fast_run, write):
 
     files = [
         'https://egonw.github.io/SARS-CoV-2-WikiPathways/wikipathways-SARS-CoV-2-rdf-authors.zip',
-        'https://egonw.github.io/SARS-CoV-2-WikiPathways/wikipathways-SARS-CoV-2-wp-rdf.zip'
+        'https://egonw.github.io/SARS-CoV-2-WikiPathways/wikipathways-SARS-CoV-2-rdf-wp.zip'
     ]
     for file in set(files):
         if "rdf-authors" in file:  # get the most accurate file
