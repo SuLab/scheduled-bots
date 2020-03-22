@@ -10,6 +10,7 @@ import ftplib
 import urllib.request
 import gzip
 from Bio import SeqIO
+import re
 
 """
 Authors:
@@ -32,7 +33,6 @@ The bot roughly works as follows:
 
 The bot aligns with the following schema: https://www.wikidata.org/wiki/EntitySchema:E165
 """
-
 
 ## Functions to create references
 def createNCBIGeneReference(ncbiGeneId, retrieved):
@@ -162,20 +162,48 @@ def parse_genbank(genbank_file):
       print(repr(seq_record.seq))
       print(len(seq_record))
       for feature in seq_record.features:
+        print(feature)
         if feature.type == "gene":
           statements += location(feature)
           statements += qualifiers(feature)
+        if feature.type == "CDS":
+          if 'protein_id' in feature.qualifiers:
+            cds(feature)
+
+def cds(feature):
+  statements = []
+  if 'protein_id' in feature.qualifiers:
+    # Refseq matching
+    refseq_regex = "^((AC|AP|NC|NG|NM|NP|NR|NT|NW|XM|XP|XR|YP|ZP)_\d+|(NZ\_[A-Z]{4}\d+))(\.\d+)?$"
+    pattern = re.compile(refseq_regex)    
+    protein_ids = feature.qualifiers['protein_id']
+    for protein_id in protein_ids:
+      if pattern.match(protein_id):
+        refseq_id = protein_id
+        statements.append(wdi_core.WDString(value=refseq_id, prop_nr="P637", references=[copy.deepcopy(ncbi_reference)]))
+
 
 def qualifiers(feature):
   statements = []
-  gene = feature.qualifiers['gene']
-  locus_tag = feature.qualifiers['locus_tag']
+  if 'gene' in feature.qualifiers:
+    gene_ids = feature.qualifiers['gene']
+    for gene_id in gene_ids:
+      pass # Add gene statement?
+  
+  if 'locus_tag' in feature.qualifiers:
+    for locus_tag in feature.qualifiers['locus_tag']:
+      statements.append(wdi_core.WDString(locus_tag, prop_nr="P2393", references=[copy.deepcopy(ncbi_reference)]))
+  
   statements += xref(feature.qualifiers['db_xref'])
   return statements
 
 
-def xref(db_xref):
+def xref(db_xrefs):
   statements = []
+  for db_xref in db_xrefs:
+    key, value = db_xref.split(":")
+    if key == 'GeneID':
+      pass # ... do something
   return statements
 
 
@@ -189,5 +217,7 @@ def location(feature):
 
 
 if __name__ == '__main__':
+  global ncbi_reference
+  ncbi_reference = createNCBIGeneReference("",retrieved)
   # main()
   refseq()
