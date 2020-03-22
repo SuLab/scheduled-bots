@@ -123,6 +123,7 @@ def main(retrieved, fast_run, write):
             u = requests.get(file)
             with closing(u), zipfile.ZipFile(io.BytesIO(u.content)) as archive:
                 for member in archive.infolist():
+                    print("parsing: " + member.filename)
                     nt_content = archive.read(member)
                     temp.parse(data=nt_content.decode(), format="turtle")
             print("size: "+str(len(temp)))
