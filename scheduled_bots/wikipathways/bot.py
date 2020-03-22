@@ -101,17 +101,10 @@ def main(retrieved, fast_run, write):
     # TODO add try catch to catch api errors while downloading. Currently when there is API glitch, an UTF error is report, which is only because it gets empty content.
     # TODO add progress indicator of the download
 
-    url = 'http://data.wikipathways.org/current/rdf'
-    page = requests.get(url).text
-    files = []
-    for link in BeautifulSoup(page, "lxml", parse_only=SoupStrainer('a')):
-        address = str(link).split("\"")
-        if len(address) > 1:
-            filename = address[1].replace("./", "/")
-            if len(filename) > 1:
-                if filename not in files:
-                    if filename != "./":
-                        files.append(url + filename)
+    files = [
+        'https://egonw.github.io/SARS-CoV-2-WikiPathways/wikipathways-SARS-CoV-2-rdf-authors.zip',
+        'https://egonw.github.io/SARS-CoV-2-WikiPathways/wikipathways-SARS-CoV-2-wp-rdf.zip'
+    ]
     for file in set(files):
         if "rdf-authors" in file:  # get the most accurate file
             print(file)
