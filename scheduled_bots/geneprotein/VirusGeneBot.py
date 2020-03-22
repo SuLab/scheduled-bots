@@ -56,38 +56,38 @@ def createNCBITaxReference(ncbiTaxId, retrieved):
 retrieved = datetime.now() # Get currentdate to use as timestamp
 
 def main():
-  ## Login to Wikidata
-  print("Logging in...")
-  if "WDUSER" in os.environ and "WDPASS" in os.environ:
-      WDUSER = os.environ['WDUSER']
-      WDPASS = os.environ['WDPASS']
-  else:
-      raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
+  # ## Login to Wikidata
+  # print("Logging in...")
+  # if "WDUSER" in os.environ and "WDPASS" in os.environ:
+  #     WDUSER = os.environ['WDUSER']
+  #     WDPASS = os.environ['WDPASS']
+  # else:
+  #     raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
 
-  login = wdi_login.WDLogin(WDUSER, WDPASS)
+  # login = wdi_login.WDLogin(WDUSER, WDPASS)
 
   ## Provide the taxonomy id from NCBI taxonomy and create or update the related Wikidata item
-  taxid = "1335626"
-  ncbiTaxref = createNCBITaxReference(taxid, retrieved)
-  ncbiTaxon = json.loads(requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=taxonomy&id={}&format=json".format(taxid)).text)
+  # taxid = "1335626"
+  # ncbiTaxref = createNCBITaxReference(taxid, retrieved)
+  # ncbiTaxon = json.loads(requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=taxonomy&id={}&format=json".format(taxid)).text)
 
-  taxonitemStatements = []
-  ## instance of
-  taxonitemStatements.append(wdi_core.WDItemID(value="Q16521", prop_nr="P31", references=[copy.deepcopy(ncbiTaxref)]))
-  ## NCBI tax id
-  taxonitemStatements.append(wdi_core.WDExternalID(value=taxid, prop_nr="P685", references=[copy.deepcopy(ncbiTaxref)]))
-  ## scientificname
-  scientificName = ncbiTaxon["result"][taxid]['scientificname']
-  taxonitemStatements.append(wdi_core.WDString(scientificName, prop_nr="P225", references=[copy.deepcopy(ncbiTaxref)]))
-  item = wdi_core.WDItemEngine(data=taxonitemStatements)
-  if item.get_label() == "":
-      item.set_label(label=scientificName, lang="en")
-  if item.get_label() != scientificName:
-      item.set_aliases(aliases=[scientificName])
-  if item.get_description(lang="en") == "":
-      item.set_description(description="strain of virus", lang="en")
-  found_in_taxID = item.write(login)
-  print(found_in_taxID)
+  # taxonitemStatements = []
+  # ## instance of
+  # taxonitemStatements.append(wdi_core.WDItemID(value="Q16521", prop_nr="P31", references=[copy.deepcopy(ncbiTaxref)]))
+  # ## NCBI tax id
+  # taxonitemStatements.append(wdi_core.WDExternalID(value=taxid, prop_nr="P685", references=[copy.deepcopy(ncbiTaxref)]))
+  # ## scientificname
+  # scientificName = ncbiTaxon["result"][taxid]['scientificname']
+  # taxonitemStatements.append(wdi_core.WDString(scientificName, prop_nr="P225", references=[copy.deepcopy(ncbiTaxref)]))
+  # item = wdi_core.WDItemEngine(data=taxonitemStatements)
+  # if item.get_label() == "":
+  #     item.set_label(label=scientificName, lang="en")
+  # if item.get_label() != scientificName:
+  #     item.set_aliases(aliases=[scientificName])
+  # if item.get_description(lang="en") == "":
+  #     item.set_description(description="strain of virus", lang="en")
+  # found_in_taxID = item.write(login)
+  # print(found_in_taxID)
 
   ## Get list of genes from https://mygene.info/ and create or update items on Wikidats for each annotated gene
   genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species="+taxid).text)
@@ -102,18 +102,18 @@ def main():
 
     # instance of gene
 
-    statements.append(wdi_core.WDItemID(value="Q7187", prop_nr="P31", references=[copy.deepcopy(ncbi_reference)]))
+    #>>statements.append(wdi_core.WDItemID(value="Q7187", prop_nr="P31", references=[copy.deepcopy(ncbi_reference)]))
 
-    if geneinfo["type_of_gene"] == "protein-coding":
-        statements.append(wdi_core.WDItemID(value="Q20747295", prop_nr="P279", references=[copy.deepcopy(ncbi_reference)]))
+    #>> if geneinfo["type_of_gene"] == "protein-coding":
+    #>>     statements.append(wdi_core.WDItemID(value="Q20747295", prop_nr="P279", references=[copy.deepcopy(ncbi_reference)]))
     # found in taxon
-    statements.append(wdi_core.WDItemID(value=found_in_taxID, prop_nr="P703", references=[copy.deepcopy(ncbi_reference)]))
+    #>statements.append(wdi_core.WDItemID(value=found_in_taxID, prop_nr="P703", references=[copy.deepcopy(ncbi_reference)]))
 
 
     ## identifiers
     # ncbi locus tag identifer
-    if "locus_tag" in geneinfo.keys():
-      statements.append(wdi_core.WDString(geneinfo["locus_tag"], prop_nr="P2393", references=[copy.deepcopy(ncbi_reference)]))
+    #>>if "locus_tag" in geneinfo.keys():
+    #>>  statements.append(wdi_core.WDString(geneinfo["locus_tag"], prop_nr="P2393", references=[copy.deepcopy(ncbi_reference)]))
 
     # ncbi identifer
     statements.append(wdi_core.WDString(geneinfo["entrezgene"], prop_nr="P351", references=[copy.deepcopy(ncbi_reference)]))
@@ -128,8 +128,10 @@ def main():
 
 
 def refseq():
+  statements = []
   # The tax id to take the refseq from
   taxid = "1335626"
+  wd_item_id_taxon = set_taxon(taxid).wd_item_id
   # assembly_summary_refseq.txt
   # Download file: https://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_refseq.txt
   for index, line in enumerate(open("assembly_summary_refseq.txt")):
@@ -149,29 +151,75 @@ def refseq():
           ftp_line = ftp_line.split()[-1]
           urllib.request.urlretrieve(ftp_full_path + "/" + ftp_line, ftp_line)
           # Start genbank parsing
-          parse_genbank(ftp_line)
+          parse_genbank(ftp_line, wd_item_id_taxon)
 
 
-def parse_genbank(genbank_file):
-  statements = []
+def set_taxon(taxid):
+  ncbiTaxon = json.loads(requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=taxonomy&id={}&format=json".format(taxid)).text)
+
+  taxonitemStatements = []
+  ## instance of
+  taxonitemStatements.append(wdi_core.WDItemID(value="Q16521", prop_nr="P31", references=[copy.deepcopy(ncbiTaxref)]))
+  ## NCBI tax id
+  taxonitemStatements.append(wdi_core.WDExternalID(value=taxid, prop_nr="P685", references=[copy.deepcopy(ncbiTaxref)]))
+  ## scientificname
+  scientificName = ncbiTaxon["result"][taxid]['scientificname']
+  taxonitemStatements.append(wdi_core.WDString(scientificName, prop_nr="P225", references=[copy.deepcopy(ncbiTaxref)]))
+  item = wdi_core.WDItemEngine(data=taxonitemStatements)
+  if item.get_label() == "":
+      item.set_label(label=scientificName, lang="en")
+  if item.get_label() != scientificName:
+      item.set_aliases(aliases=[scientificName])
+  if item.get_description(lang="en") == "":
+      item.set_description(description="strain of virus", lang="en")
+  
+  pprint.pprint(item.wd_item_id) ## get json for test purposes
+  return item
+  # found_in_taxID = item.write(login)
+  # print(found_in_taxID)
+
+def parse_genbank(genbank_file, wd_item_id_taxon):
   # Genbank file is compressed, read directly from gzip
   handle = gzip.open(genbank_file, 'rt')
   # Parse as genbank file
   for seq_record in SeqIO.parse(handle, "genbank"):
-      print(seq_record.id)
-      print(repr(seq_record.seq))
-      print(len(seq_record))
+      # print(seq_record.id)
+      # print(repr(seq_record.seq))
+      # print(len(seq_record))
       for feature in seq_record.features:
-        print(feature)
+        # print(feature)
+        # Match GENE and CDS ?
         if feature.type == "gene":
-          statements += location(feature)
-          statements += qualifiers(feature)
+          gene(feature, wd_item_id_taxon)
         if feature.type == "CDS":
-          if 'protein_id' in feature.qualifiers:
-            cds(feature)
+          cds(feature, wd_item_id_taxon)
+          return
 
-def cds(feature):
+def gene(feature, wd_item_id_taxon):
   statements = []
+  # Parent taxon
+  statements.append(wdi_core.WDItemID(value=wd_item_id_taxon, prop_nr="P703", references=[copy.deepcopy(ncbi_reference)]))
+  # Instance of gene
+  statements.append(wdi_core.WDItemID(value="Q7187", prop_nr="P31", references=[copy.deepcopy(ncbi_reference)]))
+  statements += location(feature)
+  statements += qualifiers(feature)
+  
+  # Perform write request
+  item = wdi_core.WDItemEngine(data=statements)
+  # item.set_label(geneinfo["name"], lang="en")
+  # item.set_description(scientificName+" gene", lang="en")
+  pprint.pprint(item.get_wd_json_representation()) ## get json for test purposes
+
+
+def cds(feature, wd_item_id_taxon):
+  statements = []
+  # Parent taxon
+  statements.append(wdi_core.WDItemID(value=wd_item_id_taxon, prop_nr="P703", references=[copy.deepcopy(ncbi_reference)]))
+  # Instance of gene
+  statements.append(wdi_core.WDItemID(value="Q7187", prop_nr="P31", references=[copy.deepcopy(ncbi_reference)]))
+  # CDS is always protein coding
+  statements.append(wdi_core.WDItemID(value="Q20747295", prop_nr="P279", references=[copy.deepcopy(ncbi_reference)]))
+
   if 'protein_id' in feature.qualifiers:
     # Refseq matching
     refseq_regex = "^((AC|AP|NC|NG|NM|NP|NR|NT|NW|XM|XP|XR|YP|ZP)_\d+|(NZ\_[A-Z]{4}\d+))(\.\d+)?$"
@@ -181,6 +229,12 @@ def cds(feature):
       if pattern.match(protein_id):
         refseq_id = protein_id
         statements.append(wdi_core.WDString(value=refseq_id, prop_nr="P637", references=[copy.deepcopy(ncbi_reference)]))
+
+  # Perform write request
+  item = wdi_core.WDItemEngine(data=statements)
+  # item.set_label(geneinfo["name"], lang="en")
+  # item.set_description(scientificName+" gene", lang="en")
+  pprint.pprint(item.get_wd_json_representation()) ## get json for test purposes
 
 
 def qualifiers(feature):
@@ -210,14 +264,38 @@ def xref(db_xrefs):
 def location(feature):
   statements = []
   # Add the location statements
-  strand = feature.location.strand
-  start = feature.location.start
-  end = feature.location.end
+  strand = feature.location.strand # P2548 # forward - Q22809680 # reverse - Q22809711
+  if strand == 1:
+    statements.append(wdi_core.WDItemID("Q22809680", prop_nr="P2548", references=[copy.deepcopy(ncbi_reference)]))
+  elif strand == -1:
+    statements.append(wdi_core.WDItemID("Q22809711", prop_nr="P2548", references=[copy.deepcopy(ncbi_reference)]))
+  else:
+    print(strand)
+    stop
+  
+  # P644 genomic start and P645 genomic end
+  statements.append(wdi_core.WDString(str(feature.location.start), prop_nr="P644", references=[copy.deepcopy(ncbi_reference)]))
+  statements.append(wdi_core.WDString(str(feature.location.end), prop_nr="P645", references=[copy.deepcopy(ncbi_reference)]))  
   return statements
 
 
 if __name__ == '__main__':
+  taxid = "1335626"
+
+  ## Login to Wikidata
+  print("Logging in...")
+  if "WDUSER" in os.environ and "WDPASS" in os.environ:
+      WDUSER = os.environ['WDUSER']
+      WDPASS = os.environ['WDPASS']
+  else:
+      raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
+
+  login = wdi_login.WDLogin(WDUSER, WDPASS)
+
   global ncbi_reference
   ncbi_reference = createNCBIGeneReference("",retrieved)
+  global ncbiTaxref
+  ncbiTaxref = createNCBITaxReference(taxid, retrieved)
+
   # main()
   refseq()
