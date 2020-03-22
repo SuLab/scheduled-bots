@@ -134,7 +134,6 @@ def main(retrieved, fast_run, write):
             SELECT DISTINCT ?wpid WHERE {
               ?s rdf:type <http://vocabularies.wikipathways.org/wp#Pathway> ;
                  dcterm:identifier ?wpid ;
-                 ?p <http://vocabularies.wikipathways.org/wp#Curation:AnalysisCollection> ;
                  wp:organism <http://purl.obolibrary.org/obo/NCBITaxon_9606> .
               }"""
 
