@@ -1,16 +1,15 @@
-from wikidataintegrator import wdi_core, wdi_login
 import copy
-import os
-from datetime import datetime
-import json
-import pprint
-import requests
-
 import ftplib
-import urllib.request
 import gzip
-from Bio import SeqIO
+import json
+import os
+import pprint
 import re
+import urllib.request
+from datetime import datetime
+
+import requests
+from wikidataintegrator import wdi_core, wdi_login
 
 """
 Authors:
@@ -55,7 +54,7 @@ def createNCBITaxReference(ncbiTaxId, retrieved):
 
 retrieved = datetime.now() # Get currentdate to use as timestamp
 
-def main():
+def main(taxid):
   ## Get list of genes from https://mygene.info/ and create or update items on Wikidats for each annotated gene
   genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species="+taxid).text)
   pprint.pprint(genelist)
@@ -80,29 +79,29 @@ def main():
 
 
 def refseq(taxid):
-  statements = []
-  # The tax id to take the refseq from
-  wd_item_id_taxon = set_taxon(taxid).wd_item_id
-  # assembly_summary_refseq.txt
-  # Download file: https://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_refseq.txt
-  for index, line in enumerate(open("assembly_summary_refseq.txt")):
-    line = line.split("\t")
-    if len(line) < 10: continue
-    # When taxid matches and it is a reference genome download the genbank file from the NCBI
-    if line[5] == taxid and line[4] == "reference genome":
-      ftp_full_path = line[-3]
-      ftp_path = '/' + '/'.join(ftp_full_path.split("/")[3:])
-      ftp = ftplib.FTP('ftp.ncbi.nlm.nih.gov')
-      ftp.login()
-      ftp.cwd(ftp_path)
-      dir_list = []
-      ftp.dir(dir_list.append)
-      for ftp_line in dir_list:
-        if ftp_line.endswith("_genomic.gbff.gz"):
-          ftp_line = ftp_line.split()[-1]
-          urllib.request.urlretrieve(ftp_full_path + "/" + ftp_line, ftp_line)
-          # Start genbank parsing
-          parse_genbank(ftp_line, wd_item_id_taxon)
+    statements = []
+    # The tax id to take the refseq from
+    wd_item_id_taxon = set_taxon(taxid).wd_item_id
+    # assembly_summary_refseq.txt
+    # Download file: https://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_refseq.txt
+    for index, line in enumerate(open("assembly_summary_refseq.txt")):
+      line = line.split("\t")
+      if len(line) < 10: continue
+      # When taxid matches and it is a reference genome download the genbank file from the NCBI
+      if line[5] == taxid and line[4] == "reference genome":
+        ftp_full_path = line[-3]
+        ftp_path = '/' + '/'.join(ftp_full_path.split("/")[3:])
+        ftp = ftplib.FTP('ftp.ncbi.nlm.nih.gov')
+        ftp.login()
+        ftp.cwd(ftp_path)
+        dir_list = []
+        ftp.dir(dir_list.append)
+        for ftp_line in dir_list:
+          if ftp_line.endswith("_genomic.gbff.gz"):
+            ftp_line = ftp_line.split()[-1]
+            urllib.request.urlretrieve(ftp_full_path + "/" + ftp_line, ftp_line)
+            # Start genbank parsing
+            parse_genbank(ftp_line, wd_item_id_taxon)
 
 
 def set_taxon(taxid):
@@ -232,7 +231,7 @@ def location(feature):
 
 
 if __name__ == '__main__':
-  taxid = "1335626"
+  taxid = "227859"
 
   ## Login to Wikidata
   print("Logging in...")
@@ -249,5 +248,5 @@ if __name__ == '__main__':
   global ncbiTaxref
   ncbiTaxref = createNCBITaxReference(taxid, retrieved)
 
-  # main()
-  refseq()
+  main(taxid)
+  #refseq(taxid)
