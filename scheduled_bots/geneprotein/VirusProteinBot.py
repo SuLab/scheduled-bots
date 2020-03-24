@@ -69,6 +69,9 @@ def getGeneQid(ncbiId):
     wdi_core.WDString(value=ncbiId, prop_nr="P351", references=[copy.deepcopy(ncbi_reference)])]
     return wdi_core.WDItemEngine(data=gene_statements)
 
+def getTaxonItem(taxonQid):
+    return wdi_core.WDItemEngine(wd_item_id=taxonQid)
+
 def create_or_update_protein_item(geneid, uniprotID):
     retrieved = datetime.now()
     ncbi_reference = createNCBIGeneReference(hit["entrezgene"], retrieved)
@@ -129,18 +132,20 @@ def create_or_update_protein_item(geneid, uniprotID):
     # pdb
     for id in pdb:
         statements.append(wdi_core.WDString(id, prop_nr="P638", references=[copy.deepcopy(uniprot_reference)]))
-
+    taxonname = getTaxonItem(geneJson['claims']["P703"][0]["mainsnak"]["datavalue"]["value"]["id"]).get_label(lang="en")
     protein_item = wdi_core.WDItemEngine(data=statements)
     if protein_item.get_label(lang="en") == "":
         protein_item.set_label(protein_label, lang="en")
     if protein_item.get_description(lang="en") == "":
-        protein_item.set_description("protein found in "+taxonname, lang="en")
+        protein_item.set_description("protein in "+taxonname, lang="en")
     if protein_item.get_description(lang="de") == "":
         protein_item.set_description("Eiweiß in "+taxonname+" gefunden", lang="de")
     if protein_item.get_description(lang="nl") == "":
-        protein_item.set_description("Eiwit gevonden in "+taxonname, lang="nl")
+        protein_item.set_description("Eiwit in "+taxonname, lang="nl")
     if protein_item.get_description(lang="es") == "":
         protein_item.set_description("proteína encontrada en "+taxonname, lang="es")
+    if protein_item.get_description(lang="it") == "":
+        protein_item.set_description("Proteina in " + taxonname, lang="it")
 
     print(protein_item.get_wd_json_representation())
     protein_qid = protein_item.write(login)
@@ -154,8 +159,6 @@ def create_or_update_protein_item(geneid, uniprotID):
 taxid = "11137"
 genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species="+taxid).text)
 
-
-
 for hit in genelist["hits"]:
     print(hit["entrezgene"])
     geneinfo = json.loads(requests.get("http://mygene.info/v3/gene/" + hit["entrezgene"]).text)
@@ -164,9 +167,9 @@ for hit in genelist["hits"]:
         if "Swiss-Prot" in geneinfo["uniprot"]:
             if isinstance(geneinfo["uniprot"]["Swiss-Prot"], list):
                 for uniprot in geneinfo["uniprot"]["Swiss-Prot"]:
-                    create_or_update_protein_item(protein_label, hit["entrezgene"], uniprot, pdb, refseq)
+                    print(uniprot +": "+create_or_update_protein_item(hit["entrezgene"], uniprot))
             else:
-                create_or_update_protein_item(protein_label, hit["entrezgene"], uniprot, pdb, refseq)
+                print(uniprot +": "+create_or_update_protein_item(hit["entrezgene"], uniprot))
 
 
 
