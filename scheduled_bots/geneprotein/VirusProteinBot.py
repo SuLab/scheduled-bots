@@ -6,6 +6,7 @@ import json
 import pprint
 import requests
 from rdflib import Graph, URIRef
+from Bio import Entrez,SeqIO
 
 import ftplib
 import urllib.request
@@ -20,7 +21,7 @@ Authors:
 
 This bot uses of the WikidataIntegrator.
 
-Taxa ran: 694009, 1335626, 277944, 11137
+Taxa ran: 694009, 1335626, 277944, 11137, 31631
 
 This bot is a first attempt to automatically maintain genomics data on Wikidata from authoritittive resources on the 
 SARS-CoV-2 virus. SARS-CoV-2 belongs to the broad family of viruses known as coronaviruses. This bot addresses the
@@ -33,8 +34,10 @@ The bot roughly works as follows:
 
 The bot aligns with the following schema: https://www.wikidata.org/wiki/EntitySchema:E169
 """
+taxid = "1335626"
 
 ## Functions to create references
+
 
 print("Logging in...")
 if "WDUSER" in os.environ and "WDPASS" in os.environ:
@@ -63,7 +66,7 @@ def createUniprotReference(uniprotId, retrieved):
     reference = [refStatedIn, refRetrieved, refUniprotID]
     return reference
 
-def getGeneQid(ncbiId):
+def getGeneQid(ncbiId, ncbi_reference):
     # Parent taxon
     gene_statements = [
     wdi_core.WDString(value=ncbiId, prop_nr="P351", references=[copy.deepcopy(ncbi_reference)])]
@@ -72,7 +75,7 @@ def getGeneQid(ncbiId):
 def getTaxonItem(taxonQid):
     return wdi_core.WDItemEngine(wd_item_id=taxonQid)
 
-def create_or_update_protein_item(geneid, uniprotID):
+def create_or_update_uniprot_protein_item(geneid, uniprotID):
     retrieved = datetime.now()
     ncbi_reference = createNCBIGeneReference(hit["entrezgene"], retrieved)
     uniprot_reference = createUniprotReference(uniprotID, retrieved)
@@ -83,25 +86,25 @@ def create_or_update_protein_item(geneid, uniprotID):
                             SERVICE <https://sparql.uniprot.org/sparql> {
                                  VALUES ?database {<http://purl.uniprot.org/database/PDB> <http://purl.uniprot.org/database/RefSeq>}
                                 uniprotkb:"""
-    query += uniprot
+    query += uniprotID
     query += """ rdfs:label ?label ;
                                      rdfs:seeAlso ?id .
-                                 ?o <http://purl.uniprot.org/core/database> ?database .
+                                 ?id <http://purl.uniprot.org/core/database> ?database .
                                  }
                                     }"""
+    print(query)
 
-    results = wdi_core.WDItemEngine.execute_sparql_query(query)
+    results = wdi_core.WDItemEngine.execute_sparql_query(query, endpoint="https://sparql.uniprot.org/sparql")
     refseq = []
     pdb = []
     for result in results["results"]["bindings"]:
-        if not protein_label:
-            protein_label = result["label"]["value"]
+        protein_label = result["label"]["value"]
         if result["database"]["value"] == "http://purl.uniprot.org/database/RefSeq":
             if result["id"]["value"].replace("http://purl.uniprot.org/refseq/", "") not in refseq:
                 refseq.append(result["id"]["value"].replace("http://purl.uniprot.org/refseq/", ""))
-        if result["database"]["value"] == "http://purl.uniprot.org/database/RefSeq":
-            if result["id"]["value"].replace("http://purl.uniprot.org/PDB/", "") not in refseq:
-                refseq.append(result["id"]["value"].replace("http://rdf.wwpdb.org/pdb/", ""))
+        if result["database"]["value"] == "http://purl.uniprot.org/database/PDB":
+            if result["id"]["value"].replace("http://rdf.wwpdb.org/pdb/", "") not in pdb:
+                pdb.append(result["id"]["value"].replace("http://rdf.wwpdb.org/pdb/", ""))
 
     statements = []
 
@@ -109,7 +112,7 @@ def create_or_update_protein_item(geneid, uniprotID):
     statements.append(wdi_core.WDItemID(value="Q8054", prop_nr="P31", references=[copy.deepcopy(uniprot_reference)]))
 
     # encoded by
-    geneitem = getGeneQid(geneid)
+    geneitem = getGeneQid(geneid, ncbi_reference)
     geneqid = geneitem.wd_item_id
     statements.append(wdi_core.WDItemID(value=geneqid, prop_nr="P702", references=[copy.deepcopy(ncbi_reference)]))
 
@@ -120,11 +123,9 @@ def create_or_update_protein_item(geneid, uniprotID):
 
     # exactMatch
     statements.append(wdi_core.WDUrl("http://purl.uniprot.org/uniprot/"+uniprotID, prop_nr="P2888",  references=[copy.deepcopy(uniprot_reference)]))
-
     ## Identifier statements
     # uniprot
-    statements.append(wdi_core.WDString(id, prop_nr="P352", references=[copy.deepcopy(uniprot_reference)]))
-
+    statements.append(wdi_core.WDString(uniprotID, prop_nr="P352", references=[copy.deepcopy(uniprot_reference)]))
     # refseq
     for id in refseq:
         statements.append(wdi_core.WDString(id, prop_nr="P637", references=[copy.deepcopy(uniprot_reference)]))
@@ -139,11 +140,11 @@ def create_or_update_protein_item(geneid, uniprotID):
     if protein_item.get_description(lang="en") == "":
         protein_item.set_description("protein in "+taxonname, lang="en")
     if protein_item.get_description(lang="de") == "":
-        protein_item.set_description("Eiweiß in "+taxonname+" gefunden", lang="de")
+        protein_item.set_description("Eiweiß in "+taxonname, lang="de")
     if protein_item.get_description(lang="nl") == "":
-        protein_item.set_description("Eiwit in "+taxonname, lang="nl")
+        protein_item.set_description("eiwit in "+taxonname, lang="nl")
     if protein_item.get_description(lang="es") == "":
-        protein_item.set_description("proteína encontrada en "+taxonname, lang="es")
+        protein_item.set_description("proteína en "+taxonname, lang="es")
     if protein_item.get_description(lang="it") == "":
         protein_item.set_description("Proteina in " + taxonname, lang="it")
 
@@ -153,10 +154,59 @@ def create_or_update_protein_item(geneid, uniprotID):
     ## add the newly create protein item to the gene item
     encodes = [wdi_core.WDItemID(protein_qid, prop_nr="P688", references=[copy.deepcopy(ncbi_reference)])]
     geneitem = wdi_core.WDItemEngine(wd_item_id=geneqid, data=encodes)
-    geneitem.write(login)
+    return geneitem.write(login)
 
+def create_or_update_refseq_protein_item(geneid, refseqID):
+    statements = []
+    retrieved = datetime.now()
+    ncbi_reference = createNCBIGeneReference(hit["entrezgene"], retrieved)
+    pdb = []
+    # Instance of protein
+    statements.append(wdi_core.WDItemID(value="Q8054", prop_nr="P31", references=[copy.deepcopy(ncbi_reference)]))
 
-taxid = "11137"
+    # encoded by
+    geneitem = getGeneQid(geneid, ncbi_reference)
+    geneqid = geneitem.wd_item_id
+    statements.append(wdi_core.WDItemID(value=geneqid, prop_nr="P702", references=[copy.deepcopy(ncbi_reference)]))
+
+    # found in taxon
+    geneJson = geneitem.get_wd_json_representation()
+    taxonQID = geneJson['claims']["P703"][0]["mainsnak"]["datavalue"]["value"]["id"]
+    statements.append(wdi_core.WDItemID(taxonQID, prop_nr="P703", references=[copy.deepcopy(ncbi_reference)]))
+
+    # refseq
+    statements.append(wdi_core.WDString(refseqID, prop_nr="P637", references=[copy.deepcopy(ncbi_reference)]))
+
+    handle = Entrez.efetch(id=geneinfo["refseq"]["protein"], db='protein', rettype='gb', retmode='text')
+    record = SeqIO.read(handle, 'genbank')
+    for feature in record.features:
+        if feature.type.lower() == "protein":
+            print(feature.qualifiers['product'])
+            protein_label = feature.qualifiers['product'][0]
+    taxonname = getTaxonItem(geneJson['claims']["P703"][0]["mainsnak"]["datavalue"]["value"]["id"]).get_label(lang="en")
+
+    protein_item = wdi_core.WDItemEngine(data=statements)
+    if protein_item.get_label(lang="en") == "":
+        protein_item.set_label(protein_label, lang="en")
+    if protein_item.get_description(lang="en") == "":
+        protein_item.set_description("protein in " + taxonname, lang="en")
+    if protein_item.get_description(lang="de") == "":
+        protein_item.set_description("Eiweiß in " + taxonname, lang="de")
+    if protein_item.get_description(lang="nl") == "":
+        protein_item.set_description("eiwit in " + taxonname, lang="nl")
+    if protein_item.get_description(lang="es") == "":
+        protein_item.set_description("proteína en " + taxonname, lang="es")
+    if protein_item.get_description(lang="it") == "":
+        protein_item.set_description("Proteina in " + taxonname, lang="it")
+
+    pprint.pprint(protein_item.get_wd_json_representation())
+    protein_qid = protein_item.write(login)
+    print(protein_qid)
+    ## add the newly create protein item to the gene item
+    encodes = [wdi_core.WDItemID(protein_qid, prop_nr="P688", references=[copy.deepcopy(ncbi_reference)])]
+    geneitem = wdi_core.WDItemEngine(wd_item_id=geneqid, data=encodes)
+    return geneitem.write(login)
+
 genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species="+taxid).text)
 
 for hit in genelist["hits"]:
@@ -167,11 +217,19 @@ for hit in genelist["hits"]:
         if "Swiss-Prot" in geneinfo["uniprot"]:
             if isinstance(geneinfo["uniprot"]["Swiss-Prot"], list):
                 for uniprot in geneinfo["uniprot"]["Swiss-Prot"]:
-                    print(uniprot +": "+create_or_update_protein_item(hit["entrezgene"], uniprot))
+                    print(uniprot +": "+create_or_update_uniprot_protein_item(hit["entrezgene"], uniprot))
             else:
-                print(uniprot +": "+create_or_update_protein_item(hit["entrezgene"], uniprot))
-
-
-
-
-
+                print(geneinfo["uniprot"]["Swiss-Prot"] +": "+create_or_update_uniprot_protein_item(hit["entrezgene"], geneinfo["uniprot"]["Swiss-Prot"]))
+    elif "refseq" in geneinfo.keys():
+        if "protein" in geneinfo["refseq"].keys():
+            if isinstance(geneinfo["refseq"]["protein"], list):
+                for refseqID in geneinfo["refseq"]["protein"]:
+                    try:
+                       print(create_or_update_refseq_protein_item(hit["entrezgene"], refseqID))
+                    except:
+                        pass
+            else:
+                try:
+                    print(create_or_update_refseq_protein_item(hit["entrezgene"], geneinfo["refseq"]["protein"]))
+                except:
+                    pass
