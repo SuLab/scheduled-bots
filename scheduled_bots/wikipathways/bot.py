@@ -163,6 +163,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
     prep = dict()
 
     prep = get_PathwayElements(pathway=pathway_id,datatype="Metabolite", temp=temp, prep=prep)
+    prep = get_PathwayElements(pathway=pathway_id,datatype="Protein", temp=temp, prep=prep)
     prep = get_PathwayElements(pathway=pathway_id, datatype="GeneProduct",temp=temp, prep=prep)
     # P703 = found in taxon, Q15978631 = "Homo sapiens"
     prep["P703"] = [
@@ -383,6 +384,8 @@ def get_PathwayElements(pathway, datatype, temp, prep):
                     rdfs:label ?label ;"""
     if datatype == "Metabolite":
         query += "   wp:bdbPubChem ?id ;"
+    if datatype == "Protein":
+        query += "   wp:bdbWikidata ?id ;"
     if datatype == "GeneProduct":
         query += "   wp:bdbEntrezGene ?id ;"
     query += """
@@ -394,9 +397,15 @@ def get_PathwayElements(pathway, datatype, temp, prep):
     qres2 = temp.query(query)
 
     ids = []
-    for row in qres2:
-        ids.append("\"" + str(row[2]).replace("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID", "").replace(
-            "http://identifiers.org/ncbigene/", "") + "\"")
+    if datatype == "Protein":
+        for row in qres2:
+            ids.append("wd:" + str(row[2]).replace(
+                "http://www.wikidata.org/entity/", "")
+            )
+    else:
+        for row in qres2:
+            ids.append("\"" + str(row[2]).replace("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID", "").replace(
+                "http://identifiers.org/ncbigene/", "") + "\"")
 
 
     # Check for existence of the ids in wikidata
@@ -407,6 +416,10 @@ def get_PathwayElements(pathway, datatype, temp, prep):
         wd_query += "} ?item wdt:P662 ?id . }"
     if datatype == "GeneProduct":
         wd_query += "} ?item wdt:P351 ?id . }"
+    if datatype == "Protein":
+        wd_query = "SELECT DISTINCT * WHERE { VALUES ?item { "
+        wd_query += " ".join(list(set(ids)))
+        wd_query += " } ?item wdt:P31 | wdt:P279 wd:Q8054 }"
 
     results = wdi_core.WDItemEngine.execute_sparql_query(wd_query,)
     for result in results["results"]["bindings"]:
