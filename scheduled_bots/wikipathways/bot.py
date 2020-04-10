@@ -13,6 +13,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 import re
 import tqdm
 import requests
+import sys
 # from scheduled
 from scheduled_bots import PROPS, ITEMS, get_default_core_props
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
@@ -138,6 +139,7 @@ def main(retrieved, fast_run, write):
     wp_query = """prefix dcterm: <http://purl.org/dc/terms/>
             prefix wp: <http://vocabularies.wikipathways.org/wp#>
             SELECT DISTINCT ?wpid WHERE {
+              VALUES ?wpid { "WP4846"^^xsd:string }
               ?s rdf:type <http://vocabularies.wikipathways.org/wp#Pathway> ;
                  dcterm:identifier ?wpid ;
                  ?p <http://vocabularies.wikipathways.org/wp#Curation:AnalysisCollection> ;
@@ -165,6 +167,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
     prep = get_PathwayElements(pathway=pathway_id,datatype="Metabolite", temp=temp, prep=prep)
     prep = get_PathwayElements(pathway=pathway_id,datatype="Protein", temp=temp, prep=prep)
     prep = get_PathwayElements(pathway=pathway_id, datatype="GeneProduct",temp=temp, prep=prep)
+    prep = get_PathwayElements(pathway=pathway_id, datatype="Complex",temp=temp, prep=prep)
     # P703 = found in taxon, Q15978631 = "Homo sapiens"
     prep["P703"] = [
         wdi_core.WDItemID(value="Q15978631", prop_nr='P703', references=[copy.deepcopy(pathway_reference)])]
@@ -388,6 +391,8 @@ def get_PathwayElements(pathway, datatype, temp, prep):
         query += "   wp:bdbWikidata ?id ;"
     if datatype == "GeneProduct":
         query += "   wp:bdbEntrezGene ?id ;"
+    if datatype == "Complex":
+        query += "   wp:bdbWikidata ?id ;"
     query += """
                     dcterms:isPartOf ?pathway .
             ?pathway a wp:Pathway ;
@@ -398,6 +403,11 @@ def get_PathwayElements(pathway, datatype, temp, prep):
 
     ids = []
     if datatype == "Protein":
+        for row in qres2:
+            ids.append("wd:" + str(row[2]).replace(
+                "http://www.wikidata.org/entity/", "")
+            )
+    elif datatype == "Complex":
         for row in qres2:
             ids.append("wd:" + str(row[2]).replace(
                 "http://www.wikidata.org/entity/", "")
@@ -420,8 +430,17 @@ def get_PathwayElements(pathway, datatype, temp, prep):
         wd_query = "SELECT DISTINCT * WHERE { VALUES ?item { "
         wd_query += " ".join(list(set(ids)))
         wd_query += " } ?item wdt:P31 | wdt:P279 wd:Q8054 }"
+    if datatype == "Complex":
+        wd_query = "SELECT DISTINCT * WHERE { VALUES ?item { "
+        wd_query += " ".join(list(set(ids)))
+        wd_query += " } ?item wdt:P7718 | wdt:P3937 ?id }"
+
+    if datatype == "Complex":
+        print(wd_query)
 
     results = wdi_core.WDItemEngine.execute_sparql_query(wd_query,)
+    if datatype == "Complex":
+        print(results)
     for result in results["results"]["bindings"]:
         if "P527" not in prep.keys():
             prep["P527"] = []
