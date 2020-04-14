@@ -30,8 +30,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
-#import ssl
-#ssl._create_default_https_context = ssl._create_unverified_context
+# import ssl
+# ssl._create_default_https_context = ssl._create_unverified_context
 
 import os 
 import copy 
@@ -133,21 +133,25 @@ for index, row in df.iterrows():
         
         # Add disease value to gene item page, and gene value to disease item page (symmetry)
         ### Creates 'gene assocation' statement (P2293) whether or not it's already there, and includes the references
-        statement_HGNC = [wdi_core.WDItemID(value=MONDO_qid, prop_nr="P2293", references=[copy.deepcopy(reference)])] 
+        statement_HGNC = [wdi_core.WDItemID(value=MONDO_qid,
+                                            prop_nr="P2293",
+                                            references=[copy.deepcopy(reference)])] 
         wikidata_HGNCitem = wdi_core.WDItemEngine(wd_item_id=HGNC_qid, 
-                                                  data=statement_HGNC, 
+                                                  data=statement_HGNC,
+                                                  append_value="P2293",
                                                   global_ref_mode='CUSTOM', # parameter that looks within 180 days
-                                                  ref_handler=update_retrieved_if_new_multiple_refs(days=30),
-                                                  append_value=["P2293"])
+                                                  ref_handler=update_retrieved_if_new_multiple_refs)
         wikidata_HGNCitem.get_wd_json_representation() # Gives json structure that submitted to API, helpful for debugging
         wikidata_HGNCitem.write(login)
         
-        statement_MONDO = [wdi_core.WDItemID(value=HGNC_qid, prop_nr="P2293", references=[copy.deepcopy(reference)])] 
+        statement_MONDO = [wdi_core.WDItemID(value=HGNC_qid,
+                                             prop_nr="P2293",
+                                             references=[copy.deepcopy(reference)])] 
         wikidata_MONDOitem = wdi_core.WDItemEngine(wd_item_id=MONDO_qid, 
-                                                   data=statement_MONDO, 
-                                                   global_ref_mode='CUSTOM',
-                                                   ref_handler=update_retrieved_if_new_multiple_refs(days=30),
-                                                   append_value=["P2293"])
+                                                   data=statement_MONDO,
+                                                   append_value="P2293",
+                                                   global_ref_mode='CUSTOM', # parameter that looks within 180 days
+                                                   ref_handler=update_retrieved_if_new_multiple_refs)
         wikidata_MONDOitem.get_wd_json_representation()
         wikidata_MONDOitem.write(login)
         
