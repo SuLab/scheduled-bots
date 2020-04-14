@@ -139,7 +139,6 @@ def main(retrieved, fast_run, write):
     wp_query = """prefix dcterm: <http://purl.org/dc/terms/>
             prefix wp: <http://vocabularies.wikipathways.org/wp#>
             SELECT DISTINCT ?wpid WHERE {
-              VALUES ?wpid { "WP4846"^^xsd:string }
               ?s rdf:type <http://vocabularies.wikipathways.org/wp#Pathway> ;
                  dcterm:identifier ?wpid ;
                  ?p <http://vocabularies.wikipathways.org/wp#Curation:AnalysisCollection> ;
