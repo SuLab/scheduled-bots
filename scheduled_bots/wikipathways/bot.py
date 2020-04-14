@@ -13,6 +13,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 import re
 import tqdm
 import requests
+import sys
 # from scheduled
 from scheduled_bots import PROPS, ITEMS, get_default_core_props
 from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
@@ -102,8 +103,8 @@ def main(retrieved, fast_run, write):
     # TODO add progress indicator of the download
 
     files = [
-        'https://egonw.github.io/SARS-CoV-2-WikiPathways/wikipathways-SARS-CoV-2-rdf-authors.zip',
-        'https://egonw.github.io/SARS-CoV-2-WikiPathways/wikipathways-SARS-CoV-2-wp-rdf.zip'
+        'https://wikipathways.github.io/SARS-CoV-2-WikiPathways/wikipathways-SARS-CoV-2-rdf-authors.zip',
+        'https://wikipathways.github.io/SARS-CoV-2-WikiPathways/wikipathways-SARS-CoV-2-rdf-wp.zip'
     ]
     for file in set(files):
         if "rdf-authors" in file:  # get the most accurate file
@@ -123,6 +124,7 @@ def main(retrieved, fast_run, write):
             u = requests.get(file)
             with closing(u), zipfile.ZipFile(io.BytesIO(u.content)) as archive:
                 for member in archive.infolist():
+                    print("parsing: " + member.filename)
                     nt_content = archive.read(member)
                     temp.parse(data=nt_content.decode(), format="turtle")
             print("size: "+str(len(temp)))
@@ -133,7 +135,6 @@ def main(retrieved, fast_run, write):
             SELECT DISTINCT ?wpid WHERE {
               ?s rdf:type <http://vocabularies.wikipathways.org/wp#Pathway> ;
                  dcterm:identifier ?wpid ;
-                 ?p <http://vocabularies.wikipathways.org/wp#Curation:AnalysisCollection> ;
                  wp:organism <http://purl.obolibrary.org/obo/NCBITaxon_9606> .
               }"""
 
@@ -156,7 +157,9 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
     prep = dict()
 
     prep = get_PathwayElements(pathway=pathway_id,datatype="Metabolite", temp=temp, prep=prep)
+    prep = get_PathwayElements(pathway=pathway_id,datatype="Protein", temp=temp, prep=prep)
     prep = get_PathwayElements(pathway=pathway_id, datatype="GeneProduct",temp=temp, prep=prep)
+    prep = get_PathwayElements(pathway=pathway_id, datatype="Complex",temp=temp, prep=prep)
     # P703 = found in taxon, Q15978631 = "Homo sapiens"
     prep["P703"] = [
         wdi_core.WDItemID(value="Q15978631", prop_nr='P703', references=[copy.deepcopy(pathway_reference)])]
@@ -376,8 +379,12 @@ def get_PathwayElements(pathway, datatype, temp, prep):
                     rdfs:label ?label ;"""
     if datatype == "Metabolite":
         query += "   wp:bdbPubChem ?id ;"
+    if datatype == "Protein":
+        query += "   wp:bdbWikidata ?id ;"
     if datatype == "GeneProduct":
         query += "   wp:bdbEntrezGene ?id ;"
+    if datatype == "Complex":
+        query += "   wp:bdbWikidata ?id ;"
     query += """
                     dcterms:isPartOf ?pathway .
             ?pathway a wp:Pathway ;
@@ -387,9 +394,20 @@ def get_PathwayElements(pathway, datatype, temp, prep):
     qres2 = temp.query(query)
 
     ids = []
-    for row in qres2:
-        ids.append("\"" + str(row[2]).replace("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID", "").replace(
-            "http://identifiers.org/ncbigene/", "") + "\"")
+    if datatype == "Protein":
+        for row in qres2:
+            ids.append("wd:" + str(row[2]).replace(
+                "http://www.wikidata.org/entity/", "")
+            )
+    elif datatype == "Complex":
+        for row in qres2:
+            ids.append("wd:" + str(row[2]).replace(
+                "http://www.wikidata.org/entity/", "")
+            )
+    else:
+        for row in qres2:
+            ids.append("\"" + str(row[2]).replace("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID", "").replace(
+                "http://identifiers.org/ncbigene/", "") + "\"")
 
 
     # Check for existence of the ids in wikidata
@@ -400,8 +418,21 @@ def get_PathwayElements(pathway, datatype, temp, prep):
         wd_query += "} ?item wdt:P662 ?id . }"
     if datatype == "GeneProduct":
         wd_query += "} ?item wdt:P351 ?id . }"
+    if datatype == "Protein":
+        wd_query = "SELECT DISTINCT * WHERE { VALUES ?item { "
+        wd_query += " ".join(list(set(ids)))
+        wd_query += " } ?item wdt:P31 | wdt:P279 wd:Q8054 }"
+    if datatype == "Complex":
+        wd_query = "SELECT DISTINCT * WHERE { VALUES ?item { "
+        wd_query += " ".join(list(set(ids)))
+        wd_query += " } ?item wdt:P7718 | wdt:P3937 ?id }"
+
+    if datatype == "Complex":
+        print(wd_query)
 
     results = wdi_core.WDItemEngine.execute_sparql_query(wd_query,)
+    if datatype == "Complex":
+        print(results)
     for result in results["results"]["bindings"]:
         if "P527" not in prep.keys():
             prep["P527"] = []
