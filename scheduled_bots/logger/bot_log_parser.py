@@ -167,7 +167,7 @@ def format_ManualInterventionReqException(s):
     if "More than one WD item has the same property value" in s:
         pid = s.split("Property: ")[1].split(",")[0].strip()
         qids = literal_eval(s.split("items affected: ")[1])
-        urls = ['<a href="https://www.wikidata.org/wiki/Q{}#{}">Q{}</a>'.format(x, pid, x) for x in qids]
+        urls = ['<a href="https://www.wikidata.org/wiki/{}#{}">{}</a>'.format(x, pid, x) for x in qids]
         return "More than one WD item has the same property value: {}".format(", ".join(urls))
     elif "does not match provided core ID" in s:
         qid = s.split("Retrieved item (")[1].split(")")[0]
