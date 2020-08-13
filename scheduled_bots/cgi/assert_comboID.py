@@ -12,15 +12,8 @@ combo_qid = {x['item']['value'].replace("http://www.wikidata.org/entity/", ""): 
 qid_combo = {v:k for k,v in combo_qid.items()}
 #assert len(combo_qid) == len(qid_combo)
 
-counts = dict()
-for qid in combo_qid.keys():
-    if combo_qid[qid] not in counts.keys():
-        counts[combo_qid[qid]] = 1;
-    else:
-         counts[combo_qid[qid]] += 1
-
-for count in counts.keys():
-    if counts[count]>1:
-        print(count)
-
-pprint.pprint(combo_qid)
+for qid1 in combo_qid.keys():
+    for qid2 in combo_qid.keys():
+        if qid1 != qid2:
+            if combo_qid[qid1] == combo_qid[qid2]:
+                print(qid1, combo_qid[qid1], ":", qid2, combo_qid[qid2])
