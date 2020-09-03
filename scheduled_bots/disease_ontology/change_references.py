@@ -1,6 +1,4 @@
 from wikidataintegrator import wdi_core, wdi_login
-from getpass import getpass
-import pprint
 import os
 
 print("Logging in...")
@@ -37,7 +35,7 @@ for result in results["results"]["bindings"]:
 
 
 for wdid in list_to_curate:
-  disease = wdi_core.WDItemEngine(wd_item_id=wdid)
+  disease = wdi_core.WDItemEngine(wd_item_id=wdid, )
   json = disease.wd_json_representation
   claims = json["claims"]
   for prop in claims.keys():
