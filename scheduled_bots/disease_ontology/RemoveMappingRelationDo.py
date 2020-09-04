@@ -11,7 +11,7 @@ else:
 login = wdi_login.WDLogin(WDUSER, WDPASS)
 
 query = """SELECT DISTINCT ?item ?itemLabel ?mappingrelationLabel WHERE {
-   ?item p:P699 ?s .
+   ?item p:P492 ?s .
    ?s pq:P4390 ?mappingrelation .
    ?s prov:wasDerivedFrom ?references .
    ?references pr:P248 wd:Q5282129 .
@@ -26,7 +26,7 @@ for result in results["results"]["bindings"]:
 for wdid in list_to_curate:
   disease = wdi_core.WDItemEngine(wd_item_id=wdid)
   json = disease.wd_json_representation
-  claims = json["claims"]["P699"]
+  claims = json["claims"]["P492"]
   for value in claims:
     for reference in value['references']:
       if "P248" in reference['snaks'].keys():
