@@ -58,7 +58,7 @@ def create(doid):
     query+= "<"+uri+"> rdfs:subClassOf [ owl:onProperty doid:has_symptom ; owl:someValuesFrom ?symptom ] .} "
 
     for row in doGraph.query(query):
-        #print(soQids[str(row[0])])
+        print(soQids[str(row[0])])
         statements.append(wdi_core.WDItemID(value=soQids[str(row[0])].replace("http://www.wikidata.org/entity/", ""),
                                           prop_nr="P780", references=[copy.deepcopy(do_reference)]))
     query="""PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
@@ -148,5 +148,5 @@ for key in doQids.keys():
 
 for index, row in df_doNative.iterrows():
     doid = row["doid"]
-    create(do)
+    create(doid)
 
