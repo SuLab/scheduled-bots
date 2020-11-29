@@ -5,6 +5,7 @@ from rdflib import Graph, URIRef
 import pandas as pd
 import copy
 from datetime import datetime
+import traceback
 
 print("Logging in...")
 if "WDUSER" in os.environ and "WDPASS" in os.environ:
@@ -46,17 +47,7 @@ def create(doid):
        ?symptom wdt:P8656 ?soid .
     }
     """
-    soQids = {}
-    inwikidata=wdi_core.WDFunctionsEngine.execute_sparql_query(query, as_dataframe=True)
-    for index, row in inwikidata.iterrows():
-        soQids["http://purl.obolibrary.org/obo/SYMP_"+row["soid"]] = row["symptom"]
-    query="""PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
-        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
-
-        SELECT * WHERE {"""
-    query+= "<"+uri+"> rdfs:subClassOf [ owl:onProperty doid:has_symptom ; owl:someValuesFrom ?symptom ] .} "
-
+    global soQids
     for row in doGraph.query(query):
         print(soQids[str(row[0])])
         statements.append(wdi_core.WDItemID(value=soQids[str(row[0])].replace("http://www.wikidata.org/entity/", ""),
@@ -103,50 +94,59 @@ def create(doid):
     item.get_wd_json_representation()
     try_write(item, record_id=doid, record_prop="P699", edit_summary="Updated a Disease Ontology term",
               login=login)
+try:
+    print("\nDownloading the Disease Ontology...")
+    url = "https://raw.githubusercontent.com/DiseaseOntology/HumanDiseaseOntology/main/src/ontology/releases/2020-11-11/doid.owl"
 
-print("\nDownloading the Disease Ontology...")
-url = "https://raw.githubusercontent.com/DiseaseOntology/HumanDiseaseOntology/main/src/ontology/releases/2020-11-11/doid.owl"
+    doGraph = Graph()
+    doGraph.parse(url, format="xml")
 
-doGraph = Graph()
-doGraph.parse(url, format="xml")
+    df_doNative = pd.DataFrame(columns=["do_uri", "doid", "label"])
 
-df_doNative = pd.DataFrame(columns=["do_uri", "doid", "label"])
+    qres = doGraph.query(
+        """
+           PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
+           PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+           PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
+    
+           SELECT DISTINCT ?do_uri ?doid ?label 
+           WHERE {
+              ?do_uri obo:id ?doid ;
+                      rdfs:label ?label .
+    
+           } """)
 
-qres = doGraph.query(
+    for row in qres:
+        df_doNative = df_doNative.append({
+         "do_uri": str(row[0]),
+         "doid": str(row[1]),
+         "label":  str(row[2]),
+          }, ignore_index=True)
+
+    query = """
+      SELECT DISTINCT ?disease ?doid WHERE {?disease  wdt:P699 ?doid .}
     """
-       PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
-       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-       PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
+    df_wd = wdi_core.WDFunctionsEngine.execute_sparql_query(query, as_dataframe=True)
 
-       SELECT DISTINCT ?do_uri ?doid ?label 
-       WHERE {
-          ?do_uri obo:id ?doid ;
-                  rdfs:label ?label .
+    doQids = {}
+    inwikidata=wdi_core.WDFunctionsEngine.execute_sparql_query(query, as_dataframe=True)
+    for index, row in inwikidata.iterrows():
+        doQids[row["doid"]] = row["disease"]
 
-       } """)
+    QidsDo = dict()
+    for key in doQids.keys():
+        QidsDo[doQids[key]] = key
 
-for row in qres:
-    df_doNative = df_doNative.append({
-     "do_uri": str(row[0]),
-     "doid": str(row[1]),
-     "label":  str(row[2]),
-      }, ignore_index=True)
+    soQids = {}
+    inwikidata = wdi_core.WDFunctionsEngine.execute_sparql_query(query, as_dataframe=True)
+    for index, sorow in inwikidata.iterrows():
+        soQids["http://purl.obolibrary.org/obo/SYMP_" + sorow["soid"]] = sorow["symptom"]
 
-query = """
-  SELECT DISTINCT ?disease ?doid WHERE {?disease  wdt:P699 ?doid .}
-"""
-df_wd = wdi_core.WDFunctionsEngine.execute_sparql_query(query, as_dataframe=True)
-
-doQids = {}
-inwikidata=wdi_core.WDFunctionsEngine.execute_sparql_query(query, as_dataframe=True)
-for index, row in inwikidata.iterrows():
-    doQids[row["doid"]] = row["disease"]
-
-QidsDo = dict()
-for key in doQids.keys():
-    QidsDo[doQids[key]] = key
-
-for index, row in df_doNative.iterrows():
-    doid = row["doid"]
-    create(doid)
+    for index, row in df_doNative.iterrows():
+        doid = row["doid"]
+        create(doid)
+except Exception as e:
+    traceback.print_exc()
+    wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(
+        doid, "P699", None, str(e), type(e)))
 
