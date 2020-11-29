@@ -30,6 +30,7 @@ def createIORef():
     return [statedin, referenceURL]
 
 def create(doid):
+    global soQids
     do_reference = createDOReference(doid)
     identorg_reference = createIORef()
     tuple = df_doNative[df_doNative["doid"]==doid]
@@ -42,12 +43,14 @@ def create(doid):
     # identifiers.org URI
     statements.append(wdi_core.WDUrl("http://identifiers.org/doid/"+dorow["doid"], prop_nr="P2888", references=[copy.deepcopy(identorg_reference)]))
     uri = str(dorow["do_uri"])
-    query = """
-    SELECT ?symptom ?soid WHERE {
-       ?symptom wdt:P8656 ?soid .
-    }
-    """
-    global soQids
+
+    query = """PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
+
+            SELECT * WHERE {"""
+    query += "<" + uri + "> rdfs:subClassOf [ owl:onProperty doid:has_symptom ; owl:someValuesFrom ?symptom ] .} "
+
     for row in doGraph.query(query):
         print(soQids[str(row[0])])
         statements.append(wdi_core.WDItemID(value=soQids[str(row[0])].replace("http://www.wikidata.org/entity/", ""),
@@ -94,6 +97,8 @@ def create(doid):
     item.get_wd_json_representation()
     try_write(item, record_id=doid, record_prop="P699", edit_summary="Updated a Disease Ontology term",
               login=login)
+
+
 try:
     print("\nDownloading the Disease Ontology...")
     url = "https://raw.githubusercontent.com/DiseaseOntology/HumanDiseaseOntology/main/src/ontology/releases/2020-11-11/doid.owl"
@@ -138,6 +143,12 @@ try:
         QidsDo[doQids[key]] = key
 
     soQids = {}
+    query = """
+    SELECT ?symptom ?symptomLabel ?soid WHERE {
+       ?symptom wdt:P8656 ?soid .
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+    }
+    """
     inwikidata = wdi_core.WDFunctionsEngine.execute_sparql_query(query, as_dataframe=True)
     for index, sorow in inwikidata.iterrows():
         soQids["http://purl.obolibrary.org/obo/SYMP_" + sorow["soid"]] = sorow["symptom"]
@@ -147,6 +158,5 @@ try:
         create(doid)
 except Exception as e:
     traceback.print_exc()
-    wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg(
-        doid, "P699", None, str(e), type(e)))
+    wdi_core.WDItemEngine.log("ERROR", wdi_helpers.format_msg("Foutje", "P699", None, str(e), type(e)))
 
