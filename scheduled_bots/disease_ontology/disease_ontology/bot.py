@@ -52,7 +52,8 @@ def create(doid):
     query += "<" + uri + "> rdfs:subClassOf [ owl:onProperty doid:has_symptom ; owl:someValuesFrom ?symptom ] .} "
 
     for row in doGraph.query(query):
-        print(soQids[str(row[0])])
+        if str(row[0]) not in soQids.keys():
+            continue
         statements.append(wdi_core.WDItemID(value=soQids[str(row[0])].replace("http://www.wikidata.org/entity/", ""),
                                           prop_nr="P780", references=[copy.deepcopy(do_reference)]))
     query="""PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
