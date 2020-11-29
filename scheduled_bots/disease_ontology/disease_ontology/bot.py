@@ -1,4 +1,4 @@
-from wikidataintegrator import wdi_core, wdi_login
+from wikidataintegrator import wdi_core, wdi_login, wdi_helpers
 from wikidataintegrator.wdi_helpers import try_write
 import os
 from rdflib import Graph, URIRef
