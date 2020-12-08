@@ -75,7 +75,7 @@ def create(doid):
     for row in doGraph.query(query):
         extID = row[0]
         if "MESH:" in extID:
-            statements.append(wdi_core.WDExternalID(row["exactMatch"].replace("MESH", ""), prop_nr="P486", references=[copy.deepcopy(do_reference)]))
+            statements.append(wdi_core.WDExternalID(row["exactMatch"].replace("MESH:", ""), prop_nr="P486", references=[copy.deepcopy(do_reference)]))
         if "NCI:" in extID:
             statements.append(wdi_core.WDExternalID(row["exactMatch"], prop_nr="P1748", references=[copy.deepcopy(do_reference)]))
         if "ICD10CM:" in extID:
