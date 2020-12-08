@@ -30,8 +30,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
-# import ssl
-# ssl._create_default_https_context = ssl._create_unverified_context
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 import os 
 import copy 
@@ -53,9 +53,9 @@ login = wdi_login.WDLogin(WDUSER, WDPASS)
 
 # ClinGen gene-disease validity data
 ### Read as csv
-df = pd.read_csv('https://search.clinicalgenome.org/kb/gene-validity.csv', skiprows=6, header=None)  
+df = pd.read_csv('https://search.clinicalgenome.org/kb/gene-validity.csv', skiprows=6, header=None)
 
-df = new.drop(columns=[9]) # temporary fix
+df = df.drop(columns=[9]) # temporary fix
 
 ### Label column headings
 df.columns = ['Gene', 'HGNC Gene ID', 'Disease', 'MONDO Disease ID','Inheritance','SOP','Classification','Report Reference URL','Report Date']
