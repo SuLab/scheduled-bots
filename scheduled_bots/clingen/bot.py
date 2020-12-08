@@ -55,6 +55,8 @@ login = wdi_login.WDLogin(WDUSER, WDPASS)
 ### Read as csv
 df = pd.read_csv('https://search.clinicalgenome.org/kb/gene-validity.csv', skiprows=6, header=None)  
 
+df = new.drop(columns=[9]) # temporary fix
+
 ### Label column headings
 df.columns = ['Gene', 'HGNC Gene ID', 'Disease', 'MONDO Disease ID', 'Inheritance', 'SOP','Classification','Report Reference URL','Report Date']
 
@@ -77,6 +79,11 @@ def create_reference():
         return [refStatedIn, refRetrieved, refURL]
 
 # For loop that executes the following through each row of the dataframe
+
+# Write input to a .csv file
+now = datetime.now()
+# Includes hour:minute:second_dd-mm-yyyy time stamp (https://en.wikipedia.org/wiki/ISO_8601)
+df.to_csv("ClinGenBot_Data-Input_" + now.isoformat() + ".csv")  # isoformat
 
 start_time = time.time() # Keep track of how long it takes loop to run
 
@@ -162,6 +169,5 @@ print("The total time of this loop is:", end_time - start_time, "seconds, or", (
 
 # Write output to a .csv file
 now = datetime.now()
-
 # Includes hour:minute:second_dd-mm-yyyy time stamp (https://en.wikipedia.org/wiki/ISO_8601)
 df.to_csv("ClinGenBot_Status-Output_" + now.isoformat() + ".csv")  # isoformat
