@@ -13,8 +13,6 @@
 
 ### Python script contributions, in order: Sabah Ul-Hasan, Andra Waagmeester, Andrew Su, Ginger Tsueng
 
-
-
 # Relevant modules and libraries
 ### Installations by shell 
 #get_ipython().system("pip install --upgrade pip")
