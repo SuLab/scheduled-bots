@@ -51,7 +51,7 @@ login = wdi_login.WDLogin(WDUSER, WDPASS)
 
 # ClinGen gene-disease validity data
 ### Read as csv
-df = pd.read_csv('https://search.clinicalgenome.org/kb/gene-validity.csv', skiprows=6, header=None)
+df = pd.read_csv('https://search.clinicalgenome.org/kb/gene-validity/download', skiprows=6, header=None)
 
 df = df.drop(columns=[4,9]) # temporary fix
 
