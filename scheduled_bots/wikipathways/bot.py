@@ -231,7 +231,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
         qres4 = temp.query(query)
         p = re.compile('^[0-9]+$')
         for pubmed_result in qres4:
-            pmid = str(pubmed_result[0]).replace("http://identifiers.org/pubmed/", "").replace("http://identifiers.org/pubmed/", "")
+            pmid = str(pubmed_result[0]).replace("http://identifiers.org/pubmed/", "").replace("https://identifiers.org/pubmed/", "")
             print(pmid)
             m = p.match(pmid)
 
