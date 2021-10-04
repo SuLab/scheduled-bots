@@ -31,6 +31,7 @@ def createIORef():
     return [statedin, referenceURL]
 
 def create(doid):
+    print(doid)
     if doid in doQids.keys():
         qid = doQids[doid].replace("http://www.wikidata.org/entity/", "")
         item = wdi_core.WDItemEngine(wd_item_id=qid)

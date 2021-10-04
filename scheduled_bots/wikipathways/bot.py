@@ -9,9 +9,7 @@ import zipfile
 import io
 from contextlib import closing
 from bs4 import BeautifulSoup, SoupStrainer
-from SPARQLWrapper import SPARQLWrapper, JSON
 import re
-import tqdm
 import requests
 import sys
 # from scheduled
