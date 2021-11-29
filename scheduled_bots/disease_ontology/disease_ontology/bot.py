@@ -31,7 +31,6 @@ def createIORef():
     return [statedin, referenceURL]
 
 def create(doid):
-    print(doid)
     if doid in doQids.keys():
         qid = doQids[doid].replace("http://www.wikidata.org/entity/", "")
         item = wdi_core.WDItemEngine(wd_item_id=qid)
@@ -117,13 +116,13 @@ def create(doid):
                 curation_report[qid] = postcheck["reason"]
             else:
                 doQids[doid].replace("http://www.wikidata.org/entity/", "")
-                #try_write(item, record_id=doid, record_prop="P699", edit_summary="Updated a Disease Ontology term",
-                #          login=login)
+                try_write(item, record_id=doid, record_prop="P699", edit_summary="Updated a Disease Ontology term",
+                          login=login)
 
 
 try:
     print("\nDownloading the Disease Ontology...")
-    url = "https://raw.githubusercontent.com/DiseaseOntology/HumanDiseaseOntology/v2021-08-17/src/ontology/doid.owl"
+    url = "https://raw.githubusercontent.com/DiseaseOntology/HumanDiseaseOntology/main/src/ontology/doid.owl"
 
     doGraph = Graph()
     doGraph.parse(url, format="xml")
@@ -140,7 +139,7 @@ try:
            WHERE {
               ?do_uri obo:id ?doid ;
                       rdfs:label ?label .
-    
+              FILTER NOT EXISTS {?do_uri <http://www.w3.org/2002/07/owl#deprecated> ?value .}
            } """)
 
     for row in qres:
@@ -174,10 +173,10 @@ try:
     inwikidata = wdi_core.WDFunctionsEngine.execute_sparql_query(query, as_dataframe=True)
     for index, sorow in inwikidata.iterrows():
         soQids["http://purl.obolibrary.org/obo/SYMP_" + sorow["soid"]] = sorow["symptom"]
-
     for index, row in df_doNative.iterrows():
         doid = row["doid"]
         create(doid)
+        print(doid)
 
 except Exception as e:
     traceback.print_exc()
