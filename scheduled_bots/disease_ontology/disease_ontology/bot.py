@@ -102,7 +102,7 @@ def create(doid):
 
 try:
     print("\nDownloading the Disease Ontology...")
-    url = "https://raw.githubusercontent.com/DiseaseOntology/HumanDiseaseOntology/main/src/ontology/releases/2020-11-11/doid.owl"
+    url = "https://raw.githubusercontent.com/DiseaseOntology/HumanDiseaseOntology/main/src/ontology/doid.owl"
 
     doGraph = Graph()
     doGraph.parse(url, format="xml")

@@ -19,7 +19,7 @@ protein_query = """SELECT * WHERE {
                  ?P352node ps:P352 ?uniprot ;
                        psn:P352 ?uniprot_uri .
                  FILTER NOT EXISTS {?protein wdt:P2888 ?skos .}
-                 } LIMIT 10"""
+                 } LIMIT 1000 """
 df = wdi_core.WDFunctionsEngine.execute_sparql_query(query=protein_query, as_dataframe=True)
 
 
