@@ -9,9 +9,7 @@ import zipfile
 import io
 from contextlib import closing
 from bs4 import BeautifulSoup, SoupStrainer
-from SPARQLWrapper import SPARQLWrapper, JSON
 import re
-import tqdm
 import requests
 import sys
 # from scheduled
@@ -212,7 +210,8 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
         prep["P2410"] = [wdi_core.WDString(pathway_id, prop_nr='P2410', references=[copy.deepcopy(pathway_reference)])]
 
         # P2888 = exact match
-        prep["P2888"] = [wdi_core.WDUrl("http://identifiers.org/wikipathways/" + pw_id, prop_nr='P2888',
+        prep["P2888"] = [wdi_core.WDUrl("https://identifiers.org/wikipathways/" + pw_id, prop_nr='P2888',
+                                        references=[copy.deepcopy(pathway_reference)]), wdi_core.WDUrl("http://identifiers.org/wikipathways/" + pw_id, prop_nr='P2888',
                                         references=[copy.deepcopy(pathway_reference)])]
 
         query = """
@@ -231,7 +230,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
         qres4 = temp.query(query)
         p = re.compile('^[0-9]+$')
         for pubmed_result in qres4:
-            pmid = str(pubmed_result[0]).replace("http://identifiers.org/pubmed/", "")
+            pmid = str(pubmed_result[0]).replace("http://identifiers.org/pubmed/", "").replace("https://identifiers.org/pubmed/", "")
             print(pmid)
             m = p.match(pmid)
 
@@ -253,7 +252,7 @@ def run_one(pathway_id, retrieved, fast_run, write, login, temp):
                 PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
                 SELECT ?author ?authorName ?authorHomepage ?authorQIRI
                 WHERE {
-                  <http://identifiers.org/wikipathways/""" + pathway_id + """> dc:creator ?author .
+                  <https://identifiers.org/wikipathways/""" + pathway_id + """> dc:creator ?author .
                   ?author a                    foaf:Person ;
                   foaf:name            ?authorName ;
                   foaf:homepage            ?authorHomepage .
@@ -414,7 +413,7 @@ def get_PathwayElements(pathway, datatype, temp, prep):
     else:
         for row in qres2:
             ids.append("\"" + str(row[2]).replace("http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID", "").replace(
-                "http://identifiers.org/ncbigene/", "") + "\"")
+                "https://identifiers.org/ncbigene/", "") + "\"")
 
 
     # Check for existence of the ids in wikidata
