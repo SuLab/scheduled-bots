@@ -118,6 +118,8 @@ def create(doid):
                 doQids[doid].replace("http://www.wikidata.org/entity/", "")
                 try_write(item, record_id=doid, record_prop="P699", edit_summary="Updated a Disease Ontology term",
                           login=login)
+    else:
+
 
 
 try:
