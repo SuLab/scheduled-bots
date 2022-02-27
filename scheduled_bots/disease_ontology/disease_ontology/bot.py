@@ -31,94 +31,102 @@ def createIORef():
     return [statedin, referenceURL]
 
 def create(doid):
-    if doid in doQids.keys():
+    if doid in doQids.keys(): # check if the DOID is already in wikidata
         qid = doQids[doid].replace("http://www.wikidata.org/entity/", "")
-        item = wdi_core.WDItemEngine(wd_item_id=qid)
+        item = wdi_core.WDItemEngine(wd_item_id=qid) # get the json for the item to evaluate with ShEx
         precheck = item.check_entity_schema(eid="E323", output="result")
         if not precheck["result"]:
             wdi_core.WDItemEngine.log("ERROR", "Updating "+qid+" was skipped before updating, it does not fit the EntitySchema provided")
             wdi_core.WDItemEngine.log("ERROR", qid + precheck["reason"])
-        else: # if precheck = true
-            global soQids
-            do_reference = createDOReference(doid)
-            identorg_reference = createIORef()
-            tuple = df_doNative[df_doNative["doid"]==doid]
+            return # The item has some issues, skip it
 
-            dorow = tuple.iloc[0]
-            statements = []
-            # Disease Ontology ID (P31)
-            statements.append(wdi_core.WDString(value=dorow["doid"], prop_nr="P699", references=[copy.deepcopy(do_reference)]))
-            # exact match (P2888)
-            statements.append(wdi_core.WDUrl(value=dorow["do_uri"], prop_nr="P2888", references=[copy.deepcopy(do_reference)]))
-            # identifiers.org URI
-            statements.append(wdi_core.WDUrl("http://identifiers.org/doid/"+dorow["doid"], prop_nr="P2888", references=[copy.deepcopy(identorg_reference)]))
-            uri = str(dorow["do_uri"])
+    global soQids
+    do_reference = createDOReference(doid) # create the reference to the DOID
+    identorg_reference = createIORef() # create the reference to the Identifier.org
 
-            query = """PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
-                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                    PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
-        
-                    SELECT * WHERE {"""
-            query += "<" + uri + "> rdfs:subClassOf [ owl:onProperty doid:has_symptom ; owl:someValuesFrom ?symptom ] .} "
+    # Select the data from DO to update in Wikidata which is stored in a pandas dataframe
+    tuple = df_doNative[df_doNative["doid"]==doid] # get the row of the dataframe with the DOID
+    dorow = tuple.iloc[0]
 
-            for row in doGraph.query(query):
-                if str(row[0]) not in soQids.keys():
-                    continue
-                statements.append(wdi_core.WDItemID(value=soQids[str(row[0])].replace("http://www.wikidata.org/entity/", ""),
-                                                  prop_nr="P780", references=[copy.deepcopy(do_reference)]))
-            query="""PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
-                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
-        
-                SELECT ?subClassOf WHERE {"""
-            query+= "<"+uri+"> rdfs:subClassOf ?subClassOf .  FILTER (REGEX(str(?subClassOf), 'http', 'i'))} "
+    # prepare the statement to update
+    statements = []
+    # Disease Ontology ID (P31)
+    statements.append(wdi_core.WDString(value=dorow["doid"], prop_nr="P699", references=[copy.deepcopy(do_reference)]))
+    # exact match (P2888)
+    statements.append(wdi_core.WDUrl(value=dorow["do_uri"], prop_nr="P2888", references=[copy.deepcopy(do_reference)]))
+    # identifiers.org URI
+    statements.append(wdi_core.WDUrl("http://identifiers.org/doid/"+dorow["doid"], prop_nr="P2888", references=[copy.deepcopy(identorg_reference)]))
+    uri = str(dorow["do_uri"])
 
-            for row in doGraph.query(query):
-                if row[0].replace("http://purl.obolibrary.org/obo/DOID_", "DOID:") not in doQids.keys():
-                    doQids[row[0].replace("http://purl.obolibrary.org/obo/DOID_", "DOID:")] = create(row[0].replace("http://purl.obolibrary.org/obo/DOID_", "DOID:"))
-                if not (row[0] is None):
-                    try:
-                        statements.append(wdi_core.WDItemID(value=doQids[row[0].replace("http://purl.obolibrary.org/obo/DOID_", "DOID:")].replace("http://www.wikidata.org/entity/", ""),
-                                                   prop_nr="P279", references=[copy.deepcopy(do_reference)]))
-                    except:
-                        print("doQids is empty for: "+ row[0])
-            query="""PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-        
-                SELECT ?exactMatch WHERE {"""
-            query+= "<"+uri+"> skos:exactMatch ?exactMatch .}"
-            for row in doGraph.query(query):
-                extID = row[0]
-                # if "MESH:" in extID:
-                #    statements.append(wdi_core.WDExternalID(row["exactMatch"].replace("MESH:", ""), prop_nr="P486", references=[copy.deepcopy(do_reference)]))
-                if "NCI:" in extID:
-                    statements.append(wdi_core.WDExternalID(row["exactMatch"], prop_nr="P1748", references=[copy.deepcopy(do_reference)]))
-                if "ICD10CM:" in extID:
-                    statements.append(wdi_core.WDExternalID(row["exactMatch"], prop_nr="P4229", references=[copy.deepcopy(do_reference)]))
-                if "UMLS_CUI:" in extID:
-                    statements.append(wdi_core.WDExternalID(row["exactMatch"], prop_nr="P2892", references=[copy.deepcopy(do_reference)]))
+    query = """PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
 
-            item = wdi_core.WDItemEngine(wd_item_id=qid, data=statements, keep_good_ref_statements=True)
-            post_item_json = item.get_wd_json_representation()
+            SELECT * WHERE {"""
+    query += "<" + uri + "> rdfs:subClassOf [ owl:onProperty doid:has_symptom ; owl:someValuesFrom ?symptom ] .} "
 
-            if item.get_label() == "":
-                item.set_label(dorow["label"], lang="en")
-                if item.get_description() == "":
-                    item.set_description("human disease", lang="en")
-            elif item.get_label() != dorow["label"]:
-                aliases = item.get_aliases()
-                if dorow["label"] not in aliases:
-                    aliases.append(dorow["label"])
-                    item.set_aliases(aliases)
-            postcheck = item.check_entity_schema(eid="E323")
-            if not postcheck:
-                wdi_core.WDItemEngine.log("ERROR",
-                                          "Writing " + qid + " was skipped after updating, it does not fit the EntitySchema provided")
-                curation_report[qid] = postcheck["reason"]
-            else:
-                doQids[doid].replace("http://www.wikidata.org/entity/", "")
-                try_write(item, record_id=doid, record_prop="P699", edit_summary="Updated a Disease Ontology term",
-                          login=login)
+    # symptoms
+    for row in doGraph.query(query):
+        if str(row[0]) not in soQids.keys():
+            continue
+        statements.append(wdi_core.WDItemID(value=soQids[str(row[0])].replace("http://www.wikidata.org/entity/", ""),
+                                          prop_nr="P780", references=[copy.deepcopy(do_reference)]))
+
+    query="""PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
+
+        SELECT ?subClassOf WHERE {"""
+    query+= "<"+uri+"> rdfs:subClassOf ?subClassOf .  FILTER (REGEX(str(?subClassOf), 'http', 'i'))} "
+
+    #subclass of
+    for row in doGraph.query(query):
+        if row[0].replace("http://purl.obolibrary.org/obo/DOID_", "DOID:") not in doQids.keys():
+            doQids[row[0].replace("http://purl.obolibrary.org/obo/DOID_", "DOID:")] = create(row[0].replace("http://purl.obolibrary.org/obo/DOID_", "DOID:"))
+        if not (row[0] is None):
+            try:
+                statements.append(wdi_core.WDItemID(value=doQids[row[0].replace("http://purl.obolibrary.org/obo/DOID_", "DOID:")].replace("http://www.wikidata.org/entity/", ""),
+                                           prop_nr="P279", references=[copy.deepcopy(do_reference)]))
+            except:
+                print("doQids is empty for: "+ row[0])
+    query="""PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+
+        SELECT ?exactMatch WHERE {"""
+    query+= "<"+uri+"> skos:exactMatch ?exactMatch .}"
+    for row in doGraph.query(query):
+        extID = row[0]
+        # if "MESH:" in extID:
+        #    statements.append(wdi_core.WDExternalID(row["exactMatch"].replace("MESH:", ""), prop_nr="P486", references=[copy.deepcopy(do_reference)]))
+        if "NCI:" in extID:
+            statements.append(wdi_core.WDExternalID(row["exactMatch"], prop_nr="P1748", references=[copy.deepcopy(do_reference)]))
+        if "ICD10CM:" in extID:
+            statements.append(wdi_core.WDExternalID(row["exactMatch"], prop_nr="P4229", references=[copy.deepcopy(do_reference)]))
+        if "UMLS_CUI:" in extID:
+            statements.append(wdi_core.WDExternalID(row["exactMatch"], prop_nr="P2892", references=[copy.deepcopy(do_reference)]))
+
+    # refetch the item from Wikidata to add the prepared statements to it and write back to wikidata
+    item = wdi_core.WDItemEngine(wd_item_id=qid, data=statements, keep_good_ref_statements=True)
+    if item.get_label() == "":
+        item.set_label(dorow["label"], lang="en")
+        if item.get_description() == "":
+            item.set_description("human disease", lang="en")
+    elif item.get_label() != dorow["label"]:
+        aliases = item.get_aliases()
+        if dorow["label"] not in aliases:
+            aliases.append(dorow["label"])
+            item.set_aliases(aliases)
+
+    # Recheck the updated item with ShEx before update to Wikidata
+    postcheck = item.check_entity_schema(eid="E323")
+    if not postcheck:
+        wdi_core.WDItemEngine.log("ERROR Writing " + qid + " was skipped after updating, it does not fit the EntitySchema provided")
+        curation_report[qid] = postcheck["reason"]
     else:
+        # doQids[doid].replace("http://www.wikidata.org/entity/", "")
+        try_write(item, record_id=doid, record_prop="P699", edit_summary="Updated a Disease Ontology term",
+                  login=login)
+        doQids[doid] = item.wd_item_id
+
 
 
 
@@ -179,6 +187,7 @@ try:
         doid = row["doid"]
         create(doid)
         print(doid)
+        sys.exit()
 
 except Exception as e:
     traceback.print_exc()
