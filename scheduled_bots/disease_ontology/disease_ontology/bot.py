@@ -123,11 +123,13 @@ def create(doid):
             item.set_aliases(aliases)
 
     # Recheck the updated item with ShEx before update to Wikidata
-    postcheck = item.check_entity_schema(eid="E323")
-    if not postcheck:
-        wdi_core.WDItemEngine.log("ERROR Writing " + qid + " was skipped after updating, it does not fit the EntitySchema provided")
-        curation_report[qid] = postcheck["reason"]
+    if qid:
+        postcheck = item.check_entity_schema(eid="E323")
+        if not postcheck:
+            wdi_core.WDItemEngine.log("ERROR Writing " + qid + " was skipped after updating, it does not fit the EntitySchema provided")
+            curation_report[qid] = postcheck["reason"]
     else:
+
         # doQids[doid].replace("http://www.wikidata.org/entity/", "")
         try_write(item, record_id=doid, record_prop="P699", edit_summary="Updated a Disease Ontology term",
                   login=login)
