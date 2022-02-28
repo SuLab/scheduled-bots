@@ -134,8 +134,7 @@ def create(doid):
         try_write(item, record_id=doid, record_prop="P699", edit_summary="Updated a Disease Ontology term",
                   login=login)
         doQids[doid] = item.wd_item_id
-        sys.exit("stopped to test")
-
+        print(doQids[doid])
 
 
 
@@ -195,7 +194,7 @@ try:
     for index, row in df_doNative.iterrows():
         doid = row["doid"]
         create(doid)
-        print(doid)
+        #print(doid)
 
 except Exception as e:
     traceback.print_exc()
