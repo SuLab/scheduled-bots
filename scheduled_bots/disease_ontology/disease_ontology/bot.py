@@ -32,15 +32,18 @@ def createIORef():
 
 def create(doid):
     if doid in doQids.keys(): # check if the DOID is already in wikidata
+        qid = doQids[doid].replace("http://www.wikidata.org/entity/", "")
         return
 
-        qid = doQids[doid].replace("http://www.wikidata.org/entity/", "")
+
         item = wdi_core.WDItemEngine(wd_item_id=qid) # get the json for the item to evaluate with ShEx
         precheck = item.check_entity_schema(eid="E323", output="result")
         if not precheck["result"]:
             wdi_core.WDItemEngine.log("ERROR", "Updating "+qid+" was skipped before updating, it does not fit the EntitySchema provided")
             wdi_core.WDItemEngine.log("ERROR", qid + precheck["reason"])
             return # The item has some issues, skip it
+    else:
+        qid = None
 
     global soQids
     do_reference = createDOReference(doid) # create the reference to the DOID
@@ -107,7 +110,8 @@ def create(doid):
             statements.append(wdi_core.WDExternalID(row["exactMatch"], prop_nr="P2892", references=[copy.deepcopy(do_reference)]))
 
     # refetch the item from Wikidata to add the prepared statements to it and write back to wikidata
-    item = wdi_core.WDItemEngine(wd_item_id=qid, data=statements, keep_good_ref_statements=True)
+    item = wdi_core.WDItemEngine(data=statements, keep_good_ref_statements=True)
+
     if item.get_label() == "":
         item.set_label(dorow["label"], lang="en")
         if item.get_description() == "":
