@@ -6,7 +6,7 @@ import pandas as pd
 import copy
 from datetime import datetime
 import traceback
-import json
+import sys
 
 print("Logging in...")
 if "WDUSER" in os.environ and "WDPASS" in os.environ:
@@ -32,6 +32,8 @@ def createIORef():
 
 def create(doid):
     if doid in doQids.keys(): # check if the DOID is already in wikidata
+        return
+
         qid = doQids[doid].replace("http://www.wikidata.org/entity/", "")
         item = wdi_core.WDItemEngine(wd_item_id=qid) # get the json for the item to evaluate with ShEx
         precheck = item.check_entity_schema(eid="E323", output="result")
@@ -126,6 +128,7 @@ def create(doid):
         try_write(item, record_id=doid, record_prop="P699", edit_summary="Updated a Disease Ontology term",
                   login=login)
         doQids[doid] = item.wd_item_id
+        sys.exit("stopped to test")
 
 
 
@@ -187,7 +190,6 @@ try:
         doid = row["doid"]
         create(doid)
         print(doid)
-        sys.exit()
 
 except Exception as e:
     traceback.print_exc()
