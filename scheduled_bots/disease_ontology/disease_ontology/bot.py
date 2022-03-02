@@ -33,9 +33,6 @@ def createIORef():
 def create(doid):
     if doid in doQids.keys(): # check if the DOID is already in wikidata
         qid = doQids[doid].replace("http://www.wikidata.org/entity/", "")
-        return
-
-
         item = wdi_core.WDItemEngine(wd_item_id=qid) # get the json for the item to evaluate with ShEx
         precheck = item.check_entity_schema(eid="E323", output="result")
         if not precheck["result"]:
